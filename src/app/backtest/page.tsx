@@ -113,17 +113,15 @@ export default function BacktestPage() {
                 onChange={handleInputChange}
                 disabled={isLoading}
               >
-                <option value="SOXL">SOXL (반도체 3배)</option>
-                <option value="TQQQ">TQQQ (나스닥 3배)</option>
-                <option value="BITU">BITU (비트코인 2배)</option>
-                <option value="TECL">TECL (기술주 3배)</option>
+                <option value="SOXL">SOXL</option>
+                <option value="TQQQ">TQQQ</option>
               </select>
             </div>
 
             {/* 모드 선택 */}
             <div className="col-12 col-md-6">
               <label htmlFor="mode" className="form-label">
-                전략 모드
+                Pro/Custom
               </label>
               <select
                 className="form-select"
@@ -133,8 +131,8 @@ export default function BacktestPage() {
                 onChange={handleInputChange}
                 disabled={isLoading}
               >
-                <option value="Pro">Pro (추천 전략)</option>
-                <option value="Custom">Custom (사용자 정의)</option>
+                <option value="Pro">Pro</option>
+                <option value="Custom">Custom</option>
               </select>
             </div>
 
