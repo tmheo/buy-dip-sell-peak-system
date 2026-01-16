@@ -1,0 +1,208 @@
+/* 떨사오팔 Pro 레이더 - Global Styles */
+
+/* CSS Variables */
+:root {
+  --price-up: #ff5370;
+  --price-down: #26c6da;
+  --font-family: "Noto Sans KR", sans-serif;
+}
+
+/* Global Font */
+body {
+  font-family: var(--font-family);
+}
+
+/* Sidebar Styles */
+#fixedSidebar {
+  position: fixed;
+  top: 120px;
+  right: 20px;
+  width: 320px;
+  z-index: 1000;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+#fixedSidebar .card {
+  background-color: rgba(0, 43, 54, 0.95);
+  border: 1px solid #073642;
+}
+
+#fixedSidebar .table {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+}
+
+#fixedSidebar .table td,
+#fixedSidebar .table th {
+  padding: 0.5rem;
+}
+
+/* Price Colors */
+.price-up {
+  color: var(--price-up);
+}
+
+.price-down {
+  color: var(--price-down);
+}
+
+/* Flowchart Styles */
+.flowchart-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+  padding: 1rem 0;
+}
+
+.flowchart-step {
+  background-color: #073642;
+  border: 2px solid #2aa198;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  text-align: center;
+  min-width: 150px;
+  color: #93a1a1;
+}
+
+.flowchart-step .step-number {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #2aa198;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.flowchart-step .step-text {
+  font-size: 0.9rem;
+}
+
+.flowchart-arrow {
+  font-size: 2rem;
+  color: #2aa198;
+  padding: 0 0.5rem;
+}
+
+/* Strategy Card */
+.strategy-card {
+  height: 100%;
+}
+
+.strategy-card .card-header {
+  font-weight: bold;
+  text-align: center;
+}
+
+.strategy-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.strategy-settings .setting-item {
+  background-color: #073642;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Split Ratio Display */
+.split-ratio {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.split-ratio .ratio-part {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.split-ratio .ratio-cash {
+  background-color: #2aa198;
+  color: #002b36;
+}
+
+.split-ratio .ratio-invest {
+  background-color: #d33682;
+  color: #fff;
+}
+
+/* Main Content Area */
+.main-content {
+  margin-right: 360px;
+  padding: 1rem;
+}
+
+/* Navigation Active State */
+.nav-link.active {
+  background-color: #073642 !important;
+  border-color: #2aa198 !important;
+}
+
+/* Responsive Styles */
+@media (max-width: 1700px) {
+  #fixedSidebar {
+    display: none;
+  }
+
+  .main-content {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .flowchart-container {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .flowchart-arrow {
+    transform: rotate(90deg);
+    padding: 0.25rem 0;
+  }
+
+  .flowchart-step {
+    min-width: 100%;
+  }
+
+  .strategy-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .main-content {
+    padding: 0.5rem;
+  }
+
+  .container-fluid {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  display: none;
+}
+
+.loading-spinner.show {
+  display: inline-block;
+}
+
+/* Section Spacing */
+.info-section {
+  margin-bottom: 2rem;
+}
+
+.info-section h2 {
+  color: #2aa198;
+  border-bottom: 2px solid #2aa198;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}

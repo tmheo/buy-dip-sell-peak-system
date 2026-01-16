@@ -107,6 +107,53 @@ Yahoo Finance API → dataFetcher (재시도/파싱) → database (트랜잭션)
 - **증분 업데이트**: 마지막 저장 날짜 이후 데이터만 다운로드
 - **멀티 티커 지원**: SOXL, TQQQ 동시 관리
 
+---
+
+## 프론트엔드
+
+### 개발 서버 실행
+
+```bash
+# 프론트엔드 개발 서버 시작
+npm run web:dev
+```
+
+개발 서버는 http://localhost:3000 에서 실행됩니다.
+
+### 프론트엔드 프로젝트 구조
+
+```
+src/
+├── app/                          # Next.js App Router 페이지
+│   ├── layout.tsx                # 루트 레이아웃 (CDN, 메타데이터)
+│   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
+│   ├── info/
+│   │   └── page.tsx              # Info 페이지 (전략 설명)
+│   └── backtest/
+│       └── page.tsx              # Backtest 페이지 (백테스트 폼)
+├── components/                   # React 공통 컴포넌트
+│   ├── TopControlBar.tsx         # 상단 컨트롤 바
+│   ├── MainNavigation.tsx        # 메인 네비게이션
+│   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가)
+│   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
+│   ├── FlowChart.tsx             # 사용법 플로우차트
+│   └── PremiumModal.tsx          # 프리미엄 모달
+└── styles/
+    └── globals.css               # 글로벌 스타일 + 커스텀 CSS
+```
+
+### 프론트엔드 기술 스택
+
+| 항목 | 버전 | 비고 |
+|------|------|------|
+| Next.js | 15 (App Router) | React 프레임워크 |
+| React | 19 | UI 라이브러리 |
+| Bootstrap | 5.3.3 | CSS 프레임워크 |
+| Bootswatch Solar | 5.3.3 | 다크 테마 |
+| Google Fonts | Noto Sans KR | 한글 폰트 |
+
+---
+
 ## 라이선스
 
 MIT
