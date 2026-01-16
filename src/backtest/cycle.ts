@@ -106,8 +106,15 @@ export class CycleManager {
    * @param buyPrice - 매수 체결가
    * @param shares - 매수 수량
    * @param date - 매수 체결일
+   * @param dayIndex - 매수 시점의 거래일 인덱스
    */
-  activateTier(tier: number, buyPrice: number, shares: number, date: string): void {
+  activateTier(
+    tier: number,
+    buyPrice: number,
+    shares: number,
+    date: string,
+    dayIndex: number
+  ): void {
     const cost = buyPrice * shares;
     this.cash -= cost;
     this.hasTraded = true;
@@ -120,6 +127,7 @@ export class CycleManager {
       buyPrice,
       shares,
       buyDate: date,
+      buyDayIndex: dayIndex,
       sellLimitPrice,
     });
   }
@@ -155,12 +163,35 @@ export class CycleManager {
   }
 
   /**
-   * REQ-006: 손절일 도달 여부 확인
+   * REQ-006: 손절일 도달 여부 확인 (사이클 전체 기준 - deprecated)
    *
    * @returns 손절일 이상이면 true
+   * @deprecated 각 티어별 손절일 확인은 getTiersAtStopLossDay 사용
    */
   isStopLossDay(): boolean {
     return this.dayCount >= this.strategy.stopLossDay;
+  }
+
+  /**
+   * REQ-006: 현재 거래일 기준으로 손절일에 도달한 티어 목록 반환
+   * 각 티어의 매수 거래일로부터 손절일이 경과한 티어만 반환 (거래일 기준)
+   *
+   * @param currentDayIndex - 현재 거래일 인덱스
+   * @returns 손절일에 도달한 티어 목록
+   */
+  getTiersAtStopLossDay(currentDayIndex: number): TierState[] {
+    const result: TierState[] = [];
+
+    for (const tier of this.tiers.values()) {
+      // 보유일 계산: (현재 거래일 - 매수 거래일) + 1 (매수 당일 = 1일)
+      const holdingDays = currentDayIndex - tier.buyDayIndex + 1;
+
+      if (holdingDays >= this.strategy.stopLossDay) {
+        result.push(tier);
+      }
+    }
+
+    return result;
   }
 
   /**

@@ -9,6 +9,7 @@ import type {
   DailySnapshot,
   StrategyConfig,
   StrategyName,
+  TierState,
   TradeAction,
 } from "./types";
 import { getStrategy } from "./strategy";
@@ -70,9 +71,14 @@ export class BacktestEngine {
         cycleManager.incrementDay();
       }
 
-      // 1. 손절 처리 (REQ-006)
-      if (cycleManager.isStopLossDay() && cycleManager.getActiveTiers().length > 0) {
-        const stopLossTrades = this.handleStopLoss(cycleManager, currentPrice.close);
+      // 1. 손절 처리 (REQ-006) - 각 티어별 매수 거래일 기준으로 손절일 도달 여부 확인
+      const tiersAtStopLoss = cycleManager.getTiersAtStopLossDay(i);
+      if (tiersAtStopLoss.length > 0) {
+        const stopLossTrades = this.handleStopLossForTiers(
+          cycleManager,
+          tiersAtStopLoss,
+          currentPrice.close
+        );
         trades.push(...stopLossTrades);
       }
 
@@ -94,7 +100,8 @@ export class BacktestEngine {
         cycleManager,
         prevPrice.close,
         currentPrice.close,
-        currentPrice.date
+        currentPrice.date,
+        i
       );
       if (buyTrade) {
         trades.push(buyTrade);
@@ -127,13 +134,17 @@ export class BacktestEngine {
   }
 
   /**
-   * REQ-006: 손절일 MOC 매도 처리
+   * REQ-006: 특정 티어들에 대한 손절일 MOC 매도 처리
+   * 각 티어의 매수일 기준으로 손절일에 도달한 티어만 처리
    */
-  private handleStopLoss(cycleManager: CycleManager, currentClose: number): TradeAction[] {
+  private handleStopLossForTiers(
+    cycleManager: CycleManager,
+    tiersToStopLoss: TierState[],
+    currentClose: number
+  ): TradeAction[] {
     const trades: TradeAction[] = [];
-    const activeTiers = cycleManager.getActiveTiers();
 
-    for (const tier of activeTiers) {
+    for (const tier of tiersToStopLoss) {
       cycleManager.deactivateTier(tier.tier, currentClose);
       trades.push({
         type: "STOP_LOSS",
@@ -179,7 +190,8 @@ export class BacktestEngine {
     cycleManager: CycleManager,
     prevClose: number,
     currentClose: number,
-    date: string
+    date: string,
+    dayIndex: number
   ): TradeAction | null {
     const nextTier = cycleManager.getNextBuyTier();
     if (nextTier === null) {
@@ -193,13 +205,14 @@ export class BacktestEngine {
     }
 
     const tierAmount = cycleManager.getTierAmount(nextTier);
-    const shares = calculateBuyQuantity(tierAmount, currentClose);
+    // REQ-002: 매수 수량 = floor(티어 금액 ÷ 매수 지정가, 정수)
+    const shares = calculateBuyQuantity(tierAmount, buyLimitPrice);
 
     if (shares === 0) {
       return null;
     }
 
-    cycleManager.activateTier(nextTier, currentClose, shares, date);
+    cycleManager.activateTier(nextTier, currentClose, shares, date, dayIndex);
 
     return {
       type: "BUY",

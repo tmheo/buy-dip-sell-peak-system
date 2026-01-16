@@ -38,6 +38,8 @@ export interface TierState {
   shares: number;
   // 매수 체결일
   buyDate: string;
+  // 매수 체결 시점의 거래일 인덱스 (손절일 계산용)
+  buyDayIndex: number;
   // 매도 지정가
   sellLimitPrice: number;
 }
