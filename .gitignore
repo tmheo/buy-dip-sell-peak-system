@@ -81,6 +81,7 @@ env/
 .aws/config
 # Environment files
 # Test Coverage
+coverage/
 *.tmp
 *.pyo
 # Python Cache & Bytecode
