@@ -29,6 +29,74 @@
 
 ---
 
+## Frontend Layer
+
+### 기술 스택 개요
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Frontend Layer                               │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │     Next.js 15      │  │      React 19       │              │
+│  │   (App Router)      │  │   (UI Library)      │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │   Bootstrap 5.3.3   │  │  Bootswatch Solar   │              │
+│  │  (CSS Framework)    │  │   (Dark Theme)      │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              Google Fonts - Noto Sans KR                 │   │
+│  │                    (한글 폰트)                           │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Next.js 15 (App Router)
+
+**선택 이유:**
+- React 19의 최신 기능 활용 (Server Components, Streaming)
+- 파일 기반 라우팅으로 직관적인 페이지 구조
+- 빌트인 최적화 (이미지, 폰트, 스크립트)
+
+**주요 설정:**
+| 기능 | 설정 | 설명 |
+|------|------|------|
+| App Router | `src/app/` | 파일 시스템 기반 라우팅 |
+| Server Components | 기본값 | 서버 사이드 렌더링 |
+| Client Components | `'use client'` | 인터랙티브 컴포넌트 |
+
+### React 19
+
+**선택 이유:**
+- 최신 React 기능 (Actions, use hook)
+- 향상된 서버 컴포넌트 지원
+- 자동 배칭 및 Suspense 개선
+
+### Bootstrap 5.3.3 + Bootswatch Solar
+
+**선택 이유:**
+- 반응형 그리드 시스템
+- 풍부한 컴포넌트 라이브러리
+- Bootswatch Solar 테마로 일관된 다크 모드 UI
+
+**색상 팔레트:**
+| 변수 | 값 | 용도 |
+|------|-----|------|
+| `--bs-body-bg` | #002b36 | 메인 배경 (어두운 청록) |
+| `--bs-dark` | #073642 | 카드 배경 |
+| `--bs-info` | #2aa198 | 강조 텍스트 (청록) |
+| `--price-up` | #ff5370 | 상승 가격 (빨강) |
+| `--price-down` | #26c6da | 하락 가격 (밝은 청록) |
+
+### Google Fonts - Noto Sans KR
+
+**선택 이유:**
+- 한글 지원에 최적화
+- Google CDN을 통한 빠른 로딩
+- 다양한 굵기 지원
+
+---
+
 ## 핵심 기술
 
 ### TypeScript 5.7.3
@@ -208,6 +276,9 @@ npx tsx src/index.ts init --ticker SOXL
 | `format` | `prettier --write src/` | 코드 포매팅 |
 | `format:check` | `prettier --check src/` | 포매팅 검사 |
 | `prepare` | `husky` | Husky 설치 |
+| `web:dev` | `next dev --turbopack` | Next.js 개발 서버 (Turbopack) |
+| `web:build` | `next build` | Next.js 프로덕션 빌드 |
+| `web:start` | `next start` | Next.js 프로덕션 서버 |
 
 ---
 

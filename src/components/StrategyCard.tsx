@@ -63,9 +63,7 @@ export default function StrategyCard({
 
         {/* 특징 */}
         <div className="mt-3 pt-3 border-top border-secondary">
-          <div className="small text-info text-center">
-            💡 {feature}
-          </div>
+          <div className="small text-info text-center">💡 {feature}</div>
         </div>
       </div>
     </div>

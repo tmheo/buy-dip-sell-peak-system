@@ -1,7 +1,7 @@
 ---
 id: SPEC-FRONTEND-001
-version: "1.0.0"
-status: "draft"
+version: "1.1.0"
+status: "in_progress"
 created: "2026-01-16"
 updated: "2026-01-16"
 author: "허태명"
@@ -15,6 +15,7 @@ priority: "high"
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |------|------|--------|----------|
 | 1.0.0 | 2026-01-16 | 허태명 | 초기 SPEC 문서 생성 |
+| 1.1.0 | 2026-01-16 | 허태명 | Phase 1 UI 구현 완료, 코드 포맷팅 적용 |
 
 ---
 

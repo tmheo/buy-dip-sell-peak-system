@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
 // MainNavigation 컴포넌트 - 메인 네비게이션 바
 // Client Component - usePathname 사용을 위해
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface NavItem {
   href: string;
@@ -12,12 +12,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/info', label: 'Info' },
-  { href: '/strategy', label: '추천전략' },
-  { href: '/stats', label: '통계' },
-  { href: '/backtest', label: '백테스트(기본)' },
-  { href: '/backtest-strategy', label: '백테스트(추천전략)' },
-  { href: '/update-note', label: 'Update Note' },
+  { href: "/info", label: "Info" },
+  { href: "/strategy", label: "추천전략" },
+  { href: "/stats", label: "통계" },
+  { href: "/backtest", label: "백테스트(기본)" },
+  { href: "/backtest-strategy", label: "백테스트(추천전략)" },
+  { href: "/update-note", label: "Update Note" },
 ];
 
 export default function MainNavigation() {
@@ -28,7 +28,10 @@ export default function MainNavigation() {
       <div className="container-fluid">
         {/* 로고 */}
         <Link href="/info" className="navbar-brand">
-          <span role="img" aria-label="radar">&#x1F6F0;&#xFE0F;</span> 떨사오팔 Pro 레이더
+          <span role="img" aria-label="radar">
+            &#x1F6F0;&#xFE0F;
+          </span>{" "}
+          떨사오팔 Pro 레이더
         </Link>
 
         {/* 모바일 토글 버튼 */}
@@ -51,8 +54,8 @@ export default function MainNavigation() {
               <li key={item.href} className="nav-item">
                 <Link
                   href={item.href}
-                  className={`nav-link ${pathname === item.href ? 'active' : ''}`}
-                  aria-current={pathname === item.href ? 'page' : undefined}
+                  className={`nav-link ${pathname === item.href ? "active" : ""}`}
+                  aria-current={pathname === item.href ? "page" : undefined}
                 >
                   {item.label}
                 </Link>

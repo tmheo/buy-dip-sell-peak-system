@@ -9,11 +9,11 @@ interface PriceData {
 
 // 목업 데이터
 const mockPriceData: PriceData[] = [
-  { date: '2026-01-15', close: 28.45, change: 2.3 },
-  { date: '2026-01-14', close: 27.81, change: -1.8 },
-  { date: '2026-01-13', close: 28.32, change: 0.5 },
-  { date: '2026-01-10', close: 28.18, change: -0.7 },
-  { date: '2026-01-09', close: 28.38, change: 1.2 },
+  { date: "2026-01-15", close: 28.45, change: 2.3 },
+  { date: "2026-01-14", close: 27.81, change: -1.8 },
+  { date: "2026-01-13", close: 28.32, change: 0.5 },
+  { date: "2026-01-10", close: 28.18, change: -0.7 },
+  { date: "2026-01-09", close: 28.38, change: 1.2 },
 ];
 
 export default function Sidebar() {
@@ -21,7 +21,10 @@ export default function Sidebar() {
     <aside id="fixedSidebar">
       <div className="card">
         <div className="card-header">
-          <span role="img" aria-label="calendar">&#x1F4C5;</span> 최근 주가 (SOXL)
+          <span role="img" aria-label="calendar">
+            &#x1F4C5;
+          </span>{" "}
+          최근 주가 (SOXL)
         </div>
         <div className="card-body p-0">
           <table className="table table-dark table-striped table-hover mb-0">
@@ -37,12 +40,8 @@ export default function Sidebar() {
                 <tr key={data.date}>
                   <td>{data.date}</td>
                   <td className="text-end">${data.close.toFixed(2)}</td>
-                  <td
-                    className={`text-end ${
-                      data.change >= 0 ? 'price-up' : 'price-down'
-                    }`}
-                  >
-                    {data.change >= 0 ? '+' : ''}
+                  <td className={`text-end ${data.change >= 0 ? "price-up" : "price-down"}`}>
+                    {data.change >= 0 ? "+" : ""}
                     {data.change.toFixed(1)}%
                   </td>
                 </tr>

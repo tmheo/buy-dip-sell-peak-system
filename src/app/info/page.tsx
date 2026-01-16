@@ -1,73 +1,73 @@
 // Info 페이지 - 서비스 소개
 // Server Component
 
-import StrategyCard from '@/components/StrategyCard';
-import FlowChart from '@/components/FlowChart';
+import StrategyCard from "@/components/StrategyCard";
+import FlowChart from "@/components/FlowChart";
 
 // 전략 데이터 (원본 사이트와 동일)
 const strategies = [
   {
-    title: 'Pro1',
-    subtitle: '보수적 접근',
-    tierRatios: ['5.0%', '10.0%', '15.0%', '20.0%', '25.0%', '25.0%', '예비'],
+    title: "Pro1",
+    subtitle: "보수적 접근",
+    tierRatios: ["5.0%", "10.0%", "15.0%", "20.0%", "25.0%", "25.0%", "예비"],
     splits: 6,
     stopLossDays: 10,
-    buyThreshold: '-0.01%',
-    sellThreshold: '+0.01%',
-    feature: '보수적인 mdd가 낮은 전략',
+    buyThreshold: "-0.01%",
+    sellThreshold: "+0.01%",
+    feature: "보수적인 mdd가 낮은 전략",
   },
   {
-    title: 'Pro2',
-    subtitle: '균형잡힌 효율성',
-    tierRatios: ['10.0%', '15.0%', '20.0%', '25.0%', '20.0%', '10.0%', '예비'],
+    title: "Pro2",
+    subtitle: "균형잡힌 효율성",
+    tierRatios: ["10.0%", "15.0%", "20.0%", "25.0%", "20.0%", "10.0%", "예비"],
     splits: 6,
     stopLossDays: 10,
-    buyThreshold: '-0.01%',
-    sellThreshold: '+1.50%',
-    feature: '효율적이면서 대부분 적중하는 전략',
+    buyThreshold: "-0.01%",
+    sellThreshold: "+1.50%",
+    feature: "효율적이면서 대부분 적중하는 전략",
   },
   {
-    title: 'Pro3',
-    subtitle: '공격적 전략',
-    tierRatios: ['16.7%', '16.7%', '16.7%', '16.7%', '16.7%', '16.7%', '예비'],
+    title: "Pro3",
+    subtitle: "공격적 전략",
+    tierRatios: ["16.7%", "16.7%", "16.7%", "16.7%", "16.7%", "16.7%", "예비"],
     splits: 6,
     stopLossDays: 12,
-    buyThreshold: '-0.10%',
-    sellThreshold: '+2.00%',
-    feature: '공격적인 전략',
+    buyThreshold: "-0.10%",
+    sellThreshold: "+2.00%",
+    feature: "공격적인 전략",
   },
 ];
 
 // 플로우차트 단계 (원본 사이트와 동일)
 const flowchartSteps = [
-  { number: '①', text: '추천 전략 확인' },
-  { number: '②', text: '전략 선택' },
-  { number: '③', text: '매일 주문표대로 주문' },
-  { number: '④', text: '모든 티어 매도 시' },
-  { number: '⑤', text: '다음 전략 확인' },
+  { number: "①", text: "추천 전략 확인" },
+  { number: "②", text: "전략 선택" },
+  { number: "③", text: "매일 주문표대로 주문" },
+  { number: "④", text: "모든 티어 매도 시" },
+  { number: "⑤", text: "다음 전략 확인" },
 ];
 
 // 원론과의 차이점
 const differences = [
   {
-    title: '6분할 / 10일 손절',
-    description: '백테스트 결과 최효율값',
+    title: "6분할 / 10일 손절",
+    description: "백테스트 결과 최효율값",
   },
   {
-    title: '손절일도 매수',
-    description: '급격한 낙폭 대응',
+    title: "손절일도 매수",
+    description: "급격한 낙폭 대응",
   },
   {
-    title: '진행 중 시드 고정',
-    description: '단리 전략, 리스크 최소화',
+    title: "진행 중 시드 고정",
+    description: "단리 전략, 리스크 최소화",
   },
   {
-    title: '정액 매수 미실시',
-    description: 'MDD 감소 목적',
+    title: "정액 매수 미실시",
+    description: "MDD 감소 목적",
   },
   {
-    title: '예비 티어',
-    description: '6티어 가득 시 남은 자금을 7티어로 활용',
+    title: "예비 티어",
+    description: "6티어 가득 시 남은 자금을 7티어로 활용",
   },
 ];
 
@@ -77,16 +77,17 @@ export default function InfoPage() {
       {/* 헤더 */}
       <section className="info-section">
         <h1>
-          <span role="img" aria-label="info">ℹ️</span> 떨사오팔 Pro 레이더 Info
+          <span role="img" aria-label="info">
+            ℹ️
+          </span>{" "}
+          떨사오팔 Pro 레이더 Info
         </h1>
       </section>
 
       {/* 떨사오팔 Pro 레이더란? */}
       <section className="info-section">
         <h2>📡 떨사오팔 Pro 레이더는?</h2>
-        <p className="lead">
-          떨사오팔을 더 강력하게 도와주는 도구입니다.
-        </p>
+        <p className="lead">떨사오팔을 더 강력하게 도와주는 도구입니다.</p>
       </section>
 
       {/* 떨사오팔이란? */}
@@ -94,19 +95,15 @@ export default function InfoPage() {
         <h2>🤔 떨사오팔이란?</h2>
         <div className="alert alert-info">
           <p className="mb-2">
-            <strong>&apos;떨사오팔&apos;</strong>의 최초 전략을 고안하신 분은{' '}
+            <strong>&apos;떨사오팔&apos;</strong>의 최초 전략을 고안하신 분은{" "}
             <strong>[이서방v]</strong>님입니다.
           </p>
+          <p className="mb-2">Pro는 &apos;떨사오팔&apos;을 변형한 전략입니다.</p>
           <p className="mb-2">
-            Pro는 &apos;떨사오팔&apos;을 변형한 전략입니다.
-          </p>
-          <p className="mb-2">
-            시드를 분할하여 순차적으로 투자하며{' '}
+            시드를 분할하여 순차적으로 투자하며{" "}
             <strong>&quot;떨어지면 사고 오르면 파는&quot;</strong> 방식입니다.
           </p>
-          <p className="mb-0">
-            기본적으로 떨사오팔 방법에 대한 숙지가 필수입니다.
-          </p>
+          <p className="mb-0">기본적으로 떨사오팔 방법에 대한 숙지가 필수입니다.</p>
         </div>
       </section>
 
@@ -138,14 +135,16 @@ export default function InfoPage() {
           <table className="table table-dark table-bordered">
             <thead>
               <tr>
-                <th style={{ width: '40%' }}>항목</th>
+                <th style={{ width: "40%" }}>항목</th>
                 <th>설명</th>
               </tr>
             </thead>
             <tbody>
               {differences.map((diff, index) => (
                 <tr key={index}>
-                  <td><strong>{diff.title}</strong></td>
+                  <td>
+                    <strong>{diff.title}</strong>
+                  </td>
                   <td>{diff.description}</td>
                 </tr>
               ))}
@@ -165,7 +164,7 @@ export default function InfoPage() {
         <h2>📙 전략 추천 기능 사용법</h2>
         <div className="alert alert-secondary">
           <p className="mb-0">
-            새로운 사이클을 시작할 때 추천 전략을 확인하고 선택하세요.{' '}
+            새로운 사이클을 시작할 때 추천 전략을 확인하고 선택하세요.{" "}
             <strong>사이클 진행 중에는 전략을 변경하지 않습니다.</strong>
           </p>
         </div>
@@ -178,11 +177,9 @@ export default function InfoPage() {
           <p className="mb-2">
             <strong>본 프로그램은 백테스트 도구(Tool)입니다.</strong>
           </p>
-          <p className="mb-2">
-            백테스트 결과는 참고용이며 미래 결과를 보장하지 않습니다.
-          </p>
+          <p className="mb-2">백테스트 결과는 참고용이며 미래 결과를 보장하지 않습니다.</p>
           <p className="mb-0">
-            사용자가 본 프로그램 이용으로 발생한 모든 결과에 대해{' '}
+            사용자가 본 프로그램 이용으로 발생한 모든 결과에 대해{" "}
             <strong>개발자에게 법적 책임을 묻지 않음</strong>에 동의하는 것으로 간주됩니다.
           </p>
         </div>
@@ -191,11 +188,9 @@ export default function InfoPage() {
       {/* 문의 */}
       <section className="info-section">
         <h2>✉️ 문의</h2>
+        <p>서비스 관련 문의나 피드백은 아래 이메일로 연락해 주세요.</p>
         <p>
-          서비스 관련 문의나 피드백은 아래 이메일로 연락해 주세요.
-        </p>
-        <p>
-          <strong>이메일:</strong>{' '}
+          <strong>이메일:</strong>{" "}
           <a href="mailto:tmheo74@gmail.com" className="text-info">
             tmheo74@gmail.com
           </a>
