@@ -1,0 +1,11 @@
+# .coderabbit.yaml
+language: "ko-KR"
+reviews:
+  profile: "chill"
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "**/*.md"
+      instructions: |
+        Don't review formatting or minor style issues.

@@ -1,0 +1,59 @@
+/**
+ * 데이터베이스 스키마 정의
+ */
+
+export const CREATE_DAILY_PRICES_TABLE = `
+CREATE TABLE IF NOT EXISTS daily_prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker TEXT NOT NULL DEFAULT 'SOXL',
+    date TEXT NOT NULL,
+    open REAL NOT NULL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    volume INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(ticker, date)
+)
+`;
+
+export const CREATE_TICKER_DATE_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_ticker_date ON daily_prices(ticker, date)
+`;
+
+export const INSERT_DAILY_PRICE = `
+INSERT OR REPLACE INTO daily_prices (ticker, date, open, high, low, close, volume)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+`;
+
+export const SELECT_ALL_PRICES = `
+SELECT id, ticker, date, open, high, low, close, volume, created_at as createdAt
+FROM daily_prices
+ORDER BY ticker, date ASC
+`;
+
+export const SELECT_ALL_PRICES_BY_TICKER = `
+SELECT id, ticker, date, open, high, low, close, volume, created_at as createdAt
+FROM daily_prices
+WHERE ticker = ?
+ORDER BY date ASC
+`;
+
+export const SELECT_PRICES_BY_DATE_RANGE = `
+SELECT id, ticker, date, open, high, low, close, volume, created_at as createdAt
+FROM daily_prices
+WHERE ticker = ? AND date >= ? AND date <= ?
+ORDER BY date ASC
+`;
+
+export const SELECT_LATEST_DATE = `
+SELECT date FROM daily_prices WHERE ticker = ? ORDER BY date DESC LIMIT 1
+`;
+
+export const SELECT_COUNT = `
+SELECT COUNT(*) as count FROM daily_prices WHERE ticker = ?
+`;
+
+export const SELECT_TOTAL_COUNT = `
+SELECT COUNT(*) as count FROM daily_prices
+`;
