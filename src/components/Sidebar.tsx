@@ -64,17 +64,15 @@ export default function Sidebar() {
               <tr>
                 <th>날짜</th>
                 <th className="text-end">종가</th>
-                <th className="text-end">변동</th>
               </tr>
             </thead>
             <tbody>
               {priceData.map((data) => (
                 <tr key={data.date}>
                   <td>{data.date}</td>
-                  <td className="text-end">${data.close.toFixed(2)}</td>
                   <td className={`text-end ${data.change >= 0 ? "price-up" : "price-down"}`}>
-                    {data.change >= 0 ? "+" : ""}
-                    {data.change.toFixed(1)}%
+                    {data.close.toFixed(2)} ({data.change >= 0 ? "▲" : "▼"}
+                    {Math.abs(data.change).toFixed(2)}%)
                   </td>
                 </tr>
               ))}
