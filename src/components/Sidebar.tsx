@@ -1,22 +1,54 @@
 // Sidebar 컴포넌트 - 최근 주가 사이드바
 // Server Component
 
+import { getLatestPrices } from "../database/index.js";
+
 interface PriceData {
   date: string;
   close: number;
   change: number;
 }
 
-// 목업 데이터
-const mockPriceData: PriceData[] = [
-  { date: "2026-01-15", close: 28.45, change: 2.3 },
-  { date: "2026-01-14", close: 27.81, change: -1.8 },
-  { date: "2026-01-13", close: 28.32, change: 0.5 },
-  { date: "2026-01-10", close: 28.18, change: -0.7 },
-  { date: "2026-01-09", close: 28.38, change: 1.2 },
-];
-
 export default function Sidebar() {
+  // 11일 데이터 조회 (10일 표시 + 변동률 계산용 1일)
+  const rawData = getLatestPrices(11, "SOXL");
+
+  // 변동률 계산하여 PriceData 배열 생성 (최근 10일만)
+  const priceData: PriceData[] = [];
+
+  for (let i = 0; i < rawData.length - 1 && i < 10; i++) {
+    const current = rawData[i];
+    const previous = rawData[i + 1];
+
+    // 변동률 계산: ((현재 - 이전) / 이전) * 100
+    const change = ((current.close - previous.close) / previous.close) * 100;
+
+    priceData.push({
+      date: current.date,
+      close: current.close,
+      change: change,
+    });
+  }
+
+  // 데이터가 없는 경우 처리
+  if (priceData.length === 0) {
+    return (
+      <aside id="fixedSidebar">
+        <div className="card">
+          <div className="card-header">
+            <span role="img" aria-label="calendar">
+              &#x1F4C5;
+            </span>{" "}
+            최근 주가 (SOXL)
+          </div>
+          <div className="card-body">
+            <p className="text-muted mb-0">데이터가 없습니다.</p>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside id="fixedSidebar">
       <div className="card">
@@ -36,7 +68,7 @@ export default function Sidebar() {
               </tr>
             </thead>
             <tbody>
-              {mockPriceData.map((data) => (
+              {priceData.map((data) => (
                 <tr key={data.date}>
                   <td>{data.date}</td>
                   <td className="text-end">${data.close.toFixed(2)}</td>

@@ -11,6 +11,7 @@ import {
   SELECT_ALL_PRICES_BY_TICKER,
   SELECT_COUNT,
   SELECT_LATEST_DATE,
+  SELECT_LATEST_PRICES,
   SELECT_PRICES_BY_DATE_RANGE,
   SELECT_TOTAL_COUNT,
 } from "./schema.js";
@@ -142,4 +143,16 @@ export function getTotalCount(): number {
   const stmt = database.prepare(SELECT_TOTAL_COUNT);
   const result = stmt.get() as { count: number };
   return result.count;
+}
+
+/**
+ * 최근 N일 가격 데이터 조회 (날짜 내림차순)
+ */
+export function getLatestPrices(
+  limit: number,
+  ticker: string = DEFAULT_TICKER
+): { date: string; close: number }[] {
+  const database = getConnection();
+  const stmt = database.prepare(SELECT_LATEST_PRICES);
+  return stmt.all(ticker, limit) as { date: string; close: number }[];
 }

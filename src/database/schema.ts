@@ -57,3 +57,7 @@ SELECT COUNT(*) as count FROM daily_prices WHERE ticker = ?
 export const SELECT_TOTAL_COUNT = `
 SELECT COUNT(*) as count FROM daily_prices
 `;
+
+export const SELECT_LATEST_PRICES = `
+SELECT date, close FROM daily_prices WHERE ticker = ? ORDER BY date DESC LIMIT ?
+`;
