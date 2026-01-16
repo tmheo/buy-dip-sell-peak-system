@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import type { DailyPrice, QueryOptions } from "../types/index.js";
+import type { DailyPrice, QueryOptions } from "@/types";
 import {
   CREATE_DAILY_PRICES_TABLE,
   CREATE_TICKER_DATE_INDEX,
@@ -14,7 +14,7 @@ import {
   SELECT_LATEST_PRICES,
   SELECT_PRICES_BY_DATE_RANGE,
   SELECT_TOTAL_COUNT,
-} from "./schema.js";
+} from "./schema";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

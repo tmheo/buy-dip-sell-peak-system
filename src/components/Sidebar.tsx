@@ -1,7 +1,7 @@
 // Sidebar 컴포넌트 - 최근 주가 사이드바
 // Server Component
 
-import { getLatestPrices } from "../database/index.js";
+import { getLatestPrices } from "@/database";
 
 interface PriceData {
   date: string;
