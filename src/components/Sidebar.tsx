@@ -62,8 +62,8 @@ export default function Sidebar() {
           <table className="table table-dark table-striped table-hover mb-0">
             <thead>
               <tr>
-                <th>날짜</th>
-                <th className="text-end">종가</th>
+                <th className="text-center">날짜</th>
+                <th className="text-center">종가</th>
               </tr>
             </thead>
             <tbody>
