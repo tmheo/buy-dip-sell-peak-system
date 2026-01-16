@@ -134,7 +134,7 @@ src/
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
-│   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가)
+│   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가 - DB 연동)
 │   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
 │   ├── FlowChart.tsx             # 사용법 플로우차트
 │   └── PremiumModal.tsx          # 프리미엄 모달
@@ -151,6 +151,25 @@ src/
 | Bootstrap | 5.3.3 | CSS 프레임워크 |
 | Bootswatch Solar | 5.3.3 | 다크 테마 |
 | Google Fonts | Noto Sans KR | 한글 폰트 |
+
+### 사이드바 - 최근 주가 표시
+
+Sidebar 컴포넌트는 SQLite 데이터베이스에서 실시간으로 SOXL 가격 데이터를 조회하여 표시합니다.
+
+**주요 기능:**
+
+- 최근 10일간의 SOXL 종가 데이터 표시
+- 일별 변동률 자동 계산 및 색상 코딩
+  - 상승: 빨간색 (`#ff5370`)
+  - 하락: 청록색 (`#26c6da`)
+- Server Component로 구현 (데이터베이스 직접 접근)
+- 데이터 부족 시 유연한 처리
+
+**데이터 흐름:**
+
+```
+SQLite (prices.db) → getLatestPrices() → Sidebar Component → UI 표시
+```
 
 ---
 

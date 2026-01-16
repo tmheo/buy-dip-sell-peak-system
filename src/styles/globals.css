@@ -17,7 +17,7 @@ body {
   position: fixed;
   top: 120px;
   right: 20px;
-  width: 320px;
+  width: 200px;
   z-index: 1000;
   max-height: calc(100vh - 140px);
   overflow-y: auto;
@@ -31,6 +31,7 @@ body {
 #fixedSidebar .table {
   margin-bottom: 0;
   font-size: 0.9rem;
+  table-layout: auto;
 }
 
 #fixedSidebar .table td,
@@ -38,13 +39,29 @@ body {
   padding: 0.5rem;
 }
 
-/* Price Colors */
-.price-up {
-  color: var(--price-up);
+/* 날짜 컬럼은 내용에 맞게, 종가 컬럼은 오른쪽 정렬 */
+#fixedSidebar .table td:first-child,
+#fixedSidebar .table th:first-child {
+  width: 1%;
+  white-space: nowrap;
 }
 
-.price-down {
-  color: var(--price-down);
+#fixedSidebar .table td:last-child,
+#fixedSidebar .table th:last-child {
+  width: auto;
+}
+
+/* Price Colors - Bootstrap table-dark 오버라이드를 위해 specificity 강화 */
+.price-up,
+.table .price-up,
+.table-dark .price-up {
+  color: var(--price-up) !important;
+}
+
+.price-down,
+.table .price-down,
+.table-dark .price-down {
+  color: var(--price-down) !important;
 }
 
 /* Flowchart Styles */
