@@ -292,4 +292,84 @@ describe("BacktestEngine", () => {
       expect(result.returnRate).toBeCloseTo(expectedReturn, 4);
     });
   });
+
+  describe("잔여 티어", () => {
+    it("매수 후 매도되지 않은 티어가 잔여 티어로 반환되어야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-05",
+        initialCapital: 10000,
+      };
+      // 매수 후 매도 조건 미충족 상태로 종료
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99), // 매수 체결
+        createMockPrice("2025-01-04", 99), // 매도 미체결
+        createMockPrice("2025-01-05", 99), // 매도 미체결
+      ];
+
+      const result = engine.run(request, prices);
+
+      // 잔여 티어가 존재해야 함
+      expect(result.remainingTiers.length).toBeGreaterThan(0);
+      expect(result.remainingTiers[0].tier).toBe(1);
+      expect(result.remainingTiers[0].currentPrice).toBe(99);
+    });
+
+    it("모든 티어가 매도되면 잔여 티어가 없어야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-05",
+        initialCapital: 10000,
+      };
+      // 매수 후 매도 체결
+      // Pro2 sellThreshold = +1.5%, 매수가 99, 매도가 = 99 * 1.015 = 100.485 -> floor = 100.48
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99), // 매수 체결
+        createMockPrice("2025-01-04", 100.48), // 매도 체결
+        createMockPrice("2025-01-05", 101),
+      ];
+
+      const result = engine.run(request, prices);
+
+      // 매도 후 새 매수가 없으므로 잔여 티어 없음
+      expect(result.remainingTiers.length).toBe(0);
+    });
+
+    it("잔여 티어의 수익률이 올바르게 계산되어야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-04",
+        initialCapital: 10000,
+      };
+      // 매수 후 횡보 (추가 매수 발생하지 않도록)
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99), // 매수 체결 (체결가 = 종가 = 99)
+        createMockPrice("2025-01-04", 90), // 횡보 - 매수 지정가(99*0.9999=98.99) 이상이면 추가 매수 없음
+      ];
+
+      const result = engine.run(request, prices);
+
+      // 잔여 티어가 있어야 함
+      expect(result.remainingTiers.length).toBeGreaterThanOrEqual(1);
+      // 첫 번째 티어의 수익률 확인
+      const tier1 = result.remainingTiers.find((t) => t.tier === 1);
+      expect(tier1).toBeDefined();
+      expect(tier1!.buyPrice).toBe(99);
+      expect(tier1!.currentPrice).toBe(90);
+      // 수익률: (90 - 99) / 99 ≈ -0.0909 (-9.09%)
+      expect(tier1!.returnRate).toBeCloseTo(-0.0909, 3);
+    });
+  });
 });

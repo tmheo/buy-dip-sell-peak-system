@@ -7,6 +7,7 @@ import type {
   BacktestRequest,
   BacktestResult,
   DailySnapshot,
+  RemainingTier,
   StrategyConfig,
   StrategyName,
   TierState,
@@ -114,10 +115,14 @@ export class BacktestEngine {
 
     // 결과 계산
     const lastSnapshot = dailyHistory[dailyHistory.length - 1];
+    const lastPrice = prices[prices.length - 1];
     const finalAsset = lastSnapshot.totalAsset;
     const returnRate = (finalAsset - request.initialCapital) / request.initialCapital;
     const mdd = this.calculateMDD(dailyHistory);
     const winRate = this.calculateWinRate(completedCycles);
+
+    // 잔여 티어 (미매도 보유 주식) 정보 생성
+    const remainingTiers = this.createRemainingTiers(cycleManager, lastPrice.close);
 
     return {
       strategy: request.strategy,
@@ -130,6 +135,7 @@ export class BacktestEngine {
       totalCycles,
       winRate,
       dailyHistory,
+      remainingTiers,
     };
   }
 
@@ -286,5 +292,35 @@ export class BacktestEngine {
 
     const wins = cycles.filter((c) => c.profit > 0).length;
     return floorToDecimal(wins / cycles.length, 4);
+  }
+
+  /**
+   * 잔여 티어 정보 생성
+   * 백테스트 종료 시점에 아직 매도되지 않은 보유 주식 정보
+   *
+   * @param cycleManager - 사이클 매니저
+   * @param currentPrice - 백테스트 종료일 종가
+   * @returns 잔여 티어 정보 배열
+   */
+  private createRemainingTiers(cycleManager: CycleManager, currentPrice: number): RemainingTier[] {
+    const activeTiers = cycleManager.getActiveTiers();
+
+    return activeTiers.map((tier) => {
+      const currentValue = floorToDecimal(tier.shares * currentPrice, 2);
+      const cost = floorToDecimal(tier.shares * tier.buyPrice, 2);
+      const profitLoss = floorToDecimal(currentValue - cost, 2);
+      const returnRate = floorToDecimal((currentPrice - tier.buyPrice) / tier.buyPrice, 4);
+
+      return {
+        tier: tier.tier,
+        shares: tier.shares,
+        buyPrice: tier.buyPrice,
+        buyDate: tier.buyDate,
+        currentPrice,
+        currentValue,
+        profitLoss,
+        returnRate,
+      };
+    });
   }
 }

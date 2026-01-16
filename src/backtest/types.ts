@@ -83,6 +83,29 @@ export interface BacktestRequest {
 }
 
 /**
+ * 잔여 티어 정보 인터페이스
+ * 백테스트 종료 시점에 아직 매도되지 않은 보유 주식 정보
+ */
+export interface RemainingTier {
+  // 티어 번호
+  tier: number;
+  // 매수 수량
+  shares: number;
+  // 매수 체결가
+  buyPrice: number;
+  // 매수 체결일
+  buyDate: string;
+  // 현재가 (백테스트 종료일 종가)
+  currentPrice: number;
+  // 평가 금액 (현재가 × 수량)
+  currentValue: number;
+  // 수익/손실 금액
+  profitLoss: number;
+  // 수익률 (소수점)
+  returnRate: number;
+}
+
+/**
  * 백테스트 결과 인터페이스
  */
 export interface BacktestResult {
@@ -106,6 +129,8 @@ export interface BacktestResult {
   winRate: number;
   // 일별 스냅샷 히스토리
   dailyHistory: DailySnapshot[];
+  // 잔여 티어 (백테스트 종료 시 미매도 보유 주식)
+  remainingTiers: RemainingTier[];
 }
 
 /**
