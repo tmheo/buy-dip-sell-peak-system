@@ -1,19 +1,30 @@
 ---
 id: SPEC-SIDEBAR-001
 title: SOXL 가격 사이드바 실제 데이터 연동
-version: "1.0.0"
-status: "draft-saved"
+version: "1.0.1"
+status: "completed"
 created: "2026-01-16"
 updated: "2026-01-16"
+completed: "2026-01-16"
 author: "허태명"
 priority: "high"
-lifecycle: "spec-anchored"
+lifecycle: "completed"
 tags:
   - sidebar
   - database
   - server-component
   - soxl
 related_specs: []
+implementation:
+  commits:
+    - "7d579e4 feat(sidebar): SPEC-SIDEBAR-001 SOXL 가격 사이드바 DB 연동"
+    - "25092da fix(sidebar): Next.js bundler 호환 import 경로 수정"
+    - "266bbb9 fix(sidebar): 원본 디자인에 맞게 UI 수정"
+    - "033e28d fix(sidebar): Bootstrap table-dark 색상 오버라이드 및 레이아웃 최적화"
+  files_modified:
+    - src/components/Sidebar.tsx
+    - src/database/index.ts
+    - src/styles/globals.css
 ---
 
 # SPEC-SIDEBAR-001: SOXL 가격 사이드바 실제 데이터 연동
