@@ -1,0 +1,9 @@
+project:
+  name: buy-dip-sell-peak-system
+  description: ''
+  type: ''
+  locale: '{{LOCALE}}'
+  created_at: '2026-01-16T17:00:26.745503Z'
+  initialized: 'true'
+github:
+  profile_name: tmheo

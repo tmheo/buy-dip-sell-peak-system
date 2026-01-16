@@ -1,0 +1,30 @@
+constitution:
+  enforce_tdd: true
+  test_coverage_target: 100
+  tdd_mode: warn
+  tdd_by_language:
+    Python: warn
+    TypeScript: warn
+    JavaScript: warn
+  coverage_exemptions:
+    enabled: false
+    require_justification: true
+    max_exempt_percentage: 5
+  test_quality:
+    specification_based: true
+    meaningful_assertions: true
+    avoid_implementation_coupling: true
+    mutation_testing_enabled: false
+  principles:
+    simplicity:
+      max_parallel_tasks: 10
+report_generation:
+  enabled: true
+  auto_create: false
+  warn_user: true
+  user_choice: Minimal
+tag_validation:
+  enabled: true
+  mode: warn
+  check_spec_exists: true
+  max_tags_per_file: 100

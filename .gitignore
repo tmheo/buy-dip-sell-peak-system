@@ -28,3 +28,125 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+.tscache/
+.claude/skills/*/.env*
+.claude/skills/*/*/*token*
+# IDE & Editors
+.turbo/
+# Build Tools & Frameworks
+# Backups
+*.egg-info/
+.claude/settings.local.json
+.env/
+*_secret.*
+*.backup
+# Logs & Temporary Files
+*.backup/
+.claude/skills/*/secrets/
+# Skill-specific credentials
+*.secret.*
+.vercel/
+.TemporaryItems
+# Cloud provider credentials
+.LSOverride
+.Spotlight-V100
+out/
+.claude/local/
+.firebase/
+# Linux
+*.sublime-project
+# Updated: 2026-01-10
+*.suo
+.mypy_cache/
+*-secret-key.*
+# Certificate files
+.next/
+.DocumentRevisions-V100
+.Trashes
+*.pfx
+.coverage
+*.temp
+api-key-*
+# Purpose: Essential patterns for user projects
+# MoAI-ADK Package Distribution .gitignore
+*.pyc
+htmlcov/
+secret-key-*
+.directory
+*.rdb
+# Windows
+.VolumeIcon.icns
+env/
+*.sw?
+.aws/config
+# Environment files
+# Test Coverage
+*.tmp
+*.pyo
+# Python Cache & Bytecode
+.uv_cache/
+# Build Artifacts & Distribution
+build/
+*.pyd
+# Version: 0.33.0
+.ruff_cache/
+*.jks
+# ===========================================
+logs/
+*.key.*
+*_secret=*
+venv/
+*.sln
+*.sqlite
+coverage.json
+*.pem
+.claude/.env.local*
+*.dbm
+secret-*.*
+.claude/skills/*/*/*key*
+*-api-key.*
+# FIXED: Issue #237 - Replaced overly broad *key* and *secret* patterns
+!.env.example
+# ============================================
+*_key.*
+*.sqlite3
+*.egg
+.env.*
+.claude/settings.local.*.json
+.pytest_cache/
+*-backup/
+*~
+# Claude Code Configuration
+*_backup_*/
+[Dd]esktop.ini
+*-secret.*
+*.p12
+# Credential patterns in environment files
+.aws/credentials
+*.sublime-workspace
+# Private keys (specific patterns to avoid false positives)
+.fseventsd
+dist-ssr/
+Thumbs.db
+.venv/
+# OS Files
+*_token=*
+.cursor/
+.#*
+.nuxt/
+__pycache__/
+.uv-cache/
+# Node.js (for docs/Nextra)
+.AppleDouble
+.claude/skills/*/*/*secret*
+*.njsproj
+# Virtual Environments
+# Deployment & CI/CD
+*-key.*
+*.bak
+.moai-backups/
+private-key*
+# Secrets and Credentials (CRITICAL)
+.netlify/
+# Mac
+ehthumbs.db
