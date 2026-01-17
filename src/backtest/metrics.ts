@@ -177,12 +177,12 @@ export function calculateROC(prices: number[], index: number): number | null {
 }
 
 /**
- * 변동성 계산 - 20일 연환산 변동성
+ * 변동성 계산 - 20일 표본 표준편차 × √20 (원본 사이트 방식)
  * SPEC-METRICS-001
  *
  * @param prices - 가격 배열 (adjClose 값들)
  * @param index - 계산할 인덱스
- * @returns 연환산 변동성 (%) 또는 데이터 부족 시 null (CON-001)
+ * @returns 변동성 (√20 연환산) 또는 데이터 부족 시 null (CON-001)
  */
 export function calculateVolatility(prices: number[], index: number): number | null {
   const period = 20;
@@ -208,15 +208,17 @@ export function calculateVolatility(prices: number[], index: number): number | n
   const sum = returns.reduce((acc, r) => acc.add(r), new Decimal(0));
   const mean = sum.div(returns.length);
 
-  // 분산 계산
+  // 표본 분산 계산 (n-1로 나눔)
   const squaredDiffs = returns.map((r) => r.sub(mean).pow(2));
-  const variance = squaredDiffs.reduce((acc, d) => acc.add(d), new Decimal(0)).div(returns.length);
+  const variance = squaredDiffs
+    .reduce((acc, d) => acc.add(d), new Decimal(0))
+    .div(returns.length - 1);
 
-  // 표준편차
+  // 표본 표준편차
   const stddev = variance.sqrt();
 
-  // 연환산: stddev × sqrt(252) × 100
-  const annualized = stddev.mul(new Decimal(252).sqrt()).mul(100);
+  // √20 연환산 (원본 사이트 방식)
+  const annualized = stddev.mul(new Decimal(20).sqrt());
 
   return annualized.toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber();
 }
@@ -227,11 +229,13 @@ export function calculateVolatility(prices: number[], index: number): number | n
  *
  * @param prices - 가격 배열 (adjClose 값들)
  * @param index - 계산할 인덱스
+ * @param backtestDays - 백테스트 기간 내 거래일 수 (정배열 NaN 처리용, 선택)
  * @returns TechnicalMetrics 객체 또는 데이터 부족 시 null (CON-001)
  */
 export function calculateTechnicalMetrics(
   prices: number[],
-  index: number
+  index: number,
+  backtestDays?: number
 ): TechnicalMetrics | null {
   // CON-001: MA60 요구사항 - 최소 60개 데이터 필요
   if (index < 59) return null;
@@ -249,12 +253,18 @@ export function calculateTechnicalMetrics(
   if (ma60 === 0) return null;
 
   // 골든크로스: (MA20 - MA60) / MA60 × 100
-  const goldenCross = new Decimal(ma20)
-    .sub(ma60)
-    .div(ma60)
-    .mul(100)
-    .toDecimalPlaces(4, Decimal.ROUND_DOWN)
-    .toNumber();
+  // 백테스트 기간이 60일 미만이면 NaN (MA60 계산에 60일 필요)
+  let goldenCross: number;
+  if (backtestDays !== undefined && backtestDays < 60) {
+    goldenCross = NaN;
+  } else {
+    goldenCross = new Decimal(ma20)
+      .sub(ma60)
+      .div(ma60)
+      .mul(100)
+      .toDecimalPlaces(4, Decimal.ROUND_DOWN)
+      .toNumber();
+  }
 
   // MA 기울기: (MA20[t] - MA20[t-10]) / MA20[t-10] × 100
   const ma20_10DaysAgo = calculateSMA(prices, 20, index - 10);
@@ -268,8 +278,9 @@ export function calculateTechnicalMetrics(
       .toNumber();
   }
 
-  // 이격도: adjClose / MA20 × 100
+  // 이격도: (adjClose - MA20) / MA20 × 100 (원본 사이트 방식)
   const disparity = new Decimal(prices[index])
+    .sub(ma20)
     .div(ma20)
     .mul(100)
     .toDecimalPlaces(4, Decimal.ROUND_DOWN)

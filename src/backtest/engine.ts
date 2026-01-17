@@ -189,7 +189,13 @@ export class BacktestEngine {
     const remainingTiers = this.createRemainingTiers(cycleManager, lastPrice.adjClose);
 
     // SPEC-METRICS-001: 종료 시점 기술적 지표 계산
-    const technicalMetrics = calculateTechnicalMetrics(adjClosePrices, prices.length - 1);
+    // 원본 사이트 방식: 백테스트 기간 내 거래일 수가 60일 미만이면 정배열(goldenCross) NaN
+    const backtestDays = prices.length;
+    const technicalMetrics = calculateTechnicalMetrics(
+      adjClosePrices,
+      prices.length - 1,
+      backtestDays
+    );
 
     return {
       strategy: request.strategy,

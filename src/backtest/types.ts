@@ -33,13 +33,13 @@ export interface TechnicalMetrics {
   goldenCross: number;
   // MA 기울기: (MA20[t] - MA20[t-10]) / MA20[t-10] × 100
   maSlope: number;
-  // 이격도: adjClose / MA20 × 100
+  // 이격도: (adjClose - MA20) / MA20 × 100
   disparity: number;
   // RSI 14일 (Wilder's EMA 방식)
   rsi14: number;
   // 12일 변화율
   roc12: number;
-  // 20일 연환산 변동성
+  // 20일 일별 표준편차
   volatility20: number;
 }
 

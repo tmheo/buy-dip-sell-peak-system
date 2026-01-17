@@ -359,7 +359,7 @@ describe("calculateROC", () => {
 
 describe("calculateVolatility", () => {
   // 정상 계산 시나리오
-  it("20일 연환산 변동성을 올바르게 계산해야 한다", () => {
+  it("20일 일별 표준편차를 올바르게 계산해야 한다", () => {
     // 일정한 가격 = 변동성 0
     const prices = Array(21).fill(100);
     expect(calculateVolatility(prices, 20)).toBe(0);
@@ -392,8 +392,8 @@ describe("calculateVolatility", () => {
     expect(calculateVolatility(prices, 19)).toBeNull();
   });
 
-  // 연환산 검증
-  it("연환산 계수 sqrt(252)를 적용해야 한다", () => {
+  // 일별 표준편차 검증 (연환산 없음)
+  it("일별 표준편차를 반환해야 한다 (연환산 없음)", () => {
     // 매일 1% 수익률
     const prices: number[] = [100];
     for (let i = 1; i <= 20; i++) {
@@ -401,8 +401,8 @@ describe("calculateVolatility", () => {
     }
     const vol = calculateVolatility(prices, 20);
     expect(vol).not.toBeNull();
-    // 일별 수익률이 일정하므로 변동성은 0에 가까움
-    expect(vol!).toBeCloseTo(0, 1);
+    // 일별 수익률이 일정하므로 표준편차는 0에 가까움
+    expect(vol!).toBeCloseTo(0, 4);
   });
 
   // 정밀도 테스트
@@ -455,13 +455,13 @@ describe("calculateTechnicalMetrics", () => {
   });
 
   it("disparity를 올바르게 계산해야 한다", () => {
-    // disparity = adjClose / MA20 × 100
+    // disparity = (adjClose - MA20) / MA20 × 100
     const prices = Array(70).fill(100);
     const metrics = calculateTechnicalMetrics(prices, 69);
 
     expect(metrics).not.toBeNull();
-    // 가격이 일정하면 disparity = 100
-    expect(metrics!.disparity).toBeCloseTo(100, 2);
+    // 가격이 일정하면 disparity = 0 (MA20과 동일)
+    expect(metrics!.disparity).toBeCloseTo(0, 2);
   });
 
   // 경계 조건 테스트
