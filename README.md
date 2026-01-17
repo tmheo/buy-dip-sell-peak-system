@@ -128,6 +128,37 @@ Yahoo Finance API → dataFetcher (재시도/파싱) → database (트랜잭션)
 - **풀복리**: 사이클 종료 시 수익/손실 반영하여 다음 사이클 투자금 재계산
 - **손절 처리**: 손절일 도달 시 MOC 주문으로 전량 청산
 - **성과 지표**: 최종 자산, 수익률, MDD, 승률 계산
+- **기술적 지표**: 6개 핵심 지표 자동 계산 (MA20/60, RSI, ROC, 변동성 등)
+
+### 기술적 지표 (SPEC-METRICS-001)
+
+백테스트 결과에 다음 기술적 지표가 포함됩니다:
+
+| 지표 | 필드명 | 설명 |
+|------|--------|------|
+| 이동평균 | `ma20`, `ma60` | 20일/60일 단순이동평균 (DailySnapshot에 포함) |
+| 정배열 | `goldenCross` | (MA20 - MA60) / MA60 × 100 (%) |
+| MA 기울기 | `maSlope` | 10일간 MA20 변화율 (%) |
+| 이격도 | `disparity` | (종가 - MA20) / MA20 × 100 (%) |
+| RSI(14) | `rsi14` | Wilder's EMA 방식 (0-100) |
+| ROC(12) | `roc12` | 12일 변화율 (%) |
+| 변동성 | `volatility20` | 20일 표준편차 × √20 |
+
+```typescript
+// 백테스트 결과에서 기술적 지표 접근
+const result = await runBacktest({ ... });
+
+// 종료일 기준 기술적 지표
+if (result.technicalMetrics) {
+  console.log(`RSI(14): ${result.technicalMetrics.rsi14}`);
+  console.log(`정배열: ${result.technicalMetrics.goldenCross}%`);
+}
+
+// 일별 이동평균
+result.dailyHistory.forEach(day => {
+  console.log(`${day.date}: MA20=${day.ma20}, MA60=${day.ma60}`);
+});
+```
 
 ### 백테스트 모듈 구조
 
