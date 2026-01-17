@@ -225,17 +225,31 @@ src/
 ├── app/                          # Next.js App Router 페이지
 │   ├── layout.tsx                # 루트 레이아웃 (CDN, 메타데이터)
 │   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
+│   ├── api/
+│   │   └── backtest/
+│   │       └── route.ts          # 백테스트 API 엔드포인트
 │   ├── info/
 │   │   └── page.tsx              # Info 페이지 (전략 설명)
 │   └── backtest/
-│       └── page.tsx              # Backtest 페이지 (백테스트 폼)
+│       └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
+├── backtest/                     # 백테스트 엔진 모듈
+│   ├── types.ts                  # 백테스트 타입 정의
+│   ├── engine.ts                 # 백테스트 엔진 (시뮬레이션 로직)
+│   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
+│   ├── cycle.ts                  # 사이클 관리자
+│   ├── order.ts                  # 주문 계산 로직
+│   └── metrics.ts                # 기술적 지표 계산 (SMA, RSI, ROC 등)
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
 │   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가 - DB 연동)
 │   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
 │   ├── FlowChart.tsx             # 사용법 플로우차트
-│   └── PremiumModal.tsx          # 프리미엄 모달
+│   ├── PremiumModal.tsx          # 프리미엄 모달
+│   └── backtest/                 # 백테스트 결과 시각화 컴포넌트
+│       ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60, 로그 스케일)
+│       ├── MetricsCharts.tsx     # 6개 기술적 지표 미니 차트
+│       └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
 └── styles/
     └── globals.css               # 글로벌 스타일 + 커스텀 CSS
 ```
@@ -248,7 +262,28 @@ src/
 | React | 19 | UI 라이브러리 |
 | Bootstrap | 5.3.3 | CSS 프레임워크 |
 | Bootswatch Solar | 5.3.3 | 다크 테마 |
+| Recharts | 3.6 | 차트 라이브러리 |
 | Google Fonts | Noto Sans KR | 한글 폰트 |
+
+### 백테스트 결과 시각화
+
+백테스트 페이지(`/backtest`)에서 Pro1, Pro2, Pro3 전략의 성과를 시각적으로 비교할 수 있습니다.
+
+**차트 컴포넌트:**
+
+| 컴포넌트 | 설명 |
+|----------|------|
+| `PriceChart` | 종가 + MA20/MA60 라인 차트 (로그 스케일) |
+| `MetricsCharts` | 6개 기술적 지표 미니 차트 (정배열, 기울기, 이격도, RSI, ROC, 변동성) |
+| `ProResultCard` | 전략별 결과 카드 - 수익률, MDD, 자산 변동 차트 포함 |
+
+**주요 기능:**
+
+- Pro1/Pro2/Pro3 전략 병렬 실행 및 비교
+- Y축 범위 통일로 전략 간 공정한 시각적 비교
+- 인덱스 기반 X축으로 연도 간 날짜 충돌 방지
+- 커스텀 툴팁으로 정확한 날짜 및 값 표시
+- 잔여 티어 정보 (미매도 보유 주식) 표시
 
 ### 사이드바 - 최근 주가 표시
 
