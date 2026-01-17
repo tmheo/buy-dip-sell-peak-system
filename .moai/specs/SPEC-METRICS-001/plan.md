@@ -161,7 +161,7 @@ function calculateSMA(prices: number[], period: number, index: number): number |
   for (let i = index - period + 1; i <= index; i++) {
     sum = sum.add(prices[i]);
   }
-  return sum.div(period).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  return sum.div(period).toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber();
 }
 ```
 

@@ -203,6 +203,7 @@ export function calculateVolatility(prices: number[], index: number): number | n
   }
 
   if (returns.length === 0) return 0;
+  if (returns.length === 1) return 0; // 표본 분산 계산 불가 (n-1=0)
 
   // 평균 수익률
   const sum = returns.reduce((acc, r) => acc.add(r), new Decimal(0));

@@ -179,11 +179,11 @@ maSlope = (MA20[today] - MA20[10일전]) / MA20[10일전] × 100
 **[State-Driven]** **IF** MA20이 유효 **THEN** 이격도를 계산한다:
 
 ```
-disparity = adjClose / MA20 × 100
+disparity = (adjClose - MA20) / MA20 × 100
 ```
 
-- 100% 초과: 주가가 MA20 위에 위치 (과매수 가능성)
-- 100% 미만: 주가가 MA20 아래에 위치 (과매도 가능성)
+- 양수: 주가가 MA20 위에 위치 (과매수 가능성)
+- 음수: 주가가 MA20 아래에 위치 (과매도 가능성)
 
 #### REQ-009: RSI(14) 계산
 
@@ -221,8 +221,8 @@ ROC = (adjClose[today] - adjClose[12일전]) / adjClose[12일전] × 100
 
 ```
 1. 일별 수익률 = (adjClose[i] - adjClose[i-1]) / adjClose[i-1]
-2. 표준편차 = stddev(최근 20일 일별 수익률)
-3. 연율화 변동성 = 표준편차 × sqrt(252) × 100
+2. 표본 표준편차 = stddev(최근 20일 일별 수익률, n-1)
+3. 변동성 = 표본 표준편차 × sqrt(20)
 ```
 
 ### 3.2 비기능적 요구사항
@@ -414,7 +414,7 @@ const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
 const rsi = 100 - (100 / (1 + rs));
 ```
 
-#### 표준편차 알고리즘 (변동성용)
+#### 표본 표준편차 알고리즘 (변동성용)
 
 ```typescript
 // 20일 일별 수익률 계산
@@ -423,13 +423,13 @@ for (i = index - 19; i <= index; i++) {
   returns.push((prices[i] - prices[i-1]) / prices[i-1]);
 }
 
-// 표준편차 계산
+// 표본 표준편차 계산 (n-1)
 const mean = sum(returns) / 20;
-const variance = sum((r - mean)^2 for r in returns) / 20;
+const variance = sum((r - mean)^2 for r in returns) / (20 - 1);
 const stddev = sqrt(variance);
 
-// 연율화
-const volatility = stddev * sqrt(252) * 100;
+// √20 스케일링 (원본 사이트 방식)
+const volatility = stddev * sqrt(20);
 ```
 
 ---
