@@ -225,6 +225,121 @@ export function calculateVolatility(prices: number[], index: number): number | n
 }
 
 /**
+ * CAGR (Compound Annual Growth Rate) 계산
+ * 연평균 복리 수익률
+ *
+ * @param initialCapital - 초기 투자금
+ * @param finalAsset - 최종 자산
+ * @param tradingDays - 거래일 수
+ * @returns CAGR (소수점, 예: 0.15 = 15%)
+ */
+export function calculateCAGR(
+  initialCapital: number,
+  finalAsset: number,
+  tradingDays: number
+): number {
+  if (initialCapital <= 0 || tradingDays <= 0) return 0;
+
+  // 연간 거래일 수 (약 252일)
+  const tradingDaysPerYear = 252;
+  const years = tradingDays / tradingDaysPerYear;
+
+  if (years <= 0) return 0;
+
+  // CAGR = (최종자산 / 초기자산)^(1/연수) - 1
+  const ratio = new Decimal(finalAsset).div(initialCapital);
+
+  // 손실인 경우에도 정확히 계산
+  if (ratio.lte(0)) return -1; // -100% 이하 손실
+
+  const cagr = ratio.pow(new Decimal(1).div(years)).sub(1);
+
+  return cagr.toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber();
+}
+
+/**
+ * 단일 날짜의 기술적 지표 계산 (부분 계산 허용)
+ * 차트용으로 일부 지표만 계산 가능해도 반환
+ *
+ * @param prices - 가격 배열 (adjClose 값들)
+ * @param index - 계산할 인덱스
+ * @param date - 해당 날짜
+ * @returns 부분 기술적 지표 객체
+ */
+export function calculateDailyMetrics(
+  prices: number[],
+  index: number,
+  date: string
+): {
+  date: string;
+  goldenCross: number | null;
+  maSlope: number | null;
+  disparity: number | null;
+  rsi14: number | null;
+  roc12: number | null;
+  volatility20: number | null;
+} {
+  // MA20, MA60 계산
+  const ma20 = calculateSMA(prices, 20, index);
+  const ma60 = calculateSMA(prices, 60, index);
+
+  // 골든크로스: (MA20 - MA60) / MA60 × 100
+  let goldenCross: number | null = null;
+  if (ma20 !== null && ma60 !== null && ma60 !== 0) {
+    goldenCross = new Decimal(ma20)
+      .sub(ma60)
+      .div(ma60)
+      .mul(100)
+      .toDecimalPlaces(4, Decimal.ROUND_DOWN)
+      .toNumber();
+  }
+
+  // MA 기울기: (MA20[t] - MA20[t-10]) / MA20[t-10] × 100
+  let maSlope: number | null = null;
+  if (ma20 !== null && index >= 29) {
+    const ma20_10DaysAgo = calculateSMA(prices, 20, index - 10);
+    if (ma20_10DaysAgo !== null && ma20_10DaysAgo !== 0) {
+      maSlope = new Decimal(ma20)
+        .sub(ma20_10DaysAgo)
+        .div(ma20_10DaysAgo)
+        .mul(100)
+        .toDecimalPlaces(4, Decimal.ROUND_DOWN)
+        .toNumber();
+    }
+  }
+
+  // 이격도: (adjClose - MA20) / MA20 × 100
+  let disparity: number | null = null;
+  if (ma20 !== null && ma20 !== 0) {
+    disparity = new Decimal(prices[index])
+      .sub(ma20)
+      .div(ma20)
+      .mul(100)
+      .toDecimalPlaces(4, Decimal.ROUND_DOWN)
+      .toNumber();
+  }
+
+  // RSI14
+  const rsi14 = calculateRSI(prices, index);
+
+  // ROC12
+  const roc12 = calculateROC(prices, index);
+
+  // 변동성
+  const volatility20 = calculateVolatility(prices, index);
+
+  return {
+    date,
+    goldenCross,
+    maSlope,
+    disparity,
+    rsi14,
+    roc12,
+    volatility20,
+  };
+}
+
+/**
  * 기술적 지표 종합 계산
  * SPEC-METRICS-001
  *
