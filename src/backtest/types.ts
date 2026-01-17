@@ -146,27 +146,6 @@ export interface RemainingTier {
 }
 
 /**
- * 일별 기술적 지표 인터페이스
- * 차트용 일별 지표 데이터
- */
-export interface DailyTechnicalMetrics {
-  // 날짜
-  date: string;
-  // 골든크로스 지표: (MA20 - MA60) / MA60 × 100
-  goldenCross: number | null;
-  // MA 기울기: (MA20[t] - MA20[t-10]) / MA20[t-10] × 100
-  maSlope: number | null;
-  // 이격도: (adjClose - MA20) / MA20 × 100
-  disparity: number | null;
-  // RSI 14일 (Wilder's EMA 방식)
-  rsi14: number | null;
-  // 12일 변화율
-  roc12: number | null;
-  // 20일 일별 표준편차
-  volatility20: number | null;
-}
-
-/**
  * 백테스트 결과 인터페이스
  */
 export interface BacktestResult {
@@ -182,8 +161,6 @@ export interface BacktestResult {
   finalAsset: number;
   // 수익률 (소수점)
   returnRate: number;
-  // 연평균 수익률 (CAGR, 소수점)
-  cagr: number;
   // 최대 낙폭 (MDD, 소수점)
   mdd: number;
   // 총 사이클 수
@@ -198,8 +175,6 @@ export interface BacktestResult {
   completedCycles: { profit: number }[];
   // 종료 시점 기술적 지표 (데이터 부족 시 null) - SPEC-METRICS-001
   technicalMetrics: TechnicalMetrics | null;
-  // 일별 기술적 지표 배열 (차트용)
-  dailyTechnicalMetrics: DailyTechnicalMetrics[];
 }
 
 /**

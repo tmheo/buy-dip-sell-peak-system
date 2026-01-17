@@ -23,15 +23,7 @@ import {
   shouldExecuteBuy,
   shouldExecuteSell,
 } from "./order";
-import {
-  calculateMDD,
-  calculateWinRate,
-  calculateSMA,
-  calculateTechnicalMetrics,
-  calculateCAGR,
-  calculateDailyMetrics,
-} from "./metrics";
-import type { DailyTechnicalMetrics } from "./types";
+import { calculateMDD, calculateWinRate, calculateSMA, calculateTechnicalMetrics } from "./metrics";
 
 /**
  * 백테스트 엔진
@@ -193,9 +185,6 @@ export class BacktestEngine {
     const mdd = calculateMDD(dailyHistory);
     const winRate = calculateWinRate(completedCycles);
 
-    // CAGR 계산
-    const cagr = calculateCAGR(request.initialCapital, finalAsset, prices.length);
-
     // 잔여 티어 (미매도 보유 주식) 정보 생성
     const remainingTiers = this.createRemainingTiers(cycleManager, lastPrice.adjClose);
 
@@ -208,11 +197,6 @@ export class BacktestEngine {
       backtestDays
     );
 
-    // 일별 기술적 지표 배열 생성 (차트용)
-    const dailyTechnicalMetrics: DailyTechnicalMetrics[] = prices.map((price, index) => {
-      return calculateDailyMetrics(adjClosePrices, index, price.date);
-    });
-
     return {
       strategy: request.strategy,
       startDate: request.startDate,
@@ -220,7 +204,6 @@ export class BacktestEngine {
       initialCapital: request.initialCapital,
       finalAsset,
       returnRate: new Decimal(returnRate).toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber(),
-      cagr,
       mdd,
       totalCycles,
       winRate,
@@ -228,7 +211,6 @@ export class BacktestEngine {
       remainingTiers,
       completedCycles,
       technicalMetrics,
-      dailyTechnicalMetrics,
     };
   }
 

@@ -310,31 +310,17 @@ src/
 ├── app/                          # Next.js App Router 페이지
 │   ├── layout.tsx                # 루트 레이아웃 (CDN, 메타데이터)
 │   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
-│   ├── api/
-│   │   └── backtest/
-│   │       └── route.ts          # 백테스트 API 엔드포인트
 │   ├── info/
 │   │   └── page.tsx              # Info 페이지 (전략 설명)
 │   └── backtest/
-│       └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
-├── backtest/                     # 백테스트 엔진 모듈
-│   ├── types.ts                  # 백테스트 타입 정의
-│   ├── engine.ts                 # 백테스트 엔진 (시뮬레이션 로직)
-│   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
-│   ├── cycle.ts                  # 사이클 관리자
-│   ├── order.ts                  # 주문 계산 로직
-│   └── metrics.ts                # 기술적 지표 계산 (SMA, RSI, ROC 등)
+│       └── page.tsx              # Backtest 페이지 (백테스트 폼)
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
 │   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가)
 │   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
 │   ├── FlowChart.tsx             # 사용법 플로우차트
-│   ├── PremiumModal.tsx          # 프리미엄 모달
-│   └── backtest/                 # 백테스트 결과 시각화 컴포넌트
-│       ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60)
-│       ├── MetricsCharts.tsx     # 6개 기술적 지표 차트
-│       └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   └── PremiumModal.tsx          # 프리미엄 모달
 └── styles/
     └── globals.css               # 글로벌 스타일 + 커스텀 CSS
 ```
