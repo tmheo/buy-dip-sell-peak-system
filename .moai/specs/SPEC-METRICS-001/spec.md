@@ -116,10 +116,10 @@ function calculateWinRate(cycles: { profit: number }[]): number;
 |------|--------|------|------|
 | 정배열 | `goldenCross` | `(MA20 - MA60) / MA60 × 100` | % |
 | MA 기울기 | `maSlope` | `(MA20[t] - MA20[t-10]) / MA20[t-10] × 100` | % |
-| 이격도 | `disparity` | `adjClose / MA20 × 100` | % |
+| 이격도 | `disparity` | `(adjClose - MA20) / MA20 × 100` | % |
 | RSI | `rsi14` | `100 - (100 / (1 + RS))` | 0-100 |
 | ROC | `roc12` | `(adjClose[t] - adjClose[t-12]) / adjClose[t-12] × 100` | % |
-| 변동성 | `volatility20` | `stddev(daily_returns, 20) × sqrt(252) × 100` | % |
+| 변동성 | `volatility20` | `stddev(daily_returns, 20, n-1) × sqrt(20)` | 소수 |
 
 #### REQ-003: BacktestResult 확장
 

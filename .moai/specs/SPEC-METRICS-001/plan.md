@@ -208,7 +208,7 @@ function calculateRSI(prices: number[], index: number): number | null {
   if (avgLoss.isZero()) return 100;
   const rs = avgGain.div(avgLoss);
   const rsi = new Decimal(100).sub(new Decimal(100).div(rs.add(1)));
-  return rsi.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  return rsi.toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber();
 }
 ```
 
