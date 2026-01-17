@@ -23,7 +23,7 @@ import {
   shouldExecuteBuy,
   shouldExecuteSell,
 } from "./order";
-import { calculateMDD, calculateWinRate } from "./metrics";
+import { calculateMDD, calculateWinRate, calculateSMA, calculateTechnicalMetrics } from "./metrics";
 
 /**
  * 백테스트 엔진
@@ -60,8 +60,18 @@ export class BacktestEngine {
     const completedCycles: { profit: number }[] = [];
     let cycleCompletedToday = false; // 사이클 완료 플래그 (다음 날 새 사이클 시작)
 
+    // SPEC-METRICS-001: adjClose 배열 생성 (기술적 지표 계산용)
+    const adjClosePrices = prices.map((p) => p.adjClose);
+
     // 첫날 처리 (매수 불가 - 전일 종가 없음)
-    const firstDaySnapshot = this.createSnapshot(prices[0], cycleManager, [], []);
+    const firstDaySnapshot = this.createSnapshot(
+      prices[0],
+      cycleManager,
+      [],
+      [],
+      adjClosePrices,
+      0
+    );
     dailyHistory.push(firstDaySnapshot);
 
     // 둘째 날부터 거래 시작
@@ -155,8 +165,15 @@ export class BacktestEngine {
         cycleCompletedToday = true; // 다음 날 새 사이클 시작
       }
 
-      // 일별 스냅샷 생성
-      const snapshot = this.createSnapshot(currentPrice, cycleManager, trades, orders);
+      // 일별 스냅샷 생성 (SPEC-METRICS-001: MA 계산용 데이터 전달)
+      const snapshot = this.createSnapshot(
+        currentPrice,
+        cycleManager,
+        trades,
+        orders,
+        adjClosePrices,
+        i
+      );
       dailyHistory.push(snapshot);
     }
 
@@ -171,6 +188,9 @@ export class BacktestEngine {
     // 잔여 티어 (미매도 보유 주식) 정보 생성
     const remainingTiers = this.createRemainingTiers(cycleManager, lastPrice.adjClose);
 
+    // SPEC-METRICS-001: 종료 시점 기술적 지표 계산
+    const technicalMetrics = calculateTechnicalMetrics(adjClosePrices, prices.length - 1);
+
     return {
       strategy: request.strategy,
       startDate: request.startDate,
@@ -184,6 +204,7 @@ export class BacktestEngine {
       dailyHistory,
       remainingTiers,
       completedCycles,
+      technicalMetrics,
     };
   }
 
@@ -370,12 +391,15 @@ export class BacktestEngine {
   /**
    * 일별 스냅샷 생성
    * 보유 자산 평가는 adjClose(수정종가)를 사용하여 배당/분할이 반영된 실제 수익률을 계산
+   * SPEC-METRICS-001: MA20, MA60 계산 추가
    */
   private createSnapshot(
     price: DailyPrice,
     cycleManager: CycleManager,
     trades: TradeAction[],
-    orders: OrderAction[] = []
+    orders: OrderAction[] = [],
+    adjClosePrices: number[] = [],
+    priceIndex: number = 0
   ): DailySnapshot {
     const activeTiers = cycleManager.getActiveTiers();
     let holdingsValue = new Decimal(0);
@@ -392,6 +416,10 @@ export class BacktestEngine {
       .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
       .toNumber();
 
+    // SPEC-METRICS-001: MA20, MA60 계산
+    const ma20 = calculateSMA(adjClosePrices, 20, priceIndex);
+    const ma60 = calculateSMA(adjClosePrices, 60, priceIndex);
+
     return {
       date: price.date,
       open: price.open,
@@ -406,6 +434,8 @@ export class BacktestEngine {
       orders,
       activeTiers: activeTiers.length,
       cycleNumber: cycleManager.getCycleNumber(),
+      ma20,
+      ma60,
     };
   }
 

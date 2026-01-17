@@ -1,6 +1,7 @@
 /**
  * 백테스트 전용 타입 정의
  * SPEC-BACKTEST-001
+ * SPEC-METRICS-001 기술적 지표
  */
 
 // ============================================================
@@ -22,6 +23,25 @@ export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
 // ============================================================
 // 타입 정의
 // ============================================================
+
+/**
+ * 기술적 지표 인터페이스
+ * SPEC-METRICS-001
+ */
+export interface TechnicalMetrics {
+  // 골든크로스 지표: (MA20 - MA60) / MA60 × 100
+  goldenCross: number;
+  // MA 기울기: (MA20[t] - MA20[t-10]) / MA20[t-10] × 100
+  maSlope: number;
+  // 이격도: adjClose / MA20 × 100
+  disparity: number;
+  // RSI 14일 (Wilder's EMA 방식)
+  rsi14: number;
+  // 12일 변화율
+  roc12: number;
+  // 20일 연환산 변동성
+  volatility20: number;
+}
 
 /**
  * 전략 이름 타입
@@ -153,6 +173,8 @@ export interface BacktestResult {
   remainingTiers: RemainingTier[];
   // 완료된 사이클별 수익
   completedCycles: { profit: number }[];
+  // 종료 시점 기술적 지표 (데이터 부족 시 null) - SPEC-METRICS-001
+  technicalMetrics: TechnicalMetrics | null;
 }
 
 /**
@@ -185,6 +207,10 @@ export interface DailySnapshot {
   activeTiers: number;
   // 현재 사이클 번호
   cycleNumber: number;
+  // 20일 단순이동평균 (데이터 부족 시 null) - SPEC-METRICS-001
+  ma20: number | null;
+  // 60일 단순이동평균 (데이터 부족 시 null) - SPEC-METRICS-001
+  ma60: number | null;
 }
 
 /**

@@ -105,6 +105,17 @@ describe("CycleManager", () => {
       // 잔여 예수금 = 10000 - 6000 = 4000
       expect(manager.getTierAmount(7)).toBe(4000);
     });
+
+    it("잘못된 티어 번호(0 이하)면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.getTierAmount(0)).toThrow("Invalid tier number: 0");
+      expect(() => manager.getTierAmount(-1)).toThrow("Invalid tier number: -1");
+    });
+
+    it("잘못된 티어 번호(8 이상)면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.getTierAmount(8)).toThrow("Invalid tier number: 8");
+    });
   });
 
   describe("activateTier", () => {
@@ -246,6 +257,122 @@ describe("CycleManager", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
       manager.activateTier(1, 100, 10, "2025-01-02", 0);
       expect(manager.hasTradedThisCycle()).toBe(true);
+    });
+  });
+
+  describe("activateTier 에러 처리", () => {
+    it("buyPrice가 0이거나 음수면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.activateTier(1, 0, 10, "2025-01-02", 0)).toThrow(
+        "buyPrice and shares must be positive"
+      );
+      expect(() => manager.activateTier(1, -100, 10, "2025-01-02", 0)).toThrow(
+        "buyPrice and shares must be positive"
+      );
+    });
+
+    it("shares가 0이거나 음수면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.activateTier(1, 100, 0, "2025-01-02", 0)).toThrow(
+        "buyPrice and shares must be positive"
+      );
+      expect(() => manager.activateTier(1, 100, -10, "2025-01-02", 0)).toThrow(
+        "buyPrice and shares must be positive"
+      );
+    });
+
+    it("예수금이 부족하면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(1000, strategy, "2025-01-02");
+      // 100 * 20 = 2000 > 1000 예수금
+      expect(() => manager.activateTier(1, 100, 20, "2025-01-02", 0)).toThrow(
+        "Insufficient cash for tier activation"
+      );
+    });
+
+    it("잘못된 티어 번호(0 이하)면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.activateTier(0, 100, 10, "2025-01-02", 0)).toThrow(
+        "Invalid tier number: 0"
+      );
+      expect(() => manager.activateTier(-1, 100, 10, "2025-01-02", 0)).toThrow(
+        "Invalid tier number: -1"
+      );
+    });
+
+    it("잘못된 티어 번호(8 이상)면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.activateTier(8, 100, 10, "2025-01-02", 0)).toThrow(
+        "Invalid tier number: 8"
+      );
+    });
+
+    it("이미 활성화된 티어를 다시 활성화하면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
+      expect(() => manager.activateTier(1, 100, 10, "2025-01-03", 1)).toThrow(
+        "Tier 1 is already active"
+      );
+    });
+  });
+
+  describe("deactivateTier 에러 처리", () => {
+    it("비활성 티어를 비활성화하면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(() => manager.deactivateTier(1, 100)).toThrow("Tier 1 is not active");
+    });
+
+    it("이미 비활성화된 티어를 다시 비활성화하면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
+      manager.deactivateTier(1, 110);
+      expect(() => manager.deactivateTier(1, 110)).toThrow("Tier 1 is not active");
+    });
+  });
+
+  describe("endCycle 에러 처리", () => {
+    it("활성 티어가 남아있으면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
+      expect(() => manager.endCycle()).toThrow("Cannot end cycle: 1 active tier(s) remaining");
+    });
+
+    it("여러 활성 티어가 남아있으면 에러를 발생시켜야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
+      manager.activateTier(2, 95, 15, "2025-01-03", 1);
+      expect(() => manager.endCycle()).toThrow("Cannot end cycle: 2 active tier(s) remaining");
+    });
+  });
+
+  describe("getStartDate", () => {
+    it("사이클 시작일을 반환해야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(manager.getStartDate()).toBe("2025-01-02");
+    });
+
+    it("새 사이클 시작 후 새로운 시작일을 반환해야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
+      manager.deactivateTier(1, 110);
+      manager.endCycle();
+      manager.startNewCycle("2025-01-15");
+      expect(manager.getStartDate()).toBe("2025-01-15");
+    });
+  });
+
+  describe("getCycleInitialCapital", () => {
+    it("초기 사이클의 초기자본을 반환해야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      expect(manager.getCycleInitialCapital()).toBe(10000);
+    });
+
+    it("새 사이클에서 풀복리 적용된 초기자본을 반환해야 한다", () => {
+      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0); // 1000 투자
+      manager.deactivateTier(1, 110); // 1100 회수
+      manager.endCycle();
+      manager.startNewCycle("2025-01-15");
+      expect(manager.getCycleInitialCapital()).toBe(10100);
     });
   });
 });
