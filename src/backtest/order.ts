@@ -65,6 +65,10 @@ export function calculateSellLimitPrice(buyPrice: number, threshold: number): nu
  * @returns 매수 수량 (정수)
  */
 export function calculateBuyQuantity(amount: number, limitPrice: number): number {
+  if (limitPrice <= 0) {
+    throw new Error("limitPrice must be greater than 0");
+  }
+  if (amount <= 0) return 0;
   return floorToDecimal(amount / limitPrice, 0);
 }
 

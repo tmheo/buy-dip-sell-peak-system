@@ -120,7 +120,19 @@ export class CycleManager {
     date: string,
     dayIndex: number
   ): void {
+    if (tier < MIN_TIER_NUMBER || tier > RESERVE_TIER_NUMBER) {
+      throw new Error(`Invalid tier number: ${tier}`);
+    }
+    if (this.tiers.has(tier)) {
+      throw new Error(`Tier ${tier} is already active`);
+    }
+    if (buyPrice <= 0 || shares <= 0) {
+      throw new Error("buyPrice and shares must be positive");
+    }
     const cost = new Decimal(buyPrice).mul(shares);
+    if (cost.gt(this.cash)) {
+      throw new Error("Insufficient cash for tier activation");
+    }
     this.cash = this.cash.sub(cost);
     this.hasTraded = true;
 

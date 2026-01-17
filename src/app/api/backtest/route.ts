@@ -99,11 +99,12 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Backtest API error:", error);
 
+    const isDev = process.env.NODE_ENV !== "production";
     return NextResponse.json(
       {
         success: false,
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        ...(isDev && { message: error instanceof Error ? error.message : "Unknown error" }),
       },
       { status: 500 }
     );

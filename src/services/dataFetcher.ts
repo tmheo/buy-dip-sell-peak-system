@@ -118,7 +118,14 @@ async function fetchChartWithRetry(
  */
 function convertQuotesToPrices(quotes: ChartQuote[]): DailyPrice[] {
   return quotes
-    .filter((q) => q.adjclose !== null && q.close !== null && q.open !== null)
+    .filter(
+      (q) =>
+        q.adjclose !== null &&
+        q.close !== null &&
+        q.open !== null &&
+        q.high !== null &&
+        q.low !== null
+    )
     .map((quote) => ({
       date: formatDate(new Date(quote.date)),
       open: normalizePrice(quote.open!),
