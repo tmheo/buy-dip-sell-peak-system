@@ -265,13 +265,13 @@ interface TechnicalMetrics {
   goldenCross: number;
   /** MA 기울기: (MA20[today] - MA20[10일전]) / MA20[10일전] × 100 */
   maSlope: number;
-  /** 이격도: adjClose / MA20 × 100 */
+  /** 이격도: (adjClose - MA20) / MA20 × 100 */
   disparity: number;
   /** RSI(14): Wilder의 EMA 방식 */
   rsi14: number;
   /** ROC(12): 12일간 변화율 */
   roc12: number;
-  /** 변동성: 20일 일별수익률 표준편차 × sqrt(252) × 100 */
+  /** 변동성: 20일 일별수익률 표본 표준편차 × sqrt(20) */
   volatility20: number;
 }
 
