@@ -262,7 +262,7 @@ src/
 | React | 19 | UI 라이브러리 |
 | Bootstrap | 5.3.3 | CSS 프레임워크 |
 | Bootswatch Solar | 5.3.3 | 다크 테마 |
-| Recharts | 2.15 | 차트 라이브러리 |
+| Recharts | 3.6 | 차트 라이브러리 |
 | Google Fonts | Noto Sans KR | 한글 폰트 |
 
 ### 백테스트 결과 시각화
