@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS daily_prices (
     high REAL NOT NULL,
     low REAL NOT NULL,
     close REAL NOT NULL,
+    adj_close REAL NOT NULL,
     volume INTEGER NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(ticker, date)
@@ -22,25 +23,25 @@ CREATE INDEX IF NOT EXISTS idx_ticker_date ON daily_prices(ticker, date)
 `;
 
 export const INSERT_DAILY_PRICE = `
-INSERT OR REPLACE INTO daily_prices (ticker, date, open, high, low, close, volume)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT OR REPLACE INTO daily_prices (ticker, date, open, high, low, close, adj_close, volume)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 export const SELECT_ALL_PRICES = `
-SELECT id, ticker, date, open, high, low, close, volume, created_at as createdAt
+SELECT id, ticker, date, open, high, low, close, adj_close as adjClose, volume, created_at as createdAt
 FROM daily_prices
 ORDER BY ticker, date ASC
 `;
 
 export const SELECT_ALL_PRICES_BY_TICKER = `
-SELECT id, ticker, date, open, high, low, close, volume, created_at as createdAt
+SELECT id, ticker, date, open, high, low, close, adj_close as adjClose, volume, created_at as createdAt
 FROM daily_prices
 WHERE ticker = ?
 ORDER BY date ASC
 `;
 
 export const SELECT_PRICES_BY_DATE_RANGE = `
-SELECT id, ticker, date, open, high, low, close, volume, created_at as createdAt
+SELECT id, ticker, date, open, high, low, close, adj_close as adjClose, volume, created_at as createdAt
 FROM daily_prices
 WHERE ticker = ? AND date >= ? AND date <= ?
 ORDER BY date ASC
@@ -59,5 +60,5 @@ SELECT COUNT(*) as count FROM daily_prices
 `;
 
 export const SELECT_LATEST_PRICES = `
-SELECT date, close FROM daily_prices WHERE ticker = ? ORDER BY date DESC LIMIT ?
+SELECT date, adj_close as adjClose FROM daily_prices WHERE ticker = ? ORDER BY date DESC LIMIT ?
 `;

@@ -162,14 +162,14 @@ async function handleUpdateAll(): Promise<void> {
  * 가격 데이터 한 줄 출력
  */
 function formatPriceRow(price: DailyPrice): string {
-  return `${price.date}\t${price.open.toFixed(2)}\t${price.high.toFixed(2)}\t${price.low.toFixed(2)}\t${price.close.toFixed(2)}\t${price.volume.toLocaleString()}`;
+  return `${price.date}\t${price.open.toFixed(2)}\t${price.high.toFixed(2)}\t${price.low.toFixed(2)}\t${price.close.toFixed(2)}\t${price.adjClose.toFixed(2)}\t${price.volume.toLocaleString()}`;
 }
 
 /**
  * 가격 목록 출력 (처음/마지막 N개)
  */
 function printPrices(prices: DailyPrice[], displayCount: number): void {
-  const header = "날짜\t\t시가\t고가\t저가\t종가\t거래량";
+  const header = "날짜\t\t시가\t고가\t저가\t종가\t수정종가\t거래량";
 
   console.log(`--- 처음 ${displayCount}개 ---`);
   console.log(header);

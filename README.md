@@ -52,7 +52,7 @@ npm run build
 # 빌드된 파일 실행
 npm start init -- --ticker SOXL
 npm start update -- --ticker TQQQ
-npm start query -- --ticker SOXL --start 2024-01-01 --end 2024-12-31
+npm start query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ```
 
 ## 명령어
@@ -106,6 +106,73 @@ Yahoo Finance API → dataFetcher (재시도/파싱) → database (트랜잭션)
 - **트랜잭션 처리**: 대량 데이터 삽입 시 트랜잭션으로 성능 최적화
 - **증분 업데이트**: 마지막 저장 날짜 이후 데이터만 다운로드
 - **멀티 티커 지원**: SOXL, TQQQ 동시 관리
+
+---
+
+## 백테스트 엔진
+
+떨사오팔 Pro 전략의 과거 성과를 시뮬레이션하는 백테스트 엔진입니다.
+
+### 지원 전략
+
+| 전략 | 티어 비율 | 매수 기준 | 매도 기준 | 손절일 |
+|------|----------|----------|----------|--------|
+| Pro1 | 5%, 10%, 15%, 20%, 25%, 25% | -0.01% | +0.01% | 10일 |
+| Pro2 | 10%, 15%, 20%, 25%, 20%, 10% | -0.01% | +1.50% | 10일 |
+| Pro3 | 16.7% × 6 | -0.10% | +2.00% | 12일 |
+
+### 핵심 기능
+
+- **LOC 주문**: 전일 종가 기준 매수/매도 지정가 계산
+- **티어 관리**: 6개 기본 티어 + 1개 예비 티어
+- **풀복리**: 사이클 종료 시 수익/손실 반영하여 다음 사이클 투자금 재계산
+- **손절 처리**: 손절일 도달 시 MOC 주문으로 전량 청산
+- **성과 지표**: 최종 자산, 수익률, MDD, 승률 계산
+
+### 백테스트 모듈 구조
+
+```
+src/backtest/
+├── engine.ts      # 백테스트 엔진 메인 클래스
+├── strategy.ts    # 전략 매개변수 정의 (Pro1/Pro2/Pro3)
+├── cycle.ts       # 사이클 상태 관리
+├── order.ts       # LOC/MOC 주문 계산
+├── metrics.ts     # 성과 지표 계산
+├── types.ts       # 백테스트 전용 타입
+└── index.ts       # 모듈 엔트리포인트
+```
+
+### API 사용법
+
+```typescript
+import { runBacktest, STRATEGIES } from './backtest';
+
+const result = await runBacktest({
+  ticker: 'SOXL',
+  strategy: 'Pro2',
+  startDate: '2025-01-02',
+  endDate: '2025-12-19',
+  initialCapital: 10000,
+});
+
+console.log(`최종 자산: $${result.finalAsset.toFixed(2)}`);
+console.log(`수익률: ${(result.returnRate * 100).toFixed(2)}%`);
+console.log(`MDD: ${(result.mdd * 100).toFixed(2)}%`);
+```
+
+### REST API
+
+**POST /api/backtest**
+
+```json
+{
+  "ticker": "SOXL",
+  "strategy": "Pro2",
+  "startDate": "2025-01-02",
+  "endDate": "2025-12-19",
+  "initialCapital": 10000
+}
+```
 
 ---
 

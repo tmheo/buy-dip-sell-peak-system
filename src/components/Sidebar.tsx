@@ -5,7 +5,7 @@ import { getLatestPrices } from "@/database";
 
 interface PriceData {
   date: string;
-  close: number;
+  adjClose: number;
   change: number;
 }
 
@@ -21,11 +21,11 @@ export default function Sidebar() {
     const previous = rawData[i + 1];
 
     // 변동률 계산: ((현재 - 이전) / 이전) * 100
-    const change = ((current.close - previous.close) / previous.close) * 100;
+    const change = ((current.adjClose - previous.adjClose) / previous.adjClose) * 100;
 
     priceData.push({
       date: current.date,
-      close: current.close,
+      adjClose: current.adjClose,
       change: change,
     });
   }
@@ -71,7 +71,7 @@ export default function Sidebar() {
                 <tr key={data.date}>
                   <td>{data.date}</td>
                   <td className={`text-end ${data.change >= 0 ? "price-up" : "price-down"}`}>
-                    {data.close.toFixed(2)} ({data.change >= 0 ? "▲" : "▼"}
+                    {data.adjClose.toFixed(2)} ({data.change >= 0 ? "▲" : "▼"}
                     {Math.abs(data.change).toFixed(2)}%)
                   </td>
                 </tr>
