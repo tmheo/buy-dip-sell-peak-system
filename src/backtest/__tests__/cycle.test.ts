@@ -42,14 +42,14 @@ describe("CycleManager", () => {
 
     it("티어 1이 활성화되면 티어 2를 반환해야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
       expect(manager.getNextBuyTier()).toBe(2);
     });
 
     it("티어 1-6이 모두 활성화되면 null을 반환해야 한다 (예수금 없을 때)", () => {
       const manager = new CycleManager(6000, strategy, "2025-01-02");
       for (let i = 1; i <= 6; i++) {
-        manager.activateTier(i, 100, 10, "2025-01-02");
+        manager.activateTier(i, 100, 10, "2025-01-02", 0);
       }
       expect(manager.getNextBuyTier()).toBe(null);
     });
@@ -58,7 +58,7 @@ describe("CycleManager", () => {
       const manager = new CycleManager(10000, strategy, "2025-01-02");
       // 각 티어에 1000씩 사용 가정
       for (let i = 1; i <= 6; i++) {
-        manager.activateTier(i, 100, 10, "2025-01-02"); // 100 * 10 = 1000
+        manager.activateTier(i, 100, 10, "2025-01-02", 0); // 100 * 10 = 1000
       }
       // 10000 - 6000 = 4000 예수금 남음
       expect(manager.getNextBuyTier()).toBe(7);
@@ -100,7 +100,7 @@ describe("CycleManager", () => {
       const manager = new CycleManager(10000, strategy, "2025-01-02");
       // 티어 1-6 활성화 (각 1000씩)
       for (let i = 1; i <= 6; i++) {
-        manager.activateTier(i, 100, 10, "2025-01-02");
+        manager.activateTier(i, 100, 10, "2025-01-02", 0);
       }
       // 잔여 예수금 = 10000 - 6000 = 4000
       expect(manager.getTierAmount(7)).toBe(4000);
@@ -110,13 +110,13 @@ describe("CycleManager", () => {
   describe("activateTier", () => {
     it("티어를 활성화하면 예수금이 감소해야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02"); // 100 * 10 = 1000
+      manager.activateTier(1, 100, 10, "2025-01-02", 0); // 100 * 10 = 1000
       expect(manager.getCash()).toBe(9000);
     });
 
     it("활성화된 티어 정보가 저장되어야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-03");
+      manager.activateTier(1, 100, 10, "2025-01-03", 1);
       const activeTiers = manager.getActiveTiers();
       expect(activeTiers.length).toBe(1);
       expect(activeTiers[0].tier).toBe(1);
@@ -129,7 +129,7 @@ describe("CycleManager", () => {
   describe("deactivateTier", () => {
     it("티어를 비활성화하면 수익이 예수금에 추가되어야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02"); // 1000 투자
+      manager.activateTier(1, 100, 10, "2025-01-02", 0); // 1000 투자
       // 매도: 110 * 10 = 1100
       const profit = manager.deactivateTier(1, 110);
       expect(profit).toBe(100); // 1100 - 1000 = 100 수익
@@ -138,7 +138,7 @@ describe("CycleManager", () => {
 
     it("손실 시 음수 수익을 반환해야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
       const profit = manager.deactivateTier(1, 90); // 90 * 10 = 900
       expect(profit).toBe(-100); // 900 - 1000 = -100 손실
       expect(manager.getCash()).toBe(9900);
@@ -146,7 +146,7 @@ describe("CycleManager", () => {
 
     it("비활성화 후 티어가 제거되어야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
       manager.deactivateTier(1, 110);
       expect(manager.getActiveTiers().length).toBe(0);
     });
@@ -168,41 +168,11 @@ describe("CycleManager", () => {
     });
   });
 
-  describe("isStopLossDay", () => {
-    it("REQ-006: dayCount가 stopLossDay 이상이면 true", () => {
-      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      // Pro2의 stopLossDay는 10
-      for (let i = 0; i < 10; i++) {
-        manager.incrementDay();
-      }
-      expect(manager.isStopLossDay()).toBe(true);
-    });
-
-    it("dayCount가 stopLossDay 미만이면 false", () => {
-      const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      for (let i = 0; i < 9; i++) {
-        manager.incrementDay();
-      }
-      expect(manager.isStopLossDay()).toBe(false);
-    });
-
-    it("Pro3 전략은 stopLossDay가 12일", () => {
-      const pro3 = getStrategy("Pro3");
-      const manager = new CycleManager(initialCapital, pro3, "2025-01-02");
-      for (let i = 0; i < 11; i++) {
-        manager.incrementDay();
-      }
-      expect(manager.isStopLossDay()).toBe(false);
-      manager.incrementDay();
-      expect(manager.isStopLossDay()).toBe(true);
-    });
-  });
-
   describe("getActiveTiers", () => {
     it("활성화된 티어만 반환해야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02");
-      manager.activateTier(2, 95, 15, "2025-01-03");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
+      manager.activateTier(2, 95, 15, "2025-01-03", 1);
       const activeTiers = manager.getActiveTiers();
       expect(activeTiers.length).toBe(2);
       expect(activeTiers.map((t) => t.tier)).toEqual([1, 2]);
@@ -212,15 +182,15 @@ describe("CycleManager", () => {
   describe("getTotalAsset", () => {
     it("현재 가격으로 총 자산을 계산해야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02"); // 1000 투자, 9000 예수금
+      manager.activateTier(1, 100, 10, "2025-01-02", 0); // 1000 투자, 9000 예수금
       // 현재가 110일 때: 9000 + (10 * 110) = 9000 + 1100 = 10100
       expect(manager.getTotalAsset(110)).toBe(10100);
     });
 
     it("여러 티어의 총 자산을 계산해야 한다", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02"); // 1000 투자
-      manager.activateTier(2, 95, 20, "2025-01-03"); // 1900 투자
+      manager.activateTier(1, 100, 10, "2025-01-02", 0); // 1000 투자
+      manager.activateTier(2, 95, 20, "2025-01-03", 1); // 1900 투자
       // 예수금: 10000 - 1000 - 1900 = 7100
       // 현재가 100일 때: 7100 + (10 * 100) + (20 * 100) = 7100 + 1000 + 2000 = 10100
       expect(manager.getTotalAsset(100)).toBe(10100);
@@ -236,7 +206,7 @@ describe("CycleManager", () => {
     it("isCycleComplete는 모든 티어가 매도되면 true", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
       // 티어 1 매수 후 매도
-      manager.activateTier(1, 100, 10, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
       expect(manager.isCycleComplete()).toBe(false);
       manager.deactivateTier(1, 110);
       expect(manager.isCycleComplete()).toBe(true);
@@ -244,7 +214,7 @@ describe("CycleManager", () => {
 
     it("endCycle 후 startNewCycle로 풀복리 적용", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02"); // 1000 투자
+      manager.activateTier(1, 100, 10, "2025-01-02", 0); // 1000 투자
       manager.deactivateTier(1, 110); // 1100 회수 -> 수익 100
       // 현재 예수금: 10100
       manager.endCycle();
@@ -257,7 +227,7 @@ describe("CycleManager", () => {
 
     it("새 사이클에서 티어 금액이 새 초기자본 기준으로 계산", () => {
       const manager = new CycleManager(10000, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
       manager.deactivateTier(1, 110);
       manager.endCycle();
       manager.startNewCycle("2025-01-10");
@@ -274,7 +244,7 @@ describe("CycleManager", () => {
 
     it("티어 활성화 후 true", () => {
       const manager = new CycleManager(initialCapital, strategy, "2025-01-02");
-      manager.activateTier(1, 100, 10, "2025-01-02");
+      manager.activateTier(1, 100, 10, "2025-01-02", 0);
       expect(manager.hasTradedThisCycle()).toBe(true);
     });
   });

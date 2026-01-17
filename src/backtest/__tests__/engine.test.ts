@@ -10,17 +10,18 @@ import type { DailyPrice } from "@/types";
 // Mock 가격 데이터 생성 헬퍼
 function createMockPrice(
   date: string,
-  close: number,
+  adjClose: number,
   open?: number,
   high?: number,
   low?: number
 ): DailyPrice {
   return {
     date,
-    open: open ?? close,
-    high: high ?? close,
-    low: low ?? close,
-    close,
+    open: open ?? adjClose,
+    high: high ?? adjClose,
+    low: low ?? adjClose,
+    close: adjClose,
+    adjClose,
     volume: 1000000,
   };
 }
@@ -224,7 +225,7 @@ describe("BacktestEngine", () => {
       expect(result.dailyHistory.length).toBe(5);
       result.dailyHistory.forEach((snapshot, i) => {
         expect(snapshot.date).toBe(prices[i].date);
-        expect(snapshot.close).toBe(prices[i].close);
+        expect(snapshot.adjClose).toBe(prices[i].adjClose);
         expect(snapshot.totalAsset).toBeGreaterThan(0);
       });
     });

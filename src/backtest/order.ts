@@ -2,21 +2,30 @@
  * LOC/MOC 주문 계산 함수
  * SPEC-BACKTEST-001 REQ-002, REQ-003, REQ-004, REQ-005
  */
+import Decimal from "decimal.js";
 
 /**
- * 소수점 자릿수로 내림
- * 부동소수점 정밀도 문제를 해결하기 위해 정수 연산 사용
+ * 소수점 자릿수로 내림 (decimal.js 사용)
+ * 부동소수점 정밀도 문제를 해결하기 위해 decimal.js 사용
  *
  * @param value - 내림할 값
  * @param decimals - 소수점 자릿수
  * @returns 내림된 값
  */
 export function floorToDecimal(value: number, decimals: number): number {
-  const multiplier = Math.pow(10, decimals);
-  // 부동소수점 정밀도 문제 해결: 10자리까지 반올림 후 내림
-  // 예: 100 * 1.015 = 101.49999999999999 -> 반올림 -> 101.5 -> 내림 -> 101.5
-  const rounded = Math.round(value * 1e10) / 1e10;
-  return Math.floor(rounded * multiplier) / multiplier;
+  return new Decimal(value).toDecimalPlaces(decimals, Decimal.ROUND_DOWN).toNumber();
+}
+
+/**
+ * 소수점 자릿수로 반올림 (decimal.js 사용)
+ * 금융 계산에서 사용 (현금 합계 등)
+ *
+ * @param value - 반올림할 값
+ * @param decimals - 소수점 자릿수
+ * @returns 반올림된 값
+ */
+export function roundToDecimal(value: number, decimals: number): number {
+  return new Decimal(value).toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP).toNumber();
 }
 
 /**
@@ -28,8 +37,9 @@ export function floorToDecimal(value: number, decimals: number): number {
  * @returns 매수 지정가
  */
 export function calculateBuyLimitPrice(prevClose: number, threshold: number): number {
-  const rawPrice = prevClose * (1 + threshold);
-  return floorToDecimal(rawPrice, 2);
+  // decimal.js를 사용하여 부동소수점 오차 방지
+  const price = new Decimal(prevClose).mul(new Decimal(1).add(threshold));
+  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
 }
 
 /**
@@ -41,8 +51,9 @@ export function calculateBuyLimitPrice(prevClose: number, threshold: number): nu
  * @returns 매도 지정가
  */
 export function calculateSellLimitPrice(buyPrice: number, threshold: number): number {
-  const rawPrice = buyPrice * (1 + threshold);
-  return floorToDecimal(rawPrice, 2);
+  // decimal.js를 사용하여 부동소수점 오차 방지
+  const price = new Decimal(buyPrice).mul(new Decimal(1).add(threshold));
+  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
 }
 
 /**

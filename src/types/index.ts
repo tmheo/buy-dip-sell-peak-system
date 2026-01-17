@@ -1,5 +1,7 @@
 /**
  * 일별 가격 데이터 인터페이스
+ * close: 당일 종가 (원시 데이터)
+ * adjClose: 수정종가 (주식분할, 배당 등 반영)
  */
 export interface DailyPrice {
   id?: number;
@@ -9,6 +11,7 @@ export interface DailyPrice {
   high: number;
   low: number;
   close: number;
+  adjClose: number;
   volume: number;
   createdAt?: string;
 }

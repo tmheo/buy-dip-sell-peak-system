@@ -14,10 +14,12 @@ function createSnapshot(date: string, totalAsset: number): DailySnapshot {
     high: 100,
     low: 100,
     close: 100,
+    adjClose: 100,
     cash: totalAsset,
     holdingsValue: 0,
     totalAsset,
     trades: [],
+    orders: [],
     activeTiers: 0,
     cycleNumber: 1,
   };

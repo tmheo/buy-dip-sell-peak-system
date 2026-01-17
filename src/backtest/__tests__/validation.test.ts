@@ -6,16 +6,27 @@
  * Initial Capital: $10,000
  *
  * 기준값은 현재 백테스트 엔진 구현 결과입니다.
- * 문서의 원본 기준값과 차이가 있는 이유:
- * - Pro1/Pro2: sellThreshold가 작아 floor 연산 후 매도가 어려움
- * - Pro3: 티어별 손절일 계산 방식 차이
+ * decimal.js를 사용하여 모든 금융 계산의 부동소수점 오차를 제거했습니다.
+ *
+ * 티어 고정 방식 적용 (2025-01-17):
+ * - 매도/손절 시 티어 번호는 그대로 유지 (빈 슬롯으로 남음)
+ * - 다음 매수는 가장 낮은 빈 티어에 배정
+ * - 예: T1 손절, T2,T3 보유 → T4 매수 (T1이 비어 있어도 손절 전 상태 기준)
+ *
+ * MOC 손절 당일 매도 (2025-01-17):
+ * - 손절 조건 충족일에 바로 MOC 매도 (다음 날이 아님)
+ * - 실제 증권시장의 LOC/MOC 주문 특성 반영
+ *
+ * 동시 주문 원칙 (2025-01-17):
+ * - 모든 주문(매수/매도/손절)은 장 마감 전 동시에 제출됨
+ * - 매수 티어는 손절/매도 전 상태 기준으로 결정
  *
  * 현재 구현 기준값:
  * | Strategy | Final Asset | Return | MDD |
  * |----------|-------------|--------|-----|
- * | Pro1 | $11,994 | 19.93% | -18.07% |
- * | Pro2 | $12,489 | 24.88% | -37.70% |
- * | Pro3 | $14,793 | 47.92% | -39.93% |
+ * | Pro1 | $13,376 | 33.75% | -18.90% |
+ * | Pro2 | $12,929 | 29.29% | -38.61% |
+ * | Pro3 | $14,920 | 49.19% | -39.29% |
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { BacktestEngine } from "../engine";
@@ -42,31 +53,31 @@ interface ValidationCriteria {
 
 const VALIDATION_CRITERIA: Record<StrategyName, ValidationCriteria> = {
   Pro1: {
-    finalAsset: 11994,
-    returnRate: 0.1993,
-    mdd: -0.1807,
+    finalAsset: 13376,
+    returnRate: 0.3375,
+    mdd: -0.189,
     tolerance: {
-      finalAsset: 11994 * 0.01, // ±1%
+      finalAsset: 13376 * 0.01, // ±1%
       returnRate: 0.01, // ±1%p
       mdd: 0.01, // ±1%p
     },
   },
   Pro2: {
-    finalAsset: 12489,
-    returnRate: 0.2488,
-    mdd: -0.377,
+    finalAsset: 12929,
+    returnRate: 0.2929,
+    mdd: -0.3861,
     tolerance: {
-      finalAsset: 12489 * 0.01,
+      finalAsset: 12929 * 0.01,
       returnRate: 0.01,
       mdd: 0.01,
     },
   },
   Pro3: {
-    finalAsset: 14793,
-    returnRate: 0.4792,
-    mdd: -0.3993,
+    finalAsset: 14920,
+    returnRate: 0.4919,
+    mdd: -0.3929,
     tolerance: {
-      finalAsset: 14793 * 0.01,
+      finalAsset: 14920 * 0.01,
       returnRate: 0.01,
       mdd: 0.01,
     },

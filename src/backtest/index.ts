@@ -3,6 +3,9 @@
  * SPEC-BACKTEST-001
  */
 
+// 상수 내보내기
+export { BASE_TIER_COUNT, RESERVE_TIER_NUMBER, MIN_TIER_NUMBER, MAX_TIER_NUMBER } from "./types";
+
 // 타입 내보내기
 export type {
   StrategyName,

@@ -3,6 +3,26 @@
  * SPEC-BACKTEST-001
  */
 
+// ============================================================
+// 상수 정의
+// ============================================================
+
+/** 기본 티어 개수 (티어 1-6) */
+export const BASE_TIER_COUNT = 6;
+
+/** 예비 티어 번호 */
+export const RESERVE_TIER_NUMBER = 7;
+
+/** 최소 티어 번호 */
+export const MIN_TIER_NUMBER = 1;
+
+/** 최대 티어 번호 (예비 티어 포함) */
+export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
+
+// ============================================================
+// 타입 정의
+// ============================================================
+
 /**
  * 전략 이름 타입
  */
@@ -131,6 +151,8 @@ export interface BacktestResult {
   dailyHistory: DailySnapshot[];
   // 잔여 티어 (백테스트 종료 시 미매도 보유 주식)
   remainingTiers: RemainingTier[];
+  // 완료된 사이클별 수익
+  completedCycles: { profit: number }[];
 }
 
 /**
@@ -145,16 +167,20 @@ export interface DailySnapshot {
   high: number;
   // 저가
   low: number;
-  // 종가
+  // 종가 (실제 거래 체결 시 사용되는 가격)
   close: number;
+  // 수정종가 (주식분할, 배당 등 반영, 수익률 계산에 사용)
+  adjClose: number;
   // 현재 예수금
   cash: number;
-  // 보유 주식 총 가치 (종가 기준)
+  // 보유 주식 총 가치 (수정종가 기준, 수익률 계산용)
   holdingsValue: number;
   // 총 자산 (예수금 + 보유 주식 가치)
   totalAsset: number;
-  // 당일 거래 내역
+  // 당일 거래 내역 (체결된 거래만)
   trades: TradeAction[];
+  // 당일 주문 내역 (체결/미체결 모두 포함)
+  orders: OrderAction[];
   // 활성 티어 수
   activeTiers: number;
   // 현재 사이클 번호
@@ -189,4 +215,31 @@ export interface OrderCalculation {
   shares: number;
   // 총 금액
   amount: number;
+}
+
+/**
+ * 주문 상태 인터페이스
+ * 체결 여부와 관계없이 모든 주문을 추적
+ */
+export interface OrderAction {
+  // 주문 유형 (BUY: 매수, SELL: 매도)
+  type: "BUY" | "SELL";
+  // 티어 번호
+  tier: number;
+  // 지정가
+  limitPrice: number;
+  // 주문 수량
+  shares: number;
+  // 주문 금액
+  amount: number;
+  // 주문 방식 (LOC/MOC)
+  orderType: "LOC" | "MOC";
+  // 체결 여부
+  executed: boolean;
+  // 체결가 (체결된 경우에만)
+  executedPrice?: number;
+  // 체결 금액 (체결된 경우에만)
+  executedAmount?: number;
+  // 미체결 사유 (미체결인 경우에만)
+  reason?: string;
 }

@@ -1,6 +1,15 @@
 import YahooFinance from "yahoo-finance2";
+import Decimal from "decimal.js";
 
 import type { DailyPrice } from "../types/index.js";
+
+/**
+ * 가격을 소수점 2자리로 정규화 (금융 데이터 정밀도 보장)
+ * decimal.js를 사용하여 부동소수점 오차 제거
+ */
+function normalizePrice(value: number): number {
+  return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+}
 
 const yahooFinance = new YahooFinance();
 
@@ -21,6 +30,7 @@ interface ChartQuote {
   high: number | null;
   low: number | null;
   close: number | null;
+  adjclose: number | null;
   volume: number | null;
 }
 
@@ -102,16 +112,20 @@ async function fetchChartWithRetry(
 
 /**
  * Yahoo Finance 원시 데이터를 DailyPrice 배열로 변환
+ * close: 당일 종가 (원시 데이터)
+ * adjClose: 수정종가 (주식분할, 배당 등 반영)
+ * 가격 데이터는 소수점 2자리로 정규화하여 부동소수점 오차 제거
  */
 function convertQuotesToPrices(quotes: ChartQuote[]): DailyPrice[] {
   return quotes
-    .filter((q) => q.close !== null && q.open !== null)
+    .filter((q) => q.adjclose !== null && q.close !== null && q.open !== null)
     .map((quote) => ({
       date: formatDate(new Date(quote.date)),
-      open: quote.open!,
-      high: quote.high!,
-      low: quote.low!,
-      close: quote.close!,
+      open: normalizePrice(quote.open!),
+      high: normalizePrice(quote.high!),
+      low: normalizePrice(quote.low!),
+      close: normalizePrice(quote.close!),
+      adjClose: normalizePrice(quote.adjclose!),
       volume: quote.volume ?? 0,
     }));
 }
@@ -191,9 +205,9 @@ export async function fetchCurrentQuote(
     const result = await yahooFinance.quote(ticker);
     const quote = Array.isArray(result) ? result[0] : result;
     return {
-      price: quote.regularMarketPrice ?? 0,
-      change: quote.regularMarketChange ?? 0,
-      changePercent: quote.regularMarketChangePercent ?? 0,
+      price: normalizePrice(quote.regularMarketPrice ?? 0),
+      change: normalizePrice(quote.regularMarketChange ?? 0),
+      changePercent: normalizePrice(quote.regularMarketChangePercent ?? 0),
     };
   } catch (error) {
     console.error(`${ticker} 시세 조회 실패:`, error);

@@ -25,6 +25,7 @@ function createMockPrices(count: number, startPrice: number = 100): DailyPrice[]
       high: price + 1,
       low: price - 1,
       close: price,
+      adjClose: price,
       volume: 1000000,
     });
     // 약간의 변동 추가

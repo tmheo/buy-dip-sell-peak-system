@@ -61,7 +61,16 @@ export function initTables(): void {
 export function insertPrice(price: DailyPrice, ticker: string = DEFAULT_TICKER): void {
   const database = getConnection();
   const stmt = database.prepare(INSERT_DAILY_PRICE);
-  stmt.run(ticker, price.date, price.open, price.high, price.low, price.close, price.volume);
+  stmt.run(
+    ticker,
+    price.date,
+    price.open,
+    price.high,
+    price.low,
+    price.close,
+    price.adjClose,
+    price.volume
+  );
 }
 
 /**
@@ -73,7 +82,16 @@ export function insertPrices(prices: DailyPrice[], ticker: string = DEFAULT_TICK
 
   const insertMany = database.transaction((items: DailyPrice[]) => {
     for (const price of items) {
-      stmt.run(ticker, price.date, price.open, price.high, price.low, price.close, price.volume);
+      stmt.run(
+        ticker,
+        price.date,
+        price.open,
+        price.high,
+        price.low,
+        price.close,
+        price.adjClose,
+        price.volume
+      );
     }
   });
 
@@ -151,8 +169,8 @@ export function getTotalCount(): number {
 export function getLatestPrices(
   limit: number,
   ticker: string = DEFAULT_TICKER
-): { date: string; close: number }[] {
+): { date: string; adjClose: number }[] {
   const database = getConnection();
   const stmt = database.prepare(SELECT_LATEST_PRICES);
-  return stmt.all(ticker, limit) as { date: string; close: number }[];
+  return stmt.all(ticker, limit) as { date: string; adjClose: number }[];
 }
