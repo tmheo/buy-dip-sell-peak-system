@@ -18,6 +18,13 @@ constitution:
   principles:
     simplicity:
       max_parallel_tasks: 10
+  development_mode: ddd
+  enforce_quality: true
+  ddd_settings:
+    require_existing_tests: true
+    characterization_tests: true
+    behavior_snapshots: true
+    max_transformation_size: small
 report_generation:
   enabled: true
   auto_create: false
