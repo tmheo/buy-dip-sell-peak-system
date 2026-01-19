@@ -53,37 +53,50 @@ export class BacktestEngine {
    * 백테스트 실행
    *
    * @param request - 백테스트 요청
-   * @param prices - 가격 데이터 (날짜순 정렬)
+   * @param prices - 가격 데이터 (날짜순 정렬, 과거 데이터 포함 가능)
+   * @param backtestStartIndex - 백테스트 시작 인덱스 (과거 데이터는 지표 계산용)
    * @returns 백테스트 결과
    */
-  run(request: BacktestRequest, prices: DailyPrice[]): BacktestResult {
-    if (prices.length < 2) {
+  run(
+    request: BacktestRequest,
+    prices: DailyPrice[],
+    backtestStartIndex: number = 0
+  ): BacktestResult {
+    // 백테스트 시작 인덱스 유효성 검사
+    const effectiveStartIndex = Math.max(0, backtestStartIndex);
+    const backtestPricesCount = prices.length - effectiveStartIndex;
+
+    if (backtestPricesCount < 2) {
       throw new Error("At least 2 days of price data required");
     }
 
-    const cycleManager = new CycleManager(request.initialCapital, this.strategy, prices[0].date);
+    const cycleManager = new CycleManager(
+      request.initialCapital,
+      this.strategy,
+      prices[effectiveStartIndex].date
+    );
 
     const dailyHistory: DailySnapshot[] = [];
     let totalCycles = 1;
     const completedCycles: { profit: number }[] = [];
     let cycleCompletedToday = false; // 사이클 완료 플래그 (다음 날 새 사이클 시작)
 
-    // SPEC-METRICS-001: adjClose 배열 생성 (기술적 지표 계산용)
+    // SPEC-METRICS-001: adjClose 배열 생성 (기술적 지표 계산용 - 전체 데이터)
     const adjClosePrices = prices.map((p) => p.adjClose);
 
-    // 첫날 처리 (매수 불가 - 전일 종가 없음)
+    // 백테스트 첫날 처리 (매수 불가 - 전일 종가 없음)
     const firstDaySnapshot = this.createSnapshot(
-      prices[0],
+      prices[effectiveStartIndex],
       cycleManager,
       [],
       [],
       adjClosePrices,
-      0
+      effectiveStartIndex
     );
     dailyHistory.push(firstDaySnapshot);
 
-    // 둘째 날부터 거래 시작
-    for (let i = 1; i < prices.length; i++) {
+    // 백테스트 둘째 날부터 거래 시작
+    for (let i = effectiveStartIndex + 1; i < prices.length; i++) {
       const prevPrice = prices[i - 1];
       const currentPrice = prices[i];
       const trades: TradeAction[] = [];
@@ -193,25 +206,27 @@ export class BacktestEngine {
     const mdd = calculateMDD(dailyHistory);
     const winRate = calculateWinRate(completedCycles);
 
-    // CAGR 계산
-    const cagr = calculateCAGR(request.initialCapital, finalAsset, prices.length);
+    // CAGR 계산 (백테스트 기간 기준)
+    const backtestDays = prices.length - effectiveStartIndex;
+    const cagr = calculateCAGR(request.initialCapital, finalAsset, backtestDays);
 
     // 잔여 티어 (미매도 보유 주식) 정보 생성
     const remainingTiers = this.createRemainingTiers(cycleManager, lastPrice.adjClose);
 
     // SPEC-METRICS-001: 종료 시점 기술적 지표 계산
     // 원본 사이트 방식: 백테스트 기간 내 거래일 수가 60일 미만이면 정배열(goldenCross) NaN
-    const backtestDays = prices.length;
+    // 지표 계산은 전체 데이터(과거 포함)를 사용하여 정확한 값 산출
     const technicalMetrics = calculateTechnicalMetrics(
       adjClosePrices,
       prices.length - 1,
       backtestDays
     );
 
-    // 일별 기술적 지표 배열 생성 (차트용)
-    const dailyTechnicalMetrics: DailyTechnicalMetrics[] = prices.map((price, index) => {
-      return calculateDailyMetrics(adjClosePrices, index, price.date);
-    });
+    // 일별 기술적 지표 배열 생성 (차트용 - 백테스트 기간만)
+    const dailyTechnicalMetrics: DailyTechnicalMetrics[] = [];
+    for (let i = effectiveStartIndex; i < prices.length; i++) {
+      dailyTechnicalMetrics.push(calculateDailyMetrics(adjClosePrices, i, prices[i].date));
+    }
 
     return {
       strategy: request.strategy,

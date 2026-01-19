@@ -56,17 +56,26 @@ export async function POST(request: Request) {
 
     const validatedRequest = parseResult.data;
 
-    // 가격 데이터 조회
-    const prices = getPricesByDateRange(
+    // 과거 데이터 조회 기간 계산 (90일 전) - 기술적 지표 계산용
+    const lookbackDate = new Date(validatedRequest.startDate);
+    lookbackDate.setDate(lookbackDate.getDate() - 90);
+    const lookbackDateStr = lookbackDate.toISOString().split("T")[0];
+
+    // 전체 데이터 조회 (과거 데이터 + 백테스트 기간)
+    const allPrices = getPricesByDateRange(
       {
-        startDate: validatedRequest.startDate,
+        startDate: lookbackDateStr,
         endDate: validatedRequest.endDate,
       },
       validatedRequest.ticker
     );
 
-    // 데이터 부족 체크
-    if (prices.length < 2) {
+    // 백테스트 시작일 인덱스 찾기
+    const backtestStartIndex = allPrices.findIndex((p) => p.date >= validatedRequest.startDate);
+
+    // 백테스트 기간 데이터 부족 체크
+    const backtestPricesCount = backtestStartIndex >= 0 ? allPrices.length - backtestStartIndex : 0;
+    if (backtestPricesCount < 2) {
       return NextResponse.json(
         {
           success: false,
@@ -87,7 +96,7 @@ export async function POST(request: Request) {
       initialCapital: validatedRequest.initialCapital,
     };
 
-    const result = engine.run(backtestRequest, prices);
+    const result = engine.run(backtestRequest, allPrices, backtestStartIndex);
 
     return NextResponse.json(
       {

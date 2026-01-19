@@ -368,8 +368,11 @@ export function calculateTechnicalMetrics(
   // CON-002: MA60이 0이면 null (제로 나눗셈 방지)
   if (ma60 === 0) return null;
 
+  // 정배열 여부: MA20 > MA60 (짧은 백테스트 기간에도 표시)
+  const isGoldenCross = ma20 > ma60;
+
   // 골든크로스: (MA20 - MA60) / MA60 × 100
-  // 백테스트 기간이 60일 미만이면 NaN (MA60 계산에 60일 필요)
+  // 백테스트 기간이 60일 미만이면 NaN (원본 사이트 방식)
   let goldenCross: number;
   if (backtestDays !== undefined && backtestDays < 60) {
     goldenCross = NaN;
@@ -416,6 +419,7 @@ export function calculateTechnicalMetrics(
 
   return {
     goldenCross,
+    isGoldenCross,
     maSlope,
     disparity,
     rsi14,

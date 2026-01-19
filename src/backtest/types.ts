@@ -31,6 +31,8 @@ export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
 export interface TechnicalMetrics {
   // 골든크로스 지표: (MA20 - MA60) / MA60 × 100
   goldenCross: number;
+  // 정배열 여부: MA20 > MA60 (짧은 백테스트 기간에도 표시)
+  isGoldenCross: boolean;
   // MA 기울기: (MA20[t] - MA20[t-10]) / MA20[t-10] × 100
   maSlope: number;
   // 이격도: (adjClose - MA20) / MA20 × 100

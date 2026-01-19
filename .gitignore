@@ -118,6 +118,7 @@ secret-*.*
 *-backup/
 *~
 # Claude Code Configuration
+.claude/plans/
 *_backup_*/
 [Dd]esktop.ini
 *-secret.*
