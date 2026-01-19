@@ -146,6 +146,8 @@ __pycache__/
 *-key.*
 *.bak
 .moai-backups/
+.moai/cache/
+.moai/memory/
 private-key*
 # Secrets and Credentials (CRITICAL)
 .netlify/
