@@ -63,7 +63,16 @@ export class BacktestEngine {
     backtestStartIndex: number = 0
   ): BacktestResult {
     // 백테스트 시작 인덱스 유효성 검사
-    const effectiveStartIndex = Math.max(0, backtestStartIndex);
+    if (
+      !Number.isFinite(backtestStartIndex) ||
+      !Number.isInteger(backtestStartIndex) ||
+      backtestStartIndex < 0 ||
+      backtestStartIndex >= prices.length
+    ) {
+      // 유효하지 않은 경우 0으로 폴백 (전체 기간 백테스트)
+      backtestStartIndex = 0;
+    }
+    const effectiveStartIndex = backtestStartIndex;
     const backtestPricesCount = prices.length - effectiveStartIndex;
 
     if (backtestPricesCount < 2) {

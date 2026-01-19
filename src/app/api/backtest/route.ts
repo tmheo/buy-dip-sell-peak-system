@@ -57,9 +57,9 @@ export async function POST(request: Request) {
     const validatedRequest = parseResult.data;
 
     // 과거 데이터 조회 기간 계산 (90일 전) - 기술적 지표 계산용
-    const lookbackDate = new Date(validatedRequest.startDate);
-    lookbackDate.setDate(lookbackDate.getDate() - 90);
-    const lookbackDateStr = lookbackDate.toISOString().split("T")[0];
+    const lookbackDate = new Date(`${validatedRequest.startDate}T00:00:00Z`);
+    lookbackDate.setUTCDate(lookbackDate.getUTCDate() - 90);
+    const lookbackDateStr = lookbackDate.toISOString().slice(0, 10);
 
     // 전체 데이터 조회 (과거 데이터 + 백테스트 기간)
     const allPrices = getPricesByDateRange(
