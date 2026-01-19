@@ -414,6 +414,70 @@ const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
 const rsi = 100 - (100 / (1 + rs));
 ```
 
+### 4.5 확장 구현 (추가된 기능)
+
+실제 구현에서 SPEC 명세를 넘어 추가된 기능들:
+
+#### isGoldenCross 플래그
+
+```typescript
+interface TechnicalMetrics {
+  // ... 기존 필드들
+  /** 정배열 여부: MA20 > MA60 */
+  isGoldenCross: boolean;
+}
+```
+
+#### DailyTechnicalMetrics 인터페이스
+
+차트 렌더링을 위한 일별 기술적 지표 인터페이스:
+
+```typescript
+interface DailyTechnicalMetrics {
+  date: string;
+  goldenCross: number | null;
+  maSlope: number | null;
+  disparity: number | null;
+  rsi14: number | null;
+  roc12: number | null;
+  volatility20: number | null;
+}
+```
+
+#### CAGR (연평균 복리 수익률)
+
+```typescript
+interface BacktestResult {
+  // ... 기존 필드들
+  /** 연평균 복리 수익률 */
+  cagr: number;
+}
+
+/**
+ * CAGR 계산
+ * @param initial - 초기 자산
+ * @param final - 최종 자산
+ * @param days - 투자 기간 (일수)
+ * @returns CAGR (소수점, 예: 0.15 = 15%)
+ */
+function calculateCAGR(initial: number, final: number, days: number): number;
+```
+
+#### calculateDailyMetrics 함수
+
+```typescript
+/**
+ * 일별 기술적 지표 계산 (차트용)
+ * @param prices - 가격 배열 (DailyPrice[])
+ * @param startIndex - 시작 인덱스
+ * @returns 일별 기술적 지표 배열
+ */
+function calculateDailyMetrics(
+  prices: DailyPrice[],
+  startIndex: number
+): DailyTechnicalMetrics[];
+```
+
 #### 표본 표준편차 알고리즘 (변동성용)
 
 ```typescript
@@ -463,3 +527,4 @@ const volatility = stddev * sqrt(20);
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |------|------|--------|----------|
 | 1.0 | 2026-01-17 | manager-spec | 초기 SPEC 작성 |
+| 1.1 | 2026-01-20 | 문서 동기화 | 확장 구현 반영 (isGoldenCross, DailyTechnicalMetrics, CAGR) |
