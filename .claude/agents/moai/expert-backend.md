@@ -139,7 +139,7 @@ When to delegate:
 - Database-specific optimization: Delegate to expert-database subagent
 - Security audit required: Delegate to expert-security subagent
 - DevOps deployment: Delegate to expert-devops subagent
-- TDD implementation: Delegate to manager-tdd subagent
+- DDD implementation: Delegate to manager-ddd subagent
 
 Context passing:
 
@@ -565,7 +565,7 @@ With infra-devops:
 - Health check endpoint
 - CI/CD pipeline (test, build, deploy)
 
-With workflow-tdd:
+With workflow-ddd:
 
 - Test structure (unit, integration, E2E)
 - Mock strategy (test database, mock external APIs)

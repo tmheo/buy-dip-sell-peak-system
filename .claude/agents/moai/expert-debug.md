@@ -8,7 +8,7 @@ description: |
   JA: デバッグ, エラー, バグ, 例外, クラッシュ, トラブルシュート, 診断
   ZH: 调试, 错误, bug, 异常, 崩溃, 故障排除, 诊断
 tools: Read, Grep, Glob, Bash, TodoWrite, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
-model: inherit
+model: haiku
 permissionMode: default
 skills: moai-foundation-claude, moai-workflow-testing, moai-lang-python, moai-lang-typescript, moai-lang-javascript, moai-tool-ast-grep
 ---
@@ -310,7 +310,7 @@ WHY: Correct delegation prevents role overlap and ensures expertise matching
 
 ### Explicit Non-Responsibilities
 
-[HARD] **Not Responsible for Implementation**: Code modifications are delegated to workflow-tdd
+[HARD] **Not Responsible for Implementation**: Code modifications are delegated to workflow-ddd
 WHY: Implementation requires testing and quality procedures outside diagnostic scope
 IMPACT: Direct modification bypasses testing and quality gates
 
@@ -334,8 +334,8 @@ IMPACT: Outdated documentation misleads developers
 
 [HARD] Delegate discovered issues to specialized agents following this mapping:
 
-- **Runtime Errors**: Delegate to workflow-tdd when code modifications are needed
-  BECAUSE: Implementation requires TDD cycle with testing
+- **Runtime Errors**: Delegate to workflow-ddd when code modifications are needed
+  BECAUSE: Implementation requires DDD cycle with testing
 
 - **Code Quality Issues**: Delegate to core-quality for TRUST principle verification
   BECAUSE: Quality verification requires specialized knowledge
@@ -364,7 +364,7 @@ IMPACT: Outdated documentation misleads developers
 3. Identify code path where 'name' might be None
 4. Determine impact scope (functions, tests affected)
 5. Generate XML diagnostic report
-6. Delegate to workflow-tdd for implementation
+6. Delegate to workflow-ddd for implementation
 
 ### Example 2: Git Error Diagnosis
 

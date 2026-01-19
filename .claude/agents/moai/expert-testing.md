@@ -25,7 +25,7 @@ Last Updated: 2025-12-07
 
 can_resume: false
 typical_chain_position: middle
-depends_on: ["expert-backend", "expert-frontend", "manager-tdd"]
+depends_on: ["expert-backend", "expert-frontend", "manager-ddd"]
 spawns_subagents: false
 token_budget: high
 context_retention: high
@@ -111,7 +111,7 @@ IN SCOPE:
 - Flaky test detection and remediation
 
 OUT OF SCOPE:
-- TDD unit test implementation (delegate to manager-tdd)
+- Unit test implementation (delegate to manager-ddd)
 - Production deployment (delegate to expert-devops)
 - Security penetration testing (delegate to expert-security)
 - Performance load testing execution (delegate to expert-performance)
@@ -120,7 +120,7 @@ OUT OF SCOPE:
 ## Delegation Protocol
 
 When to delegate:
-- Unit test implementation: Delegate to manager-tdd subagent
+- Unit test implementation: Delegate to manager-ddd subagent
 - Load test execution: Delegate to expert-performance subagent
 - Security testing: Delegate to expert-security subagent
 - Production deployment: Delegate to expert-devops subagent
@@ -330,7 +330,7 @@ Conditional Skills (auto-loaded by Alfred when needed)
 - Backend: API integration tests, contract testing, database test fixtures
 - Frontend: Component tests, E2E user flows, visual regression
 - DevOps: CI/CD pipeline integration, test environment provisioning
-- TDD: Unit test patterns, mocking strategies, coverage targets
+- DDD: Unit test patterns, mocking strategies, coverage targets
 
 ## Workflow Steps
 
@@ -477,10 +477,10 @@ Create `.moai/docs/test-strategy-{SPEC-ID}.md`:
 
 ### Step 6: Coordinate with Team
 
-With manager-tdd:
+With manager-ddd:
 - Unit test patterns and coverage targets
 - Mock strategy and test fixture design
-- TDD workflow integration
+- DDD workflow integration
 
 With expert-backend:
 - API integration test strategy
@@ -499,10 +499,10 @@ With expert-devops:
 
 ## Team Collaboration Patterns
 
-### With manager-tdd (Unit Test Strategy)
+### With manager-ddd (Unit Test Strategy)
 
 ```markdown
-To: manager-tdd
+To: manager-ddd
 From: expert-testing
 Re: Unit Test Strategy for SPEC-{ID}
 
@@ -646,7 +646,7 @@ Phase 2: Implement unit tests (service layer, utilities)
 Phase 3: Create integration tests (API endpoints, database)
 Phase 4: Develop E2E tests (critical user flows)
 
-Next Steps: Coordinate with manager-tdd for unit test implementation.
+Next Steps: Coordinate with manager-ddd for unit test implementation.
 ```
 
 - [HARD] Internal Agent Data: XML tags are reserved for agent-to-agent data transfer only.
@@ -674,7 +674,7 @@ Test automation architecture with page objects, fixtures, mocks, and helper util
 </automation>
 
 <collaboration>
-Cross-team coordination details for TDD, backend, frontend, DevOps teams with specific test deliverables
+Cross-team coordination details for DDD, backend, frontend, DevOps teams with specific test deliverables
 </collaboration>
 
 WHY: Semantic XML sections provide structure, enable parsing for automation, and ensure consistent delivery format

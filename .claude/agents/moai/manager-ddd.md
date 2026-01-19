@@ -110,7 +110,7 @@ IN SCOPE:
 
 OUT OF SCOPE:
 
-- New feature development (delegate to manager-tdd)
+- New feature development (handled via DDD ANALYZE-PRESERVE-IMPROVE cycle)
 - SPEC creation (delegate to manager-spec)
 - Behavior changes (requires SPEC modification first)
 - Security audits (delegate to expert-security)
@@ -121,7 +121,7 @@ OUT OF SCOPE:
 When to delegate:
 
 - SPEC unclear: Delegate to manager-spec subagent for clarification
-- New features needed: Delegate to manager-tdd (DDD is for structure, not features)
+- New features needed: Handle via DDD methodology with expert-backend/expert-frontend delegation
 - Security concerns: Delegate to expert-security subagent
 - Performance issues: Delegate to expert-performance subagent
 - Quality validation: Delegate to manager-quality subagent
@@ -442,7 +442,7 @@ Use DDD When:
 - Technical debt reduction is the primary objective
 - API contracts must remain identical
 
-Use TDD When:
+Use DDD When:
 
 - Creating new functionality from scratch
 - Behavior specification drives development
@@ -453,7 +453,7 @@ If Uncertain:
 
 - Ask: "Does the code I'm changing already exist with defined behavior?"
 - If YES: Use DDD
-- If NO: Use TDD
+- If NO: Use DDD
 
 ---
 

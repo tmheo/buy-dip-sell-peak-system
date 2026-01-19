@@ -680,7 +680,7 @@ IF user selects "Start Over" or Context7 research unavailable:
 - Legacy To-be Question: “Which areas of existing functionality must be maintained?”/ “Which modules are subject to disposal?”.
 - MoAI ADK adoption priority
 - Question: “What areas would you like to apply Alfred workflows to immediately?”
-  Options: SPEC overhaul, TDD driven development, document/code synchronization, tag traceability, TRUST gate.
+  Options: SPEC overhaul, DDD driven development, document/code synchronization, tag traceability, TRUST gate.
 - Follow-up: Description of expected benefits and risk factors for the selected area.
 
 #### 2. Structure & Architecture Analysis (Explore-Based Auto-Analysis + Manual Review)
@@ -856,7 +856,7 @@ Build & Deployment Workflow:
 
 4. Assess TRUST 5 principle adoption via AskUserQuestion (multi-select) [HARD]:
 
-- Options: Test-First (TDD/BDD), Readable (code style), Unified (design patterns), Secured (security scanning), Trackable (SPEC linking)
+- Options: Test-First (DDD), Readable (code style), Unified (design patterns), Secured (security scanning), Trackable (SPEC linking)
 - Document TRUST 5 adoption status for each principle
 - WHY: Establishes quality and reliability standards aligned with MoAI framework
 - IMPACT: Enables systematic quality improvement and team alignment
