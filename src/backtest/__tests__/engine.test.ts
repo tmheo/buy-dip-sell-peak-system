@@ -251,6 +251,107 @@ describe("BacktestEngine", () => {
     });
   });
 
+  describe("backtestStartIndex", () => {
+    it("backtestStartIndex가 0일 때 전체 데이터로 백테스트해야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-06",
+        initialCapital: 10000,
+      };
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99),
+        createMockPrice("2025-01-04", 98),
+        createMockPrice("2025-01-05", 99),
+        createMockPrice("2025-01-06", 100),
+      ];
+
+      const result = engine.run(request, prices, 0);
+
+      // 전체 5일 데이터가 dailyHistory에 포함
+      expect(result.dailyHistory.length).toBe(5);
+    });
+
+    it("backtestStartIndex가 설정되면 해당 인덱스부터 거래를 시작해야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-05",
+        endDate: "2025-01-08",
+        initialCapital: 10000,
+      };
+      // 과거 데이터 3일 + 백테스트 기간 4일 = 7일
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100), // 과거 데이터 (지표 계산용)
+        createMockPrice("2025-01-03", 101),
+        createMockPrice("2025-01-04", 102),
+        createMockPrice("2025-01-05", 103), // backtestStartIndex = 3
+        createMockPrice("2025-01-06", 102),
+        createMockPrice("2025-01-07", 101),
+        createMockPrice("2025-01-08", 100),
+      ];
+
+      const result = engine.run(request, prices, 3);
+
+      // 백테스트 기간 4일만 dailyHistory에 포함
+      expect(result.dailyHistory.length).toBe(4);
+      expect(result.dailyHistory[0].date).toBe("2025-01-05");
+    });
+
+    it("backtestStartIndex 이전 데이터도 지표 계산에 사용해야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-03-01",
+        endDate: "2025-03-05",
+        initialCapital: 10000,
+      };
+      // 60일 과거 데이터 + 5일 백테스트 = 65일
+      const prices: DailyPrice[] = [];
+      for (let i = 0; i < 65; i++) {
+        const date = new Date("2025-01-01");
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split("T")[0];
+        prices.push(createMockPrice(dateStr, 100 + i * 0.5));
+      }
+
+      // backtestStartIndex = 60 (61번째 날부터 백테스트)
+      const result = engine.run(request, prices, 60);
+
+      // 백테스트 기간 5일만 dailyHistory에 포함
+      expect(result.dailyHistory.length).toBe(5);
+      // 지표는 과거 데이터를 포함하여 계산되므로 MA가 null이 아님
+      expect(result.dailyHistory[0].ma20).not.toBeNull();
+      expect(result.dailyHistory[0].ma60).not.toBeNull();
+    });
+
+    it("backtestStartIndex 미지정 시 기본값 0으로 동작해야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-04",
+        initialCapital: 10000,
+      };
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99),
+        createMockPrice("2025-01-04", 98),
+      ];
+
+      // backtestStartIndex 미지정
+      const result = engine.run(request, prices);
+
+      expect(result.dailyHistory.length).toBe(3);
+    });
+  });
+
   describe("결과 계산", () => {
     it("최종 자산이 올바르게 계산되어야 한다", () => {
       const engine = new BacktestEngine("Pro2");

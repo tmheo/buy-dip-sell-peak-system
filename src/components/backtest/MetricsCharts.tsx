@@ -31,6 +31,7 @@ function MetricChart({
   unit = "",
   referenceLine,
   decimalPlaces = 2,
+  displayValue,
 }: {
   title: string;
   data: { date: string; value: number | null }[];
@@ -40,11 +41,15 @@ function MetricChart({
   unit?: string;
   referenceLine?: number;
   decimalPlaces?: number;
+  displayValue?: string; // 커스텀 표시 값 (정배열 체크/X 등)
 }) {
+  // displayValue가 있으면 사용, 없으면 finalValue 포맷팅
   const formattedValue =
-    finalValue !== null && finalValue !== undefined
-      ? `${finalValue.toFixed(decimalPlaces)}${unit}`
-      : "N/A";
+    displayValue !== undefined
+      ? displayValue
+      : finalValue !== null && finalValue !== undefined && !Number.isNaN(finalValue)
+        ? `${finalValue.toFixed(decimalPlaces)}${unit}`
+        : "N/A";
 
   return (
     <div className="col-6 col-lg-4 col-xl-2 mb-3">
@@ -52,7 +57,7 @@ function MetricChart({
         <div className="card-header bg-secondary text-white py-2" style={{ fontSize: "0.85rem" }}>
           <div className="d-flex justify-content-between align-items-center">
             <span>{title}</span>
-            <span style={{ color }}>{formattedValue}</span>
+            <span className="text-white fw-bold">{formattedValue}</span>
           </div>
         </div>
         <div className="card-body p-1" style={{ height: "120px" }}>
@@ -124,6 +129,22 @@ export default function MetricsCharts({ dailyMetrics, finalMetrics }: MetricsCha
     value: d.volatility20, // 소수점 그대로 유지
   }));
 
+  // 정배열 표시값: 체크/X는 항상 표시, 값은 유효할 때만 표시
+  const hasValidGoldenCross =
+    finalMetrics?.goldenCross !== null &&
+    finalMetrics?.goldenCross !== undefined &&
+    !Number.isNaN(finalMetrics?.goldenCross);
+
+  const goldenCrossDisplay = finalMetrics
+    ? finalMetrics.isGoldenCross
+      ? hasValidGoldenCross
+        ? `✓ ${finalMetrics.goldenCross.toFixed(2)}%`
+        : "✓ 정배열"
+      : hasValidGoldenCross
+        ? `✗ ${finalMetrics.goldenCross.toFixed(2)}%`
+        : "✗ 역배열"
+    : "N/A";
+
   return (
     <div className="row mb-4">
       <MetricChart
@@ -134,6 +155,7 @@ export default function MetricsCharts({ dailyMetrics, finalMetrics }: MetricsCha
         finalValue={finalMetrics?.goldenCross}
         unit="%"
         referenceLine={0}
+        displayValue={goldenCrossDisplay}
       />
       <MetricChart
         title="기울기(20ma 10일)"

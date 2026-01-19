@@ -426,11 +426,40 @@ describe("calculateTechnicalMetrics", () => {
 
     expect(metrics).not.toBeNull();
     expect(metrics!).toHaveProperty("goldenCross");
+    expect(metrics!).toHaveProperty("isGoldenCross");
     expect(metrics!).toHaveProperty("maSlope");
     expect(metrics!).toHaveProperty("disparity");
     expect(metrics!).toHaveProperty("rsi14");
     expect(metrics!).toHaveProperty("roc12");
     expect(metrics!).toHaveProperty("volatility20");
+  });
+
+  it("isGoldenCross가 MA20 > MA60일 때 true를 반환해야 한다", () => {
+    // 상승 추세: MA20 > MA60
+    const prices = Array.from({ length: 70 }, (_, i) => 100 + i);
+    const metrics = calculateTechnicalMetrics(prices, 69);
+
+    expect(metrics).not.toBeNull();
+    expect(metrics!.isGoldenCross).toBe(true);
+  });
+
+  it("isGoldenCross가 MA20 <= MA60일 때 false를 반환해야 한다", () => {
+    // 하락 추세: MA20 < MA60
+    const prices = Array.from({ length: 70 }, (_, i) => 170 - i);
+    const metrics = calculateTechnicalMetrics(prices, 69);
+
+    expect(metrics).not.toBeNull();
+    expect(metrics!.isGoldenCross).toBe(false);
+  });
+
+  it("백테스트 기간이 60일 미만일 때 goldenCross는 NaN이지만 isGoldenCross는 유효해야 한다", () => {
+    // 충분한 데이터가 있지만 백테스트 기간만 짧은 경우
+    const prices = Array.from({ length: 70 }, (_, i) => 100 + i);
+    const metrics = calculateTechnicalMetrics(prices, 69, 30); // backtestDays = 30
+
+    expect(metrics).not.toBeNull();
+    expect(Number.isNaN(metrics!.goldenCross)).toBe(true);
+    expect(metrics!.isGoldenCross).toBe(true); // MA20 > MA60
   });
 
   it("goldenCross를 올바르게 계산해야 한다", () => {
