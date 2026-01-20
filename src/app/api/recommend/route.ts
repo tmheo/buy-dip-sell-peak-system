@@ -56,19 +56,19 @@ const RecommendRequestSchema = z
 /** 기술적 지표 계산을 위한 과거 데이터 추가 일수 */
 const LOOKBACK_DAYS = 90;
 
-/** 주어진 날짜 이후 N개의 예상 거래일 생성 (주말 제외) */
+/** 주어진 날짜 이후 N개의 예상 거래일 생성 (주말 제외, UTC 기준) */
 function generateFutureTradingDates(startDate: string, count: number): string[] {
   const dates: string[] = [];
-  const current = new Date(startDate);
-  current.setDate(current.getDate() + 1); // 시작일 다음 날부터
+  const current = new Date(`${startDate}T00:00:00Z`);
+  current.setUTCDate(current.getUTCDate() + 1); // 시작일 다음 날부터 (UTC 기준)
 
   while (dates.length < count) {
-    const dayOfWeek = current.getDay();
+    const dayOfWeek = current.getUTCDay();
     // 주말 제외 (0=일요일, 6=토요일)
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       dates.push(current.toISOString().split("T")[0]);
     }
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return dates;
