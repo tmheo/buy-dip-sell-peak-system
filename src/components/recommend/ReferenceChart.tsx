@@ -40,9 +40,9 @@ interface MetricDisplayProps {
   decimalPlaces?: number;
 }
 
-/** 숫자 값을 포맷팅 (null/undefined/NaN 처리) */
+/** 숫자 값을 포맷팅 (null/undefined/NaN/Infinity 처리) */
 function formatValue(value: number | null | undefined, decimalPlaces: number, unit: string): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
     return "N/A";
   }
   return `${value.toFixed(decimalPlaces)}${unit}`;

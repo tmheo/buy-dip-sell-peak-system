@@ -19,9 +19,9 @@ const STRATEGY_COLORS: Record<string, string> = {
 };
 
 const STRATEGY_CONDITIONS: Record<string, { buy: string; sell: string }> = {
-  Pro1: { buy: "전일 종가 대비 -0.01%", sell: "매수 가 대비 +0.01%" },
-  Pro2: { buy: "전일 종가 대비 -0.01%", sell: "매수 가 대비 +1.50%" },
-  Pro3: { buy: "전일 종가 대비 -0.10%", sell: "매수 가 대비 +2.00%" },
+  Pro1: { buy: "전일 종가 대비 -0.01%", sell: "매수가 대비 +0.01%" },
+  Pro2: { buy: "전일 종가 대비 -0.01%", sell: "매수가 대비 +1.50%" },
+  Pro3: { buy: "전일 종가 대비 -0.10%", sell: "매수가 대비 +2.00%" },
 };
 
 export default function RecommendationCard({ recommendation, referenceDate, isGoldenCross }: RecommendationCardProps): React.ReactElement {

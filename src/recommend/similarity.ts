@@ -28,12 +28,9 @@ const METRIC_TOLERANCES: [number, number, number, number, number] = [36, 90, 4.5
  * 공식: 유사도 = sum(weight_i * 100 * exp(-diff_i / tolerance_i))
  */
 export function calculateExponentialSimilarity(vectorA: number[], vectorB: number[]): number {
-  if (vectorA.length !== vectorB.length) {
-    throw new Error("벡터의 길이가 일치해야 합니다");
-  }
-
-  if (vectorA.length === 0) {
-    return 0;
+  const expectedLen = METRIC_WEIGHTS.length;
+  if (vectorA.length !== expectedLen || vectorB.length !== expectedLen) {
+    throw new Error(`벡터 길이는 ${expectedLen}이어야 합니다`);
   }
 
   let totalSimilarity = new Decimal(0);

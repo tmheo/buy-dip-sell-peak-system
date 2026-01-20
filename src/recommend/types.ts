@@ -61,7 +61,7 @@ export interface StrategyScore {
   strategy: StrategyName;
   /** 3개 유사 구간의 개별 점수 */
   periodScores: PeriodStrategyScore[];
-  /** 평균 점수 (3개 구간 점수의 산술 평균) */
+  /** 평균 점수 (3개 구간 점수의 유사도 가중 평균) */
   averageScore: number;
   /** 제외 여부 (정배열 시 Pro1 제외) */
   excluded: boolean;

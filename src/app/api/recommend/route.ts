@@ -120,7 +120,12 @@ function generateChartData(
 export async function POST(request: Request): Promise<Response> {
   try {
     // 요청 본문 파싱
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
+    }
 
     // 스키마 유효성 검사
     const parseResult = RecommendRequestSchema.safeParse(body);
@@ -286,6 +291,7 @@ export async function POST(request: Request): Promise<Response> {
 
       const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
       const initialCapital = 10000000; // 1000만원
+      let backtestFailed = false;
 
       for (const strategy of strategies) {
         try {
@@ -314,12 +320,19 @@ export async function POST(request: Request): Promise<Response> {
             mdd: result.mdd,
           };
         } catch (error) {
-          // 백테스트 실패 시 기본값 유지
-          console.error(
-            `Backtest failed for ${strategy} in period ending ${period.endDate}:`,
+          // 백테스트 실패 시 해당 유사 구간 건너뛰기
+          console.warn(
+            `Backtest failed for ${strategy} in period ending ${period.endDate}, skipping this period:`,
             error
           );
+          backtestFailed = true;
+          break;
         }
+      }
+
+      // 백테스트 실패한 유사 구간 건너뛰기
+      if (backtestFailed) {
+        continue;
       }
 
       // 유사 구간 차트 데이터 생성 (분석 구간 + 성과 확인 구간)
