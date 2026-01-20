@@ -41,4 +41,32 @@ export interface QueryOptions {
 /**
  * CLI 명령어 타입
  */
-export type Command = "init" | "init-all" | "update" | "update-all" | "query" | "help";
+export type Command =
+  | "init"
+  | "init-all"
+  | "update"
+  | "update-all"
+  | "query"
+  | "help"
+  | "init-metrics"
+  | "verify-metrics";
+
+/**
+ * 일별 기술적 지표 데이터 인터페이스 (SPEC-PERFORMANCE-001)
+ * DB에 저장되는 사전 계산된 기술적 지표
+ */
+export interface DailyMetricRow {
+  id?: number;
+  ticker: string;
+  date: string;
+  ma20: number | null;
+  ma60: number | null;
+  maSlope: number | null;
+  disparity: number | null;
+  rsi14: number | null;
+  roc12: number | null;
+  volatility20: number | null;
+  goldenCross: number | null;
+  isGoldenCross: boolean;
+  createdAt?: string;
+}

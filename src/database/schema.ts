@@ -62,3 +62,54 @@ SELECT COUNT(*) as count FROM daily_prices
 export const SELECT_LATEST_PRICES = `
 SELECT date, adj_close as adjClose FROM daily_prices WHERE ticker = ? ORDER BY date DESC LIMIT ?
 `;
+
+// =====================================================
+// daily_metrics 테이블 (SPEC-PERFORMANCE-001)
+// =====================================================
+
+export const CREATE_DAILY_METRICS_TABLE = `
+CREATE TABLE IF NOT EXISTS daily_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker TEXT NOT NULL DEFAULT 'SOXL',
+    date TEXT NOT NULL,
+    ma20 REAL,
+    ma60 REAL,
+    ma_slope REAL,
+    disparity REAL,
+    rsi14 REAL,
+    roc12 REAL,
+    volatility20 REAL,
+    golden_cross REAL,
+    is_golden_cross INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(ticker, date)
+)
+`;
+
+export const CREATE_METRICS_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_metrics_ticker_date ON daily_metrics(ticker, date)
+`;
+
+export const INSERT_DAILY_METRIC = `
+INSERT OR REPLACE INTO daily_metrics (ticker, date, ma20, ma60, ma_slope, disparity, rsi14, roc12, volatility20, golden_cross, is_golden_cross)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
+export const SELECT_METRICS_BY_DATE_RANGE = `
+SELECT id, ticker, date,
+       ma20, ma60, ma_slope as maSlope, disparity,
+       rsi14, roc12, volatility20,
+       golden_cross as goldenCross, is_golden_cross as isGoldenCross,
+       created_at as createdAt
+FROM daily_metrics
+WHERE ticker = ? AND date >= ? AND date <= ?
+ORDER BY date ASC
+`;
+
+export const SELECT_LATEST_METRIC_DATE = `
+SELECT date FROM daily_metrics WHERE ticker = ? ORDER BY date DESC LIMIT 1
+`;
+
+export const SELECT_METRICS_COUNT = `
+SELECT COUNT(*) as count FROM daily_metrics WHERE ticker = ?
+`;

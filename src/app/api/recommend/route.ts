@@ -8,7 +8,7 @@ import { z } from "zod";
 import { BacktestEngine } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
-import { getPricesByDateRange, getLatestDate } from "@/database";
+import { getPricesByDateRange, getLatestDate, getMetricsByDateRange } from "@/database";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -204,7 +204,6 @@ export async function POST(request: Request): Promise<Response> {
 
     // adjClose 배열 생성
     const adjClosePrices = allPrices.map((p) => p.adjClose);
-    const dates = allPrices.map((p) => p.date);
 
     // 기준일의 기술적 지표 계산
     const referenceMetrics = calculateTechnicalMetrics(adjClosePrices, referenceDateIndex);
@@ -226,19 +225,67 @@ export async function POST(request: Request): Promise<Response> {
       endDate: referenceDate,
     };
 
-    // 과거 기술적 지표 계산 (유사 구간 검색용)
+    // 과거 기술적 지표 조회 (유사 구간 검색용) - SPEC-PERFORMANCE-001
     // CON-002: 유사 구간은 기준일로부터 최소 40일 이전
     const historicalMetrics: HistoricalMetrics[] = [];
     const maxHistoricalIndex = referenceDateIndex - MIN_PAST_GAP_DAYS;
+    const maxHistoricalDate = allPrices[maxHistoricalIndex].date;
 
-    for (let i = 59; i <= maxHistoricalIndex; i++) {
-      const metrics = calculateTechnicalMetrics(adjClosePrices, i);
-      if (metrics) {
+    // 날짜-인덱스 맵 생성 (O(1) 조회용)
+    const dateToIndexMap = new Map<string, number>();
+    for (let i = 0; i < allPrices.length; i++) {
+      dateToIndexMap.set(allPrices[i].date, i);
+    }
+
+    // DB에서 기술적 지표 조회 시도
+    const metricsFromDb = getMetricsByDateRange(
+      { startDate: lookbackDateStr, endDate: maxHistoricalDate },
+      ticker
+    );
+
+    if (metricsFromDb.length > 0) {
+      // DB 지표 사용 (최적화된 경로)
+      for (const metricRow of metricsFromDb) {
+        const dateIndex = dateToIndexMap.get(metricRow.date);
+        if (dateIndex === undefined || dateIndex > maxHistoricalIndex) continue;
+
+        // null 값이 있는 행은 스킵 (기존 로직과 동일한 동작)
+        if (
+          metricRow.maSlope === null ||
+          metricRow.disparity === null ||
+          metricRow.rsi14 === null ||
+          metricRow.roc12 === null ||
+          metricRow.volatility20 === null
+        ) {
+          continue;
+        }
+
         historicalMetrics.push({
-          date: allPrices[i].date,
-          dateIndex: i,
-          metrics,
+          date: metricRow.date,
+          dateIndex,
+          metrics: {
+            goldenCross: metricRow.goldenCross ?? 0,
+            isGoldenCross: metricRow.isGoldenCross,
+            maSlope: metricRow.maSlope,
+            disparity: metricRow.disparity,
+            rsi14: metricRow.rsi14,
+            roc12: metricRow.roc12,
+            volatility20: metricRow.volatility20,
+          },
         });
+      }
+    } else {
+      // Fallback: DB에 지표가 없으면 기존 방식으로 계산
+      console.warn(`No metrics in DB for ${ticker}, falling back to runtime calculation`);
+      for (let i = 59; i <= maxHistoricalIndex; i++) {
+        const metrics = calculateTechnicalMetrics(adjClosePrices, i);
+        if (metrics) {
+          historicalMetrics.push({
+            date: allPrices[i].date,
+            dateIndex: i,
+            metrics,
+          });
+        }
       }
     }
 
@@ -253,25 +300,44 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    // 유사 구간 Top 3 검색
-    const similarPeriodsRaw = findSimilarPeriodsWithDates(
-      referenceMetrics,
-      historicalMetrics,
-      dates,
-      3
-    );
+    // 유사 구간 Top 3 검색 (정배열/역배열 필터 적용)
+    // 기준일이 정배열이면 정배열 구간에서만, 역배열이면 역배열 구간에서만 검색
+    const similarPeriodsRaw = findSimilarPeriodsWithDates(referenceMetrics, historicalMetrics, 3, {
+      filterGoldenCross: referenceMetrics.isGoldenCross,
+    });
 
-    // 유사 구간별 성과 확인 구간 백테스트 실행
-    const similarPeriods: SimilarPeriod[] = [];
+    // 유사 구간별 성과 확인 구간 백테스트 실행 (SPEC-PERFORMANCE-001: 병렬화)
+    const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+    const initialCapital = 10000000; // 1000만원
 
-    for (const period of similarPeriodsRaw) {
+    // 1단계: 유효한 유사 구간 필터링 및 백테스트 태스크 준비
+    type BacktestTask = {
+      periodIndex: number;
+      period: (typeof similarPeriodsRaw)[0];
+      strategy: StrategyName;
+      performanceStartIndex: number;
+      performanceEndIndex: number;
+      performanceStartDate: string;
+      performanceEndDate: string;
+      analysisStartIdx: number;
+      startDate: string;
+      backtestLookbackIndex: number;
+      backtestPrices: typeof allPrices;
+      backtestStartIdx: number;
+      backtestRequest: BacktestRequest;
+    };
+
+    const backtestTasks: BacktestTask[] = [];
+
+    for (let periodIndex = 0; periodIndex < similarPeriodsRaw.length; periodIndex++) {
+      const period = similarPeriodsRaw[periodIndex];
+
       // 성과 확인 구간 계산 (유사 구간 종료일 다음 거래일부터 20 거래일)
       const performanceStartIndex = period.endDateIndex + 1;
       const performanceEndIndex = performanceStartIndex + PERFORMANCE_PERIOD_DAYS - 1;
 
       // 성과 확인 구간 데이터가 충분한지 확인
       if (performanceEndIndex >= allPrices.length) {
-        // 성과 확인 구간 데이터 부족 - 이 유사 구간 건너뛰기
         continue;
       }
 
@@ -282,70 +348,121 @@ export async function POST(request: Request): Promise<Response> {
       const analysisStartIdx = Math.max(0, period.endDateIndex - ANALYSIS_PERIOD_DAYS + 1);
       const startDate = allPrices[analysisStartIdx].date;
 
-      // 성과 확인 구간 백테스트 실행 (Pro1, Pro2, Pro3)
-      const backtestResults: Record<StrategyName, PeriodBacktestResult> = {
-        Pro1: { returnRate: 0, mdd: 0 },
-        Pro2: { returnRate: 0, mdd: 0 },
-        Pro3: { returnRate: 0, mdd: 0 },
-      };
+      // 백테스트용 가격 데이터 추출 (지표 계산을 위한 과거 데이터 포함)
+      const backtestLookbackIndex = Math.max(0, performanceStartIndex - LOOKBACK_DAYS);
+      const backtestPrices = allPrices.slice(backtestLookbackIndex, performanceEndIndex + 1);
+      const backtestStartIdx = performanceStartIndex - backtestLookbackIndex;
 
-      const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
-      const initialCapital = 10000000; // 1000만원
-      let backtestFailed = false;
-
+      // 3개 전략에 대한 백테스트 태스크 생성
       for (const strategy of strategies) {
-        try {
-          // 백테스트 엔진 실행
-          const engine = new BacktestEngine(strategy);
-
-          // 성과 확인 구간용 가격 데이터 추출 (지표 계산을 위한 과거 데이터 포함)
-          const backtestLookbackIndex = Math.max(0, performanceStartIndex - LOOKBACK_DAYS);
-          const backtestPrices = allPrices.slice(backtestLookbackIndex, performanceEndIndex + 1);
-
-          // 백테스트 시작 인덱스 계산
-          const backtestStartIdx = performanceStartIndex - backtestLookbackIndex;
-
-          const backtestRequest: BacktestRequest = {
+        backtestTasks.push({
+          periodIndex,
+          period,
+          strategy,
+          performanceStartIndex,
+          performanceEndIndex,
+          performanceStartDate,
+          performanceEndDate,
+          analysisStartIdx,
+          startDate,
+          backtestLookbackIndex,
+          backtestPrices,
+          backtestStartIdx,
+          backtestRequest: {
             ticker,
             strategy,
             startDate: performanceStartDate,
             endDate: performanceEndDate,
             initialCapital,
-          };
+          },
+        });
+      }
+    }
 
-          const result = engine.run(backtestRequest, backtestPrices, backtestStartIdx);
+    // 2단계: 모든 백테스트를 병렬로 실행
+    const backtestPromises = backtestTasks.map(async (task) => {
+      try {
+        const engine = new BacktestEngine(task.strategy);
+        const result = engine.run(task.backtestRequest, task.backtestPrices, task.backtestStartIdx);
+        return {
+          periodIndex: task.periodIndex,
+          strategy: task.strategy,
+          success: true as const,
+          result: { returnRate: result.returnRate, mdd: result.mdd },
+          task,
+        };
+      } catch (error) {
+        console.warn(
+          `Backtest failed for ${task.strategy} in period ending ${task.period.endDate}:`,
+          error
+        );
+        return {
+          periodIndex: task.periodIndex,
+          strategy: task.strategy,
+          success: false as const,
+          error,
+          task,
+        };
+      }
+    });
 
-          backtestResults[strategy] = {
-            returnRate: result.returnRate,
-            mdd: result.mdd,
-          };
-        } catch (error) {
-          // 백테스트 실패 시 해당 유사 구간 건너뛰기
-          console.warn(
-            `Backtest failed for ${strategy} in period ending ${period.endDate}, skipping this period:`,
-            error
-          );
-          backtestFailed = true;
-          break;
-        }
+    const backtestResults = await Promise.all(backtestPromises);
+
+    // 3단계: 결과 그룹화 및 유사 구간 생성
+    type PeriodResultGroup = {
+      results: Record<StrategyName, PeriodBacktestResult>;
+      failed: boolean;
+      task: BacktestTask;
+    };
+    const resultsByPeriod = new Map<number, PeriodResultGroup>();
+
+    for (const result of backtestResults) {
+      if (!resultsByPeriod.has(result.periodIndex)) {
+        resultsByPeriod.set(result.periodIndex, {
+          results: {
+            Pro1: { returnRate: 0, mdd: 0 },
+            Pro2: { returnRate: 0, mdd: 0 },
+            Pro3: { returnRate: 0, mdd: 0 },
+          },
+          failed: false,
+          task: result.task,
+        });
       }
 
-      // 백테스트 실패한 유사 구간 건너뛰기
-      if (backtestFailed) {
+      const periodResult = resultsByPeriod.get(result.periodIndex)!;
+
+      if (!result.success) {
+        periodResult.failed = true;
+      } else {
+        periodResult.results[result.strategy] = result.result;
+      }
+    }
+
+    // 4단계: 유사 구간 배열 생성
+    const similarPeriods: SimilarPeriod[] = [];
+
+    for (const [_periodIndex, periodResult] of resultsByPeriod) {
+      if (periodResult.failed) {
         continue;
       }
 
+      const task = periodResult.task;
+
       // 유사 구간 차트 데이터 생성 (분석 구간 + 성과 확인 구간)
-      const periodChartData = generateChartData(allPrices, analysisStartIdx, performanceEndIndex);
+      const periodChartData = generateChartData(
+        allPrices,
+        task.analysisStartIdx,
+        task.performanceEndIndex
+      );
 
       similarPeriods.push({
-        startDate,
-        endDate: period.endDate,
-        similarity: period.similarity,
-        performanceStartDate,
-        performanceEndDate,
-        metrics: period.metrics,
-        backtestResults,
+        startDate: task.startDate,
+        endDate: task.period.endDate,
+        similarity: task.period.similarity,
+        performanceStartDate: task.performanceStartDate,
+        performanceEndDate: task.performanceEndDate,
+        metrics: task.period.metrics,
+        backtestResults: periodResult.results,
         chartData: periodChartData,
       });
     }
@@ -371,28 +488,19 @@ export async function POST(request: Request): Promise<Response> {
     const tierRatios = getStrategyTierRatios(recommendedStrategyName);
     const reason = generateRecommendReason(recommendedStrategyName, strategyScores);
 
-    // 기준일 차트 데이터 생성 (분석 구간 20일 + 이후 20일)
-    const refChartEndIndex = Math.min(
-      referenceDateIndex + PERFORMANCE_PERIOD_DAYS,
-      allPrices.length - 1
-    );
-    const referenceChartData = generateChartData(allPrices, analysisStartIndex, refChartEndIndex);
+    // 기준일 차트 데이터 생성 (분석 구간만, 기준일 이후는 항상 placeholder)
+    // 원본 사이트와 동일하게 기준일 이후 실제 데이터가 있어도 표시하지 않음
+    const referenceChartData = generateChartData(allPrices, analysisStartIndex, referenceDateIndex);
 
-    // 기준일 이후 실제 데이터가 부족한 경우, 예상 거래일을 placeholder로 추가
-    const actualDaysAfterRef = refChartEndIndex - referenceDateIndex;
-    if (actualDaysAfterRef < PERFORMANCE_PERIOD_DAYS) {
-      const missingDays = PERFORMANCE_PERIOD_DAYS - actualDaysAfterRef;
-      const lastDataDate = allPrices[refChartEndIndex]?.date || referenceDate;
-      const futureDates = generateFutureTradingDates(lastDataDate, missingDays);
-
-      for (const futureDate of futureDates) {
-        referenceChartData.push({
-          date: futureDate,
-          close: null, // 미래 날짜는 데이터 없음
-          ma20: null,
-          ma60: null,
-        });
-      }
+    // 기준일 이후 20일은 항상 placeholder로 추가 (실제 데이터 유무와 관계없이)
+    const futureDates = generateFutureTradingDates(referenceDate, PERFORMANCE_PERIOD_DAYS);
+    for (const futureDate of futureDates) {
+      referenceChartData.push({
+        date: futureDate,
+        close: null,
+        ma20: null,
+        ma60: null,
+      });
     }
 
     // 결과 생성
