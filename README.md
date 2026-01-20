@@ -207,6 +207,83 @@ console.log(`MDD: ${(result.mdd * 100).toFixed(2)}%`);
 
 ---
 
+## 전략 추천 시스템 (SPEC-RECOMMEND-001)
+
+과거 유사 구간을 분석하여 최적의 트레이딩 전략을 추천하는 시스템입니다.
+
+### 핵심 기능
+
+- **기술적 지표 벡터**: 6개 지표(정배열, 기울기, 이격도, RSI, ROC, 변동성)로 시장 상태 표현
+- **코사인 유사도**: 기준일과 과거 구간 간 유사도 계산
+- **전략 점수 계산**: `점수 = 수익률(%) × e^(MDD(%) × 0.01)` 공식으로 위험 조정 수익률 산출
+- **자동 추천**: Top 3 유사 구간의 백테스트 결과를 기반으로 최적 전략 추천
+
+### 사용법
+
+1. `/recommend` 페이지 접속
+2. 기준일 선택 (오늘 기준 / 특정일)
+3. 종목 선택 (SOXL / TQQQ)
+4. "분석" 버튼 클릭
+
+### 분석 결과
+
+| 항목 | 설명 |
+|------|------|
+| 기준일 차트 | 20일 분석 구간 + 미래 20일 영역 (회색) |
+| 유사 구간 Top 3 | 유사도 순 정렬, 각 구간의 20일 + 성과 20일 차트 |
+| 전략 점수 테이블 | Pro1/Pro2/Pro3 평균 점수 비교 |
+| 추천 전략 | 최고 점수 전략 + 티어별 투자 비율 |
+
+### 전략 제외 규칙
+
+- **Pro1**: 정배열(MA20 > MA60) 상태에서는 점수 비교에서 제외
+
+### REST API
+
+**POST /api/recommend**
+
+```json
+{
+  "ticker": "SOXL",
+  "referenceDate": "2026-01-20",
+  "isToday": true
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "referenceDate": "2026-01-20",
+    "ticker": "SOXL",
+    "referenceMetrics": { ... },
+    "similarPeriods": [...],
+    "strategyScores": { ... },
+    "recommendation": {
+      "strategy": "Pro2",
+      "tierRatios": [0.15, 0.15, 0.15, 0.15, 0.15, 0.25],
+      "reason": "평균 점수 12.34로 가장 높음"
+    }
+  }
+}
+```
+
+### 추천 모듈 구조
+
+```
+src/
+├── recommend/
+│   ├── types.ts          # 추천 관련 타입 정의
+│   ├── similarity.ts     # 코사인 유사도 계산
+│   ├── score.ts          # 전략 점수 계산
+│   └── index.ts          # 모듈 엔트리포인트
+└── app/api/recommend/
+    └── route.ts          # 추천 API 엔드포인트
+```
+
+---
+
 ## 프론트엔드
 
 ### 개발 서버 실행
@@ -226,12 +303,16 @@ src/
 │   ├── layout.tsx                # 루트 레이아웃 (CDN, 메타데이터)
 │   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
 │   ├── api/
-│   │   └── backtest/
-│   │       └── route.ts          # 백테스트 API 엔드포인트
+│   │   ├── backtest/
+│   │   │   └── route.ts          # 백테스트 API 엔드포인트
+│   │   └── recommend/
+│   │       └── route.ts          # 전략 추천 API 엔드포인트
 │   ├── info/
 │   │   └── page.tsx              # Info 페이지 (전략 설명)
-│   └── backtest/
-│       └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
+│   ├── backtest/
+│   │   └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
+│   └── recommend/
+│       └── page.tsx              # Recommend 페이지 (전략 추천)
 ├── backtest/                     # 백테스트 엔진 모듈
 │   ├── types.ts                  # 백테스트 타입 정의
 │   ├── engine.ts                 # 백테스트 엔진 (시뮬레이션 로직)
@@ -239,6 +320,11 @@ src/
 │   ├── cycle.ts                  # 사이클 관리자
 │   ├── order.ts                  # 주문 계산 로직
 │   └── metrics.ts                # 기술적 지표 계산 (SMA, RSI, ROC 등)
+├── recommend/                    # 전략 추천 모듈
+│   ├── types.ts                  # 추천 관련 타입 정의
+│   ├── similarity.ts             # 코사인 유사도 계산
+│   ├── score.ts                  # 전략 점수 계산
+│   └── index.ts                  # 모듈 엔트리포인트
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
@@ -246,10 +332,15 @@ src/
 │   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
 │   ├── FlowChart.tsx             # 사용법 플로우차트
 │   ├── PremiumModal.tsx          # 프리미엄 모달
-│   └── backtest/                 # 백테스트 결과 시각화 컴포넌트
-│       ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60, 로그 스케일)
-│       ├── MetricsCharts.tsx     # 6개 기술적 지표 미니 차트
-│       └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   ├── backtest/                 # 백테스트 결과 시각화 컴포넌트
+│   │   ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60, 로그 스케일)
+│   │   ├── MetricsCharts.tsx     # 6개 기술적 지표 미니 차트
+│   │   └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   └── recommend/                # 전략 추천 시각화 컴포넌트
+│       ├── ReferenceChart.tsx    # 기준일 분석 차트
+│       ├── SimilarPeriodCard.tsx # 유사 구간 카드
+│       ├── StrategyScoreTable.tsx# 전략 점수 테이블
+│       └── RecommendationCard.tsx# 추천 결과 카드
 └── styles/
     └── globals.css               # 글로벌 스타일 + 커스텀 CSS
 ```

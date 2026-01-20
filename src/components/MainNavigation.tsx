@@ -1,8 +1,5 @@
 "use client";
 
-// MainNavigation 컴포넌트 - 메인 네비게이션 바
-// Client Component - usePathname 사용을 위해
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -13,7 +10,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/info", label: "Info" },
-  { href: "/strategy", label: "추천전략" },
+  { href: "/recommend", label: "추천전략" },
   { href: "/stats", label: "통계" },
   { href: "/backtest", label: "백테스트(기본)" },
   { href: "/backtest-strategy", label: "백테스트(추천전략)" },
