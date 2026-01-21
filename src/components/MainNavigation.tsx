@@ -11,10 +11,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/info", label: "Info" },
   { href: "/recommend", label: "추천전략" },
-  { href: "/stats", label: "통계" },
   { href: "/backtest", label: "백테스트(기본)" },
   { href: "/backtest-recommend", label: "백테스트(추천전략)" },
-  { href: "/update-note", label: "Update Note" },
 ];
 
 export default function MainNavigation() {

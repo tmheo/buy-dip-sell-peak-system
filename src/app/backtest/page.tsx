@@ -224,6 +224,25 @@ export default function BacktestPage() {
               </select>
             </div>
 
+            {/* 초기자본 */}
+            <div>
+              <label htmlFor="initialCapital" className="form-label small mb-1">
+                초기자본
+              </label>
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                id="initialCapital"
+                name="initialCapital"
+                value={form.initialCapital}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                min={1000}
+                step={1000}
+                style={{ width: "100px" }}
+              />
+            </div>
+
             {/* Pro/Custom 선택 */}
             <div>
               <label className="form-label small mb-1">Pro/Custom</label>

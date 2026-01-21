@@ -45,6 +45,9 @@ npm run dev init-metrics -- --ticker SOXL
 # 지표 계산 결과 검증
 npm run dev verify-metrics -- --ticker SOXL
 
+# 추천 전략 사전 계산 (SOXL, TQQQ 전체 날짜)
+npx tsx scripts/precompute-recommendations.ts
+
 # 데이터 조회
 npm run dev query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ```
@@ -73,6 +76,7 @@ npm start query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 | `verify-metrics` | 지표 계산 결과 검증 |
 | `query` | 데이터 조회 |
 | `help` | 도움말 표시 |
+| `precompute-recommendations` | 추천 전략 사전 계산 (스크립트) |
 
 ### 옵션
 
@@ -85,12 +89,15 @@ npm start query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ## 프로젝트 구조
 
 ```
+scripts/
+└── precompute-recommendations.ts  # 추천 전략 사전 계산 스크립트
+
 src/
 ├── index.ts              # CLI 진입점 - 8개 명령어 핸들링
 ├── types/index.ts        # TypeScript 인터페이스 (DailyPrice, QueryOptions, Command)
 ├── database/
-│   ├── index.ts          # SQLite 연결 관리 및 CRUD 작업 (싱글톤 패턴)
-│   └── schema.ts         # daily_prices, daily_metrics 테이블 스키마 정의
+│   ├── index.ts          # SQLite 연결 관리 및 CRUD 작업 (싱글톤 패턴, 추천 캐시 포함)
+│   └── schema.ts         # daily_prices, daily_metrics, recommendation_cache 테이블 스키마
 └── services/
     ├── dataFetcher.ts    # Yahoo Finance API 연동 (재시도 로직 포함)
     └── metricsCalculator.ts  # 배치 기술적 지표 계산 (슬라이딩 윈도우 최적화)
@@ -303,6 +310,19 @@ src/
 - **동적 전략 전환**: 각 사이클 시작 시 추천 시스템을 통해 최적 전략 선택
 - **전략 사용 통계**: Pro1/Pro2/Pro3 각 전략의 사용 빈도 및 일수 추적
 - **사이클별 상세 정보**: 각 사이클의 전략, RSI, 정배열 여부, 수익률 등 기록
+- **추천 캐시 시스템**: 사전 계산된 추천 결과를 DB에 저장하여 백테스트 성능 최적화
+
+### 추천 캐시 사전 계산
+
+백테스트 성능 향상을 위해 모든 날짜의 추천 결과를 사전 계산할 수 있습니다:
+
+```bash
+npx tsx scripts/precompute-recommendations.ts
+```
+
+- SOXL, TQQQ 모든 날짜에 대해 추천 전략 계산
+- 배치 저장으로 DB I/O 최적화 (100개 단위)
+- 진행률 표시 및 결과 요약 출력
 
 ### 사용법
 
