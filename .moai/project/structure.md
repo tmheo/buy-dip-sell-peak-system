@@ -311,12 +311,23 @@ src/
 │   ├── layout.tsx                # 루트 레이아웃 (CDN, 메타데이터)
 │   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
 │   ├── api/
-│   │   └── backtest/
-│   │       └── route.ts          # 백테스트 API 엔드포인트
+│   │   ├── backtest/
+│   │   │   └── route.ts          # 백테스트 API 엔드포인트
+│   │   ├── auth/
+│   │   │   └── [...nextauth]/
+│   │   │       └── route.ts      # NextAuth.js 인증 핸들러
+│   │   └── user/
+│   │       └── delete/
+│   │           └── route.ts      # 회원 탈퇴 API (DELETE)
 │   ├── info/
 │   │   └── page.tsx              # Info 페이지 (전략 설명)
-│   └── backtest/
-│       └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
+│   ├── backtest/
+│   │   └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
+│   ├── backtest-recommend/
+│   │   └── page.tsx              # 백테스트 추천 페이지
+│   └── mypage/
+│       ├── page.tsx              # 마이페이지 서버 컴포넌트 (인증 체크)
+│       └── _client.tsx           # 마이페이지 클라이언트 컴포넌트
 ├── backtest/                     # 백테스트 엔진 모듈
 │   ├── types.ts                  # 백테스트 타입 정의
 │   ├── engine.ts                 # 백테스트 엔진 (시뮬레이션 로직)
@@ -331,10 +342,19 @@ src/
 │   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
 │   ├── FlowChart.tsx             # 사용법 플로우차트
 │   ├── PremiumModal.tsx          # 프리미엄 모달
-│   └── backtest/                 # 백테스트 결과 시각화 컴포넌트
-│       ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60)
-│       ├── MetricsCharts.tsx     # 6개 기술적 지표 차트
-│       └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   ├── backtest/                 # 백테스트 결과 시각화 컴포넌트
+│   │   ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60)
+│   │   ├── MetricsCharts.tsx     # 6개 기술적 지표 차트
+│   │   └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   └── mypage/                   # 마이페이지 컴포넌트
+│       ├── UserProfile.tsx       # 사용자 프로필 카드 (이미지, 이름, 이메일, 가입일)
+│       └── DeleteAccountModal.tsx # 회원 탈퇴 확인 모달
+├── lib/                          # 유틸리티 및 공통 모듈
+│   ├── date.ts                   # 날짜 포맷팅 유틸리티
+│   └── auth/                     # 인증 관련 모듈
+│       ├── adapter.ts            # NextAuth.js SQLite 어댑터
+│       ├── api-auth.ts           # API 인증 유틸리티
+│       └── queries.ts            # 사용자/계정 DB 쿼리 (deleteUser, getUserById)
 └── styles/
     └── globals.css               # 글로벌 스타일 + 커스텀 CSS
 ```
@@ -349,6 +369,8 @@ src/
 | StrategyCard | `StrategyCard.tsx` | Pro1/Pro2/Pro3 전략 카드 (분할 비율, 설정값) |
 | FlowChart | `FlowChart.tsx` | 사용법 5단계 플로우차트 (가로 배치, 화살표) |
 | PremiumModal | `PremiumModal.tsx` | 프리미엄 기능 안내 모달 (Bootstrap Modal) |
+| UserProfile | `mypage/UserProfile.tsx` | 사용자 프로필 카드 (이미지, 이름, 이메일, 가입일) |
+| DeleteAccountModal | `mypage/DeleteAccountModal.tsx` | 회원 탈퇴 확인 모달 (확인 후 계정 삭제) |
 
 ### Frontend 아키텍처 다이어그램
 

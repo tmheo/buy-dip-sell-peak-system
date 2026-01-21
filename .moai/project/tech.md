@@ -95,6 +95,25 @@
 - Google CDN을 통한 빠른 로딩
 - 다양한 굵기 지원
 
+### NextAuth.js v5 (Auth.js)
+
+**선택 이유:**
+- Next.js App Router와의 완벽한 통합
+- Google OAuth 등 다양한 소셜 로그인 지원
+- 세션 관리 및 JWT 토큰 자동 처리
+
+**주요 설정:**
+| 기능 | 설정 | 설명 |
+|------|------|------|
+| Google OAuth | `GoogleProvider` | 소셜 로그인 제공자 |
+| SQLite Adapter | Custom Adapter | better-sqlite3 기반 커스텀 어댑터 |
+| Session | JWT | 세션 저장 전략 |
+
+**구성 파일:**
+- `auth.ts` - NextAuth.js 설정
+- `src/lib/auth/adapter.ts` - SQLite 커스텀 어댑터
+- `src/lib/auth/queries.ts` - 사용자/계정 DB 쿼리
+
 ---
 
 ## 핵심 기술
@@ -394,7 +413,8 @@ dist/
 - [ ] **테스트**: Jest/Vitest를 활용한 유닛/통합 테스트
 - [ ] **CI/CD**: GitHub Actions를 통한 자동화 파이프라인
 - [ ] **Docker**: 컨테이너화를 통한 환경 독립성
-- [ ] **웹 UI**: React/Next.js 기반 대시보드
+- [x] **웹 UI**: React/Next.js 기반 대시보드
+- [x] **인증**: NextAuth.js v5 기반 Google OAuth 로그인
 
 ---
 
