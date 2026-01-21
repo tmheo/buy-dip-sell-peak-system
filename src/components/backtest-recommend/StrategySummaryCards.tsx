@@ -6,6 +6,7 @@
  */
 import type { StrategyUsageStats } from "@/backtest-recommend";
 import type { StrategyName } from "@/backtest/types";
+import { STRATEGY_COLORS } from "@/backtest";
 
 interface StrategySummaryCardsProps {
   strategyStats: {
@@ -17,23 +18,20 @@ interface StrategySummaryCardsProps {
   totalDays: number;
 }
 
-// 전략별 색상
+// 전략별 설정 (색상은 공유 상수 사용)
 const STRATEGY_CONFIG: Record<
   StrategyName,
-  { color: string; bgColor: string; description: string }
+  { bgColor: string; description: string }
 > = {
   Pro1: {
-    color: "#268bd2",
     bgColor: "rgba(38, 139, 210, 0.15)",
     description: "적극적 (매수 -0.01%, 매도 +0.01%)",
   },
   Pro2: {
-    color: "#2aa198",
     bgColor: "rgba(42, 161, 152, 0.15)",
     description: "균형형 (매수 -0.01%, 매도 +1.50%)",
   },
   Pro3: {
-    color: "#6c71c4",
     bgColor: "rgba(108, 113, 196, 0.15)",
     description: "보수적 (매수 -0.10%, 매도 +2.00%)",
   },
@@ -53,6 +51,7 @@ export default function StrategySummaryCards({
         {strategies.map((strategy) => {
           const stats = strategyStats[strategy];
           const config = STRATEGY_CONFIG[strategy];
+          const color = STRATEGY_COLORS[strategy];
           const cyclePercent = totalCycles > 0 ? (stats.cycles / totalCycles) * 100 : 0;
           const dayPercent = totalDays > 0 ? (stats.totalDays / totalDays) * 100 : 0;
 
@@ -62,7 +61,7 @@ export default function StrategySummaryCards({
                 className="card h-100"
                 style={{
                   backgroundColor: config.bgColor,
-                  borderColor: config.color,
+                  borderColor: color,
                   borderWidth: "2px",
                 }}
               >
@@ -72,7 +71,7 @@ export default function StrategySummaryCards({
                     <span
                       className="badge me-2"
                       style={{
-                        backgroundColor: config.color,
+                        backgroundColor: color,
                         fontSize: "0.9rem",
                         padding: "0.4em 0.8em",
                       }}
@@ -87,14 +86,14 @@ export default function StrategySummaryCards({
                     <div className="col-6">
                       <div className="p-2 rounded" style={{ backgroundColor: "#073642" }}>
                         <small className="text-muted d-block">사용 사이클</small>
-                        <strong style={{ color: config.color }}>{stats.cycles}회</strong>
+                        <strong style={{ color }}>{stats.cycles}회</strong>
                         <small className="text-muted ms-1">({cyclePercent.toFixed(1)}%)</small>
                       </div>
                     </div>
                     <div className="col-6">
                       <div className="p-2 rounded" style={{ backgroundColor: "#073642" }}>
                         <small className="text-muted d-block">사용 일수</small>
-                        <strong style={{ color: config.color }}>{stats.totalDays}일</strong>
+                        <strong style={{ color }}>{stats.totalDays}일</strong>
                         <small className="text-muted ms-1">({dayPercent.toFixed(1)}%)</small>
                       </div>
                     </div>
@@ -111,7 +110,7 @@ export default function StrategySummaryCards({
                         role="progressbar"
                         style={{
                           width: `${dayPercent}%`,
-                          backgroundColor: config.color,
+                          backgroundColor: color,
                         }}
                         aria-valuenow={dayPercent}
                         aria-valuemin={0}

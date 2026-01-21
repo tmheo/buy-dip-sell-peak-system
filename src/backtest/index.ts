@@ -4,7 +4,13 @@
  */
 
 // 상수 내보내기
-export { BASE_TIER_COUNT, RESERVE_TIER_NUMBER, MIN_TIER_NUMBER, MAX_TIER_NUMBER } from "./types";
+export {
+  BASE_TIER_COUNT,
+  RESERVE_TIER_NUMBER,
+  MIN_TIER_NUMBER,
+  MAX_TIER_NUMBER,
+  STRATEGY_COLORS,
+} from "./types";
 
 // 타입 내보내기
 export type {
@@ -37,6 +43,16 @@ export { CycleManager } from "./cycle";
 
 // 백테스트 엔진 내보내기
 export { BacktestEngine } from "./engine";
+
+// 트레이딩 유틸리티 내보내기
+export {
+  generateBuyOrder,
+  handleSellOrders,
+  handleStopLoss,
+  createSnapshot,
+  createRemainingTiers,
+} from "./trading-utils";
+export type { BuyOrderResult, SellOrderResult } from "./trading-utils";
 
 // 성과 지표 함수 내보내기
 export { calculateReturn, calculateMDD, calculateWinRate } from "./metrics";

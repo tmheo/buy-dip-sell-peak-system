@@ -5,19 +5,12 @@
  * 날짜별 거래, 보유량, 자산 정보를 표시
  */
 import type { DailySnapshotWithStrategy } from "@/backtest-recommend";
-import type { StrategyName } from "@/backtest/types";
+import { STRATEGY_COLORS } from "@/backtest";
 
 interface DailyHistoryTableProps {
   dailyHistory: DailySnapshotWithStrategy[];
   initialCapital: number;
 }
-
-// 전략별 색상
-const STRATEGY_COLORS: Record<StrategyName, string> = {
-  Pro1: "#268bd2",
-  Pro2: "#2aa198",
-  Pro3: "#6c71c4",
-};
 
 export default function DailyHistoryTable({ dailyHistory, initialCapital }: DailyHistoryTableProps) {
   // MDD 계산용 누적 peak

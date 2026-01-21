@@ -173,13 +173,14 @@ result.dailyHistory.forEach(day => {
 
 ```
 src/backtest/
-├── engine.ts      # 백테스트 엔진 메인 클래스
-├── strategy.ts    # 전략 매개변수 정의 (Pro1/Pro2/Pro3)
-├── cycle.ts       # 사이클 상태 관리
-├── order.ts       # LOC/MOC 주문 계산
-├── metrics.ts     # 성과 지표 계산
-├── types.ts       # 백테스트 전용 타입
-└── index.ts       # 모듈 엔트리포인트
+├── engine.ts         # 백테스트 엔진 메인 클래스
+├── trading-utils.ts  # 공유 거래 유틸리티 (매수/매도/손절/스냅샷)
+├── strategy.ts       # 전략 매개변수 정의 (Pro1/Pro2/Pro3)
+├── cycle.ts          # 사이클 상태 관리
+├── order.ts          # LOC/MOC 주문 계산
+├── metrics.ts        # 성과 지표 계산
+├── types.ts          # 백테스트 전용 타입 + STRATEGY_COLORS 상수
+└── index.ts          # 모듈 엔트리포인트
 ```
 
 ### API 사용법
@@ -293,6 +294,52 @@ src/
 
 ---
 
+## 추천 전략 백테스트 (SPEC-BACKTEST-RECOMMEND)
+
+사이클 경계에서 전략을 동적으로 전환하는 백테스트 시스템입니다.
+
+### 핵심 기능
+
+- **동적 전략 전환**: 각 사이클 시작 시 추천 시스템을 통해 최적 전략 선택
+- **전략 사용 통계**: Pro1/Pro2/Pro3 각 전략의 사용 빈도 및 일수 추적
+- **사이클별 상세 정보**: 각 사이클의 전략, RSI, 정배열 여부, 수익률 등 기록
+
+### 사용법
+
+1. `/backtest-recommend` 페이지 접속
+2. 시작일/종료일, 종목, 초기자본 입력
+3. "실행" 버튼 클릭
+
+### REST API
+
+**POST /api/backtest-recommend**
+
+```json
+{
+  "ticker": "SOXL",
+  "startDate": "2025-01-01",
+  "endDate": "2025-12-31",
+  "initialCapital": 10000
+}
+```
+
+### 추천 백테스트 모듈 구조
+
+```
+src/
+├── backtest-recommend/
+│   ├── engine.ts           # 추천 전략 백테스트 엔진
+│   ├── recommend-helper.ts # 빠른 전략 추천 헬퍼
+│   ├── types.ts            # 추천 백테스트 전용 타입
+│   └── index.ts            # 모듈 엔트리포인트
+├── lib/
+│   └── date.ts             # 날짜 유틸리티 함수
+└── app/api/backtest-recommend/
+    └── route.ts            # 추천 백테스트 API 엔드포인트
+```
+
+---
+
 ## 프론트엔드
 
 ### 개발 서버 실행
@@ -314,12 +361,16 @@ src/
 │   ├── api/
 │   │   ├── backtest/
 │   │   │   └── route.ts          # 백테스트 API 엔드포인트
+│   │   ├── backtest-recommend/
+│   │   │   └── route.ts          # 추천 전략 백테스트 API 엔드포인트
 │   │   └── recommend/
 │   │       └── route.ts          # 전략 추천 API 엔드포인트
 │   ├── info/
 │   │   └── page.tsx              # Info 페이지 (전략 설명)
 │   ├── backtest/
 │   │   └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
+│   ├── backtest-recommend/
+│   │   └── page.tsx              # 추천 전략 백테스트 페이지
 │   └── recommend/
 │       └── page.tsx              # Recommend 페이지 (전략 추천)
 ├── backtest/                     # 백테스트 엔진 모듈
@@ -334,6 +385,13 @@ src/
 │   ├── similarity.ts             # 코사인 유사도 계산
 │   ├── score.ts                  # 전략 점수 계산
 │   └── index.ts                  # 모듈 엔트리포인트
+├── backtest-recommend/           # 추천 전략 백테스트 모듈
+│   ├── engine.ts                 # 추천 전략 백테스트 엔진
+│   ├── recommend-helper.ts       # 빠른 전략 추천 헬퍼
+│   ├── types.ts                  # 추천 백테스트 전용 타입
+│   └── index.ts                  # 모듈 엔트리포인트
+├── lib/                          # 공유 유틸리티
+│   └── date.ts                   # 날짜 유틸리티 함수
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
@@ -345,6 +403,13 @@ src/
 │   │   ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60, 로그 스케일)
 │   │   ├── MetricsCharts.tsx     # 6개 기술적 지표 미니 차트
 │   │   └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   ├── backtest-recommend/       # 추천 전략 백테스트 시각화 컴포넌트
+│   │   ├── AssetMddChart.tsx     # 자산 및 MDD 차트
+│   │   ├── CycleStrategyTable.tsx # 사이클별 전략 테이블
+│   │   ├── DailyHistoryTable.tsx # 일별 내역 테이블
+│   │   ├── RecommendResultCard.tsx # 추천 결과 카드
+│   │   ├── StrategySummaryCards.tsx # 전략별 사용 통계 카드
+│   │   └── index.ts              # 컴포넌트 엔트리포인트
 │   └── recommend/                # 전략 추천 시각화 컴포넌트
 │       ├── ReferenceChart.tsx    # 기준일 분석 차트
 │       ├── SimilarPeriodCard.tsx # 유사 구간 카드

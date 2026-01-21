@@ -7,18 +7,15 @@
 import { useState, FormEvent } from "react";
 import dynamic from "next/dynamic";
 import type { RecommendBacktestResult } from "@/backtest-recommend";
+import { STRATEGY_COLORS } from "@/backtest";
+import type { StrategyName } from "@/backtest/types";
+import { getTodayDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화)
 const AssetMddChart = dynamic(
   () => import("@/components/backtest-recommend/AssetMddChart"),
   { ssr: false }
 );
-
-// 오늘 날짜를 YYYY-MM-DD 형식으로 반환
-function getTodayDate(): string {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-}
 
 interface BacktestForm {
   startDate: string;
@@ -255,19 +252,16 @@ export default function BacktestRecommendPage() {
                       <div className="text-muted small mb-2">📊 전략 사용 빈도</div>
                       {(() => {
                         const totalCycles = result.strategyStats.Pro1.cycles + result.strategyStats.Pro2.cycles + result.strategyStats.Pro3.cycles;
-                        const strategies = [
-                          { name: "Pro1", stats: result.strategyStats.Pro1, color: "#268bd2" },
-                          { name: "Pro2", stats: result.strategyStats.Pro2, color: "#2aa198" },
-                          { name: "Pro3", stats: result.strategyStats.Pro3, color: "#6c71c4" },
-                        ];
+                        const strategyNames: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
 
-                        return strategies.map((s) => {
-                          const percent = totalCycles > 0 ? (s.stats.cycles / totalCycles) * 100 : 0;
+                        return strategyNames.map((name) => {
+                          const stats = result.strategyStats[name];
+                          const percent = totalCycles > 0 ? (stats.cycles / totalCycles) * 100 : 0;
                           return (
-                            <div key={s.name} className="d-flex align-items-center mb-1" style={{ fontSize: "0.85rem" }}>
-                              <span style={{ color: s.color, fontWeight: "bold", width: "40px" }}>{s.name}</span>
+                            <div key={name} className="d-flex align-items-center mb-1" style={{ fontSize: "0.85rem" }}>
+                              <span style={{ color: STRATEGY_COLORS[name], fontWeight: "bold", width: "40px" }}>{name}</span>
                               <span className="ms-2">{percent.toFixed(1)}%</span>
-                              <span className="text-muted ms-1">({s.stats.cycles}회)</span>
+                              <span className="text-muted ms-1">({stats.cycles}회)</span>
                             </div>
                           );
                         });
@@ -346,9 +340,7 @@ export default function BacktestRecommendPage() {
                             <span
                               className="badge"
                               style={{
-                                backgroundColor:
-                                  cycle.strategy === "Pro1" ? "#268bd2" :
-                                  cycle.strategy === "Pro2" ? "#2aa198" : "#6c71c4",
+                                backgroundColor: STRATEGY_COLORS[cycle.strategy],
                                 fontSize: "0.65rem",
                                 padding: "2px 4px",
                               }}
@@ -436,9 +428,7 @@ export default function BacktestRecommendPage() {
                             <span
                               className="badge"
                               style={{
-                                backgroundColor:
-                                  snapshot.strategy === "Pro1" ? "#268bd2" :
-                                  snapshot.strategy === "Pro2" ? "#2aa198" : "#6c71c4",
+                                backgroundColor: STRATEGY_COLORS[snapshot.strategy],
                                 fontSize: "0.65rem",
                                 padding: "2px 4px",
                               }}

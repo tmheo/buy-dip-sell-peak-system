@@ -5,18 +5,11 @@
  * 각 사이클에서 사용된 전략과 성과를 표시
  */
 import type { CycleStrategyInfo } from "@/backtest-recommend";
-import type { StrategyName } from "@/backtest/types";
+import { STRATEGY_COLORS } from "@/backtest";
 
 interface CycleStrategyTableProps {
   cycleStrategies: CycleStrategyInfo[];
 }
-
-// 전략별 색상
-const STRATEGY_COLORS: Record<StrategyName, string> = {
-  Pro1: "#268bd2",
-  Pro2: "#2aa198",
-  Pro3: "#6c71c4",
-};
 
 export default function CycleStrategyTable({ cycleStrategies }: CycleStrategyTableProps) {
   return (

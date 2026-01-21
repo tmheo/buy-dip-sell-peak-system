@@ -5,17 +5,12 @@
  * 전략별 종합 점수 표시
  */
 import type { StrategyScore, DowngradeInfo } from "@/recommend/types";
+import { STRATEGY_COLORS } from "@/backtest";
 
 export interface StrategyScoreTableProps {
   strategyScores: StrategyScore[];
   downgradeInfo?: DowngradeInfo;
 }
-
-const STRATEGY_COLORS: Record<string, string> = {
-  Pro1: "#268bd2",
-  Pro2: "#2aa198",
-  Pro3: "#6c71c4",
-};
 
 export default function StrategyScoreTable({ strategyScores, downgradeInfo }: StrategyScoreTableProps): React.ReactElement {
   const validScores = strategyScores.filter((s) => !s.excluded);
