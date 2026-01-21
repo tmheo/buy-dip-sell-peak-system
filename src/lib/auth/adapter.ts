@@ -2,6 +2,7 @@
  * Auth.js v5 커스텀 SQLite 어댑터
  */
 
+import { randomUUID } from "node:crypto";
 import type { Adapter, AdapterUser, AdapterAccount, AdapterSession } from "next-auth/adapters";
 import {
   createUser,
@@ -22,7 +23,7 @@ import {
  * UUID 생성 함수 (crypto 모듈 사용)
  */
 function generateId(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 /**

@@ -20,8 +20,8 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/auth": ["./auth"]
+      "@/auth": ["./auth"],
+      "@/*": ["./src/*"]
     },
     "plugins": [
       {

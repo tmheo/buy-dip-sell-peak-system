@@ -50,9 +50,25 @@ export default function BacktestRecommendPageClient() {
         }),
       });
 
-      const data = await response.json();
+      if (response.status === 401) {
+        window.location.href = "/info";
+        return null;
+      }
 
-      if (!response.ok || !data.success) {
+      if (!response.ok) {
+        const text = await response.text();
+        let errorMessage = "백테스트 실행 실패";
+        try {
+          const data = JSON.parse(text);
+          errorMessage = data.error || data.message || errorMessage;
+        } catch {
+          // Non-JSON response
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      if (!data.success) {
         throw new Error(data.error || data.message || "백테스트 실행 실패");
       }
 
