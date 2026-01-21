@@ -1,6 +1,7 @@
 // TopControlBar 컴포넌트 - 상단 컨트롤 바
 // Server Component
 
+import Link from "next/link";
 import { auth } from "@/auth";
 import { LoginButton } from "./auth/LoginButton";
 import { LogoutButton } from "./auth/LogoutButton";
@@ -49,9 +50,15 @@ export default async function TopControlBar() {
           <button className="btn btn-outline-warning" type="button" disabled>
             My Custom
           </button>
-          <button className="btn btn-outline-secondary" type="button" disabled>
-            My Page
-          </button>
+          {session?.user ? (
+            <Link href="/mypage" className="btn btn-outline-secondary">
+              My Page
+            </Link>
+          ) : (
+            <button className="btn btn-outline-secondary" type="button" disabled>
+              My Page
+            </button>
+          )}
         </div>
       </div>
     </nav>
