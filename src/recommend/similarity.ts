@@ -113,28 +113,45 @@ export function findSimilarPeriods(
 /** 유사 구간 간 최소 간격 (연속 선택 방지) */
 export const MIN_PERIOD_GAP_DAYS = 20;
 
-/** 유사 구간 검색 (날짜 정보 포함, 최소 간격 보장) */
-export function findSimilarPeriodsWithDates(
-  referenceMetrics: TechnicalMetrics,
-  allHistoricalMetrics: HistoricalMetrics[],
-  _dates: string[],
-  topN: number = 3
-): Array<{
+/** 유사 구간 검색 옵션 */
+export interface SimilarPeriodsOptions {
+  /** 정배열/역배열 필터 (true: 정배열만, false: 역배열만, undefined: 필터 없음) */
+  filterGoldenCross?: boolean;
+}
+
+/** 유사 구간 검색 결과 */
+export interface SimilarPeriodWithDate {
   endDate: string;
   endDateIndex: number;
   similarity: number;
   metrics: TechnicalMetrics;
-}> {
+}
+
+/** 유사 구간 검색 (날짜 정보 포함, 최소 간격 보장, 정배열/역배열 필터) */
+export function findSimilarPeriodsWithDates(
+  referenceMetrics: TechnicalMetrics,
+  allHistoricalMetrics: HistoricalMetrics[],
+  topN: number = 3,
+  options: SimilarPeriodsOptions = {}
+): SimilarPeriodWithDate[] {
   // 기준 벡터 생성
   const referenceVector = createMetricsVector(referenceMetrics);
 
-  // 모든 과거 구간과 유사도 계산
+  // 정배열/역배열 필터 적용
+  let filteredMetrics = allHistoricalMetrics;
+  if (options.filterGoldenCross !== undefined) {
+    filteredMetrics = allHistoricalMetrics.filter(
+      (h) => h.metrics.isGoldenCross === options.filterGoldenCross
+    );
+  }
+
+  // 필터링된 과거 구간과 유사도 계산
   const similarities: Array<{
     historical: HistoricalMetrics;
     similarity: number;
   }> = [];
 
-  for (const historical of allHistoricalMetrics) {
+  for (const historical of filteredMetrics) {
     const historicalVector = createMetricsVector(historical.metrics);
     const similarity = calculateEuclideanSimilarity(referenceVector, historicalVector);
 
@@ -148,12 +165,7 @@ export function findSimilarPeriodsWithDates(
   similarities.sort((a, b) => b.similarity - a.similarity);
 
   // 최소 간격을 유지하면서 상위 N개 선택
-  const selectedPeriods: Array<{
-    endDate: string;
-    endDateIndex: number;
-    similarity: number;
-    metrics: TechnicalMetrics;
-  }> = [];
+  const selectedPeriods: SimilarPeriodWithDate[] = [];
 
   for (const result of similarities) {
     // 이미 선택된 구간들과의 간격 확인

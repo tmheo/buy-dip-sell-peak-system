@@ -1,11 +1,15 @@
 import {
   close,
+  getAllPricesByTicker,
   getCount,
   getLatestDate,
+  getMetricsCount,
   getPricesByDateRange,
   getTotalCount,
   initTables,
+  insertMetrics,
   insertPrices,
+  upsertMetrics,
 } from "./database/index.js";
 import {
   fetchAllHistory,
@@ -13,6 +17,7 @@ import {
   getSupportedTickers,
   type SupportedTicker,
 } from "./services/dataFetcher.js";
+import { calculateMetricsBatch, verifyMetrics } from "./services/metricsCalculator.js";
 import type { DailyPrice } from "./types/index.js";
 
 const SUPPORTED_TICKERS = getSupportedTickers();
@@ -29,10 +34,12 @@ function showHelp(): void {
   npx tsx src/index.ts <command> [options]
 
 명령어:
-  init [--ticker TICKER]  데이터베이스 초기화 및 전체 히스토리 다운로드
-  init-all                모든 티커의 전체 히스토리 다운로드
-  update [--ticker TICKER] 최신 데이터로 업데이트 (증분)
-  update-all              모든 티커 업데이트
+  init [--ticker TICKER]  데이터베이스 초기화 및 전체 히스토리 다운로드 (지표 포함)
+  init-all                모든 티커의 전체 히스토리 다운로드 (지표 포함)
+  update [--ticker TICKER] 최신 데이터로 업데이트 (증분, 지표 포함)
+  update-all              모든 티커 업데이트 (지표 포함)
+  init-metrics [--ticker]  기존 가격 데이터로 기술적 지표 일괄 계산
+  verify-metrics [--ticker] 지표 계산 결과 검증
   query [--ticker] [--start] [--end] 데이터 조회
   help                    도움말 표시
 
@@ -45,6 +52,8 @@ function showHelp(): void {
   npx tsx src/index.ts init --ticker SOXL
   npx tsx src/index.ts init-all
   npx tsx src/index.ts update --ticker TQQQ
+  npx tsx src/index.ts init-metrics --ticker SOXL
+  npx tsx src/index.ts verify-metrics --ticker SOXL
   npx tsx src/index.ts query --ticker SOXL --start 2024-01-01 --end 2024-12-31
 `);
 }
@@ -78,7 +87,7 @@ function getTickerFromArgs(args: string[]): SupportedTicker {
 }
 
 /**
- * init 명령어: DB 초기화 및 전체 히스토리 다운로드
+ * init 명령어: DB 초기화 및 전체 히스토리 다운로드 (지표 포함)
  */
 async function handleInit(ticker: SupportedTicker): Promise<void> {
   console.log(`=== ${ticker} 데이터베이스 초기화 ===\n`);
@@ -89,11 +98,24 @@ async function handleInit(ticker: SupportedTicker): Promise<void> {
 
   if (prices.length > 0) {
     const count = insertPrices(prices, ticker);
-    console.log(`\n${count}개의 레코드가 저장되었습니다.`);
+    console.log(`\n${count}개의 가격 레코드가 저장되었습니다.`);
+
+    // 기술적 지표 계산 및 저장 (SPEC-PERFORMANCE-001)
+    console.log("\n기술적 지표 계산 중...");
+    const adjClosePrices = prices.map((p) => p.adjClose);
+    const dates = prices.map((p) => p.date);
+    const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
+
+    if (metrics.length > 0) {
+      const metricsCount = insertMetrics(metrics, ticker);
+      console.log(`✅ ${metricsCount}개의 기술적 지표가 저장되었습니다.`);
+    }
   }
 
   const tickerCount = getCount(ticker);
-  console.log(`\n${ticker} 총 저장된 레코드 수: ${tickerCount}`);
+  const metricsCount = getMetricsCount(ticker);
+  console.log(`\n${ticker} 총 저장된 가격 레코드 수: ${tickerCount}`);
+  console.log(`${ticker} 총 저장된 지표 레코드 수: ${metricsCount}`);
 }
 
 /**
@@ -114,7 +136,7 @@ async function handleInitAll(): Promise<void> {
 }
 
 /**
- * update 명령어: 증분 업데이트
+ * update 명령어: 증분 업데이트 (지표 포함)
  */
 async function handleUpdate(ticker: SupportedTicker): Promise<void> {
   console.log(`=== ${ticker} 데이터 업데이트 ===\n`);
@@ -134,11 +156,37 @@ async function handleUpdate(ticker: SupportedTicker): Promise<void> {
 
   if (prices.length > 0) {
     const count = insertPrices(prices, ticker);
-    console.log(`\n${count}개의 새 레코드가 저장되었습니다.`);
+    console.log(`\n${count}개의 새 가격 레코드가 저장되었습니다.`);
+
+    // 지표 재계산 (SPEC-PERFORMANCE-001)
+    // 새 데이터 추가 시 영향받는 지표도 업데이트 (MA60 등으로 인해 과거 60일 영향)
+    console.log("\n기술적 지표 업데이트 중...");
+    const allPrices = getAllPricesByTicker(ticker);
+    const adjClosePrices = allPrices.map((p) => p.adjClose);
+    const dates = allPrices.map((p) => p.date);
+
+    // 새 데이터 + 영향받는 과거 데이터 재계산 (MA60 기준 60일)
+    const startIdx = Math.max(59, allPrices.length - prices.length - 60);
+    const metrics = calculateMetricsBatch(
+      adjClosePrices,
+      dates,
+      ticker,
+      startIdx,
+      allPrices.length - 1
+    );
+
+    if (metrics.length > 0) {
+      const metricsCount = upsertMetrics(metrics, ticker);
+      console.log(`✅ ${metricsCount}개의 기술적 지표가 업데이트되었습니다.`);
+    }
+  } else {
+    console.log("\n새 데이터가 없습니다.");
   }
 
   const tickerCount = getCount(ticker);
-  console.log(`\n${ticker} 총 저장된 레코드 수: ${tickerCount}`);
+  const metricsCount = getMetricsCount(ticker);
+  console.log(`\n${ticker} 총 저장된 가격 레코드 수: ${tickerCount}`);
+  console.log(`${ticker} 총 저장된 지표 레코드 수: ${metricsCount}`);
 }
 
 /**
@@ -187,6 +235,83 @@ function printPrices(prices: DailyPrice[], displayCount: number): void {
 }
 
 /**
+ * init-metrics 명령어: 기존 가격 데이터로 기술적 지표 일괄 계산
+ * SPEC-PERFORMANCE-001
+ */
+function handleInitMetrics(ticker: SupportedTicker): void {
+  console.log(`=== ${ticker} 기술적 지표 일괄 계산 ===\n`);
+
+  initTables();
+
+  const prices = getAllPricesByTicker(ticker);
+
+  if (prices.length === 0) {
+    console.log(`${ticker}의 가격 데이터가 없습니다. init 명령어를 먼저 실행하세요.`);
+    return;
+  }
+
+  console.log(`가격 데이터 수: ${prices.length}`);
+  console.log("기술적 지표 계산 중...");
+
+  const adjClosePrices = prices.map((p) => p.adjClose);
+  const dates = prices.map((p) => p.date);
+  const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
+
+  if (metrics.length > 0) {
+    const metricsCount = insertMetrics(metrics, ticker);
+    console.log(`\n✅ ${metricsCount}개의 기술적 지표가 저장되었습니다.`);
+  } else {
+    console.log("\n계산된 지표가 없습니다. (데이터 부족)");
+  }
+
+  const totalMetrics = getMetricsCount(ticker);
+  console.log(`${ticker} 총 저장된 지표 레코드 수: ${totalMetrics}`);
+}
+
+/**
+ * verify-metrics 명령어: 지표 계산 결과 검증
+ * SPEC-PERFORMANCE-001
+ */
+async function handleVerifyMetrics(ticker: SupportedTicker): Promise<void> {
+  console.log(`=== ${ticker} 기술적 지표 검증 ===\n`);
+
+  const prices = getAllPricesByTicker(ticker);
+
+  if (prices.length === 0) {
+    console.log(`${ticker}의 가격 데이터가 없습니다.`);
+    return;
+  }
+  if (prices.length <= 59) {
+    console.log(`${ticker}의 가격 데이터가 60일 미만입니다. (검증 불가)`);
+    return;
+  }
+
+  const adjClosePrices = prices.map((p) => p.adjClose);
+  const dates = prices.map((p) => p.date);
+
+  // 샘플 데이터로 검증 (전체 검증은 시간이 오래 걸림)
+  const sampleSize = Math.min(100, prices.length - 59);
+  const startIdx = prices.length - sampleSize;
+  const endIdx = prices.length - 1;
+
+  console.log(`검증 범위: ${dates[startIdx]} ~ ${dates[endIdx]} (${sampleSize}개)`);
+  console.log("배치 계산 결과와 개별 계산 결과 비교 중...\n");
+
+  const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, startIdx, endIdx);
+  const result = await verifyMetrics(metrics, adjClosePrices, dates);
+
+  if (result.passed) {
+    console.log("✅ 검증 통과: 배치 계산 결과가 기존 로직과 일치합니다.");
+  } else {
+    console.log("❌ 검증 실패:");
+    result.failures.slice(0, 10).forEach((f: string) => console.log(`  - ${f}`));
+    if (result.failures.length > 10) {
+      console.log(`  ... 외 ${result.failures.length - 10}개`);
+    }
+  }
+}
+
+/**
  * query 명령어: 데이터 조회
  */
 function handleQuery(args: string[]): void {
@@ -228,6 +353,12 @@ async function main(): Promise<void> {
         break;
       case "update-all":
         await handleUpdateAll();
+        break;
+      case "init-metrics":
+        handleInitMetrics(ticker);
+        break;
+      case "verify-metrics":
+        await handleVerifyMetrics(ticker);
         break;
       case "query":
         handleQuery(args);

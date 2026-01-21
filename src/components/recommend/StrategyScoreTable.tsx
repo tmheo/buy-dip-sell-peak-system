@@ -50,7 +50,7 @@ export default function StrategyScoreTable({ strategyScores }: StrategyScoreTabl
                           padding: "0.4rem 0.6rem",
                         }}
                       >
-                        🏢 딜사 {score.strategy}
+                        🏢 떨사 {score.strategy}
                       </span>
                       {isExcluded && (
                         <small className="text-warning">
