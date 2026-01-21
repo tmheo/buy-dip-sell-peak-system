@@ -16,4 +16,4 @@ export type {
 export { RecommendBacktestEngine } from "./engine";
 
 // 추천 헬퍼 내보내기
-export { getQuickRecommendation, clearRecommendationCache } from "./recommend-helper";
+export { getQuickRecommendation } from "./recommend-helper";

@@ -5,11 +5,7 @@
 import type { DailyPrice } from "@/types";
 import type { StrategyName, TechnicalMetrics } from "@/backtest/types";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
-import {
-  getMetricsByDateRange,
-  getRecommendationFromCache,
-  saveRecommendationToCache,
-} from "@/database";
+import { getMetricsByDateRange } from "@/database";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -24,17 +20,6 @@ import type { QuickRecommendResult } from "./types";
 
 /** 백테스트용 lookback 일수 */
 const LOOKBACK_DAYS = 90;
-
-/** 인메모리 메모이제이션 캐시 (ticker:date -> 추천 결과) */
-const recommendationCache = new Map<string, QuickRecommendResult>();
-
-/**
- * 추천 캐시 초기화
- * 새로운 백테스트 세션 시작 시 호출
- */
-export function clearRecommendationCache(): void {
-  recommendationCache.clear();
-}
 
 /**
  * 기본 기술적 지표 생성 (데이터 부족 시 사용)
@@ -66,34 +51,6 @@ export function getQuickRecommendation(
   allPrices: DailyPrice[],
   dateToIndexMap: Map<string, number>
 ): QuickRecommendResult | null {
-  // 0. 메모이제이션 캐시 확인
-  const cacheKey = `${ticker}:${referenceDate}`;
-  const memoryCached = recommendationCache.get(cacheKey);
-  if (memoryCached) {
-    return memoryCached;
-  }
-
-  // 0-1. DB 캐시 확인
-  const dbCached = getRecommendationFromCache(ticker, referenceDate);
-  if (dbCached) {
-    const result: QuickRecommendResult = {
-      strategy: dbCached.strategy as StrategyName,
-      reason: dbCached.reason ?? "캐시된 추천",
-      metrics: {
-        goldenCross: dbCached.goldenCross ?? 0,
-        isGoldenCross: dbCached.isGoldenCross,
-        maSlope: dbCached.maSlope ?? 0,
-        disparity: dbCached.disparity ?? 0,
-        rsi14: dbCached.rsi14 ?? 50,
-        roc12: dbCached.roc12 ?? 0,
-        volatility20: dbCached.volatility20 ?? 0,
-      },
-    };
-    // 인메모리 캐시에도 저장
-    recommendationCache.set(cacheKey, result);
-    return result;
-  }
-
   // 1. 기준일 인덱스 찾기
   const referenceDateIndex = dateToIndexMap.get(referenceDate);
   if (referenceDateIndex === undefined || referenceDateIndex < 59) {
@@ -266,17 +223,9 @@ export function getQuickRecommendation(
     }
   }
 
-  const result: QuickRecommendResult = {
+  return {
     strategy: recommendedStrategy,
     reason,
     metrics: referenceMetrics,
   };
-
-  // 인메모리 캐시에 저장
-  recommendationCache.set(cacheKey, result);
-
-  // DB 캐시에 저장
-  saveRecommendationToCache(ticker, referenceDate, result.strategy, result.reason, result.metrics);
-
-  return result;
 }

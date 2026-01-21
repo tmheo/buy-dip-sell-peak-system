@@ -21,8 +21,7 @@
     "web:start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "precompute": "tsx scripts/precompute-recommendations.ts"
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "soxl",
