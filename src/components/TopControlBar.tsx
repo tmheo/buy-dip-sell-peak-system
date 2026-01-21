@@ -50,7 +50,7 @@ export default async function TopControlBar() {
           <button className="btn btn-outline-warning" type="button" disabled>
             My Custom
           </button>
-{session?.user ? (
+          {session?.user ? (
             <Link href="/mypage" className="btn btn-outline-secondary">
               My Page
             </Link>

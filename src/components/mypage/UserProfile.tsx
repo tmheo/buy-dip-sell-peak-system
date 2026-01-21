@@ -2,6 +2,9 @@
  * 사용자 프로필 카드 컴포넌트
  */
 
+import type React from "react";
+import Image from "next/image";
+
 interface UserProfileProps {
   name: string | null;
   email: string;
@@ -9,7 +12,24 @@ interface UserProfileProps {
   createdAt: Date;
 }
 
-export default function UserProfile({ name, email, image, createdAt }: UserProfileProps) {
+interface ProfileRowProps {
+  label: string;
+  value: string;
+  isLast?: boolean;
+}
+
+function ProfileRow({ label, value, isLast = false }: ProfileRowProps): React.ReactElement {
+  return (
+    <div className={isLast ? "row" : "row mb-2"}>
+      <div className="col-4 text-secondary">{label}</div>
+      <div className="col-8 text-light">{value}</div>
+    </div>
+  );
+}
+
+const AVATAR_SIZE = 96;
+
+export default function UserProfile({ name, email, image, createdAt }: UserProfileProps): React.ReactElement {
   const displayName = name ?? email.split("@")[0];
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -23,18 +43,18 @@ export default function UserProfile({ name, email, image, createdAt }: UserProfi
     <div className="card bg-dark border-secondary">
       <div className="card-body text-center">
         {image ? (
-          <img
+          <Image
             src={image}
             alt={displayName}
             className="rounded-circle mb-3"
-            width={96}
-            height={96}
+            width={AVATAR_SIZE}
+            height={AVATAR_SIZE}
             style={{ objectFit: "cover" }}
           />
         ) : (
           <div
             className="rounded-circle bg-secondary d-flex align-items-center justify-content-center mx-auto mb-3"
-            style={{ width: 96, height: 96, fontSize: "2.5rem" }}
+            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: "2.5rem" }}
           >
             {initial}
           </div>
@@ -46,18 +66,9 @@ export default function UserProfile({ name, email, image, createdAt }: UserProfi
         <hr className="border-secondary" />
 
         <div className="text-start">
-          <div className="row mb-2">
-            <div className="col-4 text-secondary">이름</div>
-            <div className="col-8 text-light">{name ?? "-"}</div>
-          </div>
-          <div className="row mb-2">
-            <div className="col-4 text-secondary">이메일</div>
-            <div className="col-8 text-light">{email}</div>
-          </div>
-          <div className="row">
-            <div className="col-4 text-secondary">가입일</div>
-            <div className="col-8 text-light">{formattedDate}</div>
-          </div>
+          <ProfileRow label="이름" value={name ?? "-"} />
+          <ProfileRow label="이메일" value={email} />
+          <ProfileRow label="가입일" value={formattedDate} isLast />
         </div>
       </div>
     </div>

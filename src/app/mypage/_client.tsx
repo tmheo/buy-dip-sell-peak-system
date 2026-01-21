@@ -5,6 +5,7 @@
  * UI 렌더링 및 회원 탈퇴 처리
  */
 
+import type React from "react";
 import { useState } from "react";
 import UserProfile from "@/components/mypage/UserProfile";
 import DeleteAccountModal from "@/components/mypage/DeleteAccountModal";
@@ -16,29 +17,29 @@ interface MyPageClientProps {
   createdAt: Date;
 }
 
-export default function MyPageClient({ name, email, image, createdAt }: MyPageClientProps) {
+export default function MyPageClient({ name, email, image, createdAt }: MyPageClientProps): React.ReactElement {
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteAccount = async () => {
+  async function handleDeleteAccount(): Promise<void> {
     setIsDeleting(true);
 
-    try {
-      const response = await fetch("/api/user/delete", {
-        method: "DELETE",
-      });
+    const response = await fetch("/api/user/delete", { method: "DELETE" }).catch(() => null);
 
-      if (response.ok) {
-        window.location.href = "/";
-      } else {
-        const data = await response.json();
-        alert(data.error ?? "회원 탈퇴에 실패했습니다.");
-        setIsDeleting(false);
-      }
-    } catch {
+    if (!response) {
       alert("회원 탈퇴에 실패했습니다.");
       setIsDeleting(false);
+      return;
     }
-  };
+
+    if (response.ok) {
+      window.location.href = "/";
+      return;
+    }
+
+    const data = await response.json();
+    alert(data.error ?? "회원 탈퇴에 실패했습니다.");
+    setIsDeleting(false);
+  }
 
   return (
     <div className="container py-4">

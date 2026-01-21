@@ -4,17 +4,21 @@
  * 회원 탈퇴 확인 모달 컴포넌트
  */
 
+import type React from "react";
+
 interface DeleteAccountModalProps {
   id?: string;
   isDeleting: boolean;
   onConfirm: () => void;
 }
 
+const DEFAULT_MODAL_ID = "deleteAccountModal";
+
 export default function DeleteAccountModal({
-  id = "deleteAccountModal",
+  id = DEFAULT_MODAL_ID,
   isDeleting,
   onConfirm,
-}: DeleteAccountModalProps) {
+}: DeleteAccountModalProps): React.ReactElement {
   return (
     <div
       className="modal fade"
