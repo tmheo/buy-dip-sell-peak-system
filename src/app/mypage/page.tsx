@@ -26,7 +26,7 @@ export default async function MyPage(): Promise<React.ReactElement> {
       name={user.name}
       email={user.email}
       image={user.image}
-      createdAt={user.createdAt ?? new Date()}
+      createdAt={(user.createdAt ?? new Date()).toISOString()}
     />
   );
 }

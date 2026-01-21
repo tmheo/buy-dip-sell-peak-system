@@ -14,10 +14,11 @@ interface MyPageClientProps {
   name: string | null;
   email: string;
   image: string | null;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export default function MyPageClient({ name, email, image, createdAt }: MyPageClientProps): React.ReactElement {
+  const createdAtDate = new Date(createdAt);
   const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleDeleteAccount(): Promise<void> {
@@ -36,8 +37,14 @@ export default function MyPageClient({ name, email, image, createdAt }: MyPageCl
       return;
     }
 
-    const data = await response.json();
-    alert(data.error ?? "회원 탈퇴에 실패했습니다.");
+    let errorMessage = "회원 탈퇴에 실패했습니다.";
+    try {
+      const data = await response.json();
+      errorMessage = data.error ?? errorMessage;
+    } catch {
+      // ignore parse error
+    }
+    alert(errorMessage);
     setIsDeleting(false);
   }
 
@@ -51,7 +58,7 @@ export default function MyPageClient({ name, email, image, createdAt }: MyPageCl
             name={name}
             email={email}
             image={image}
-            createdAt={createdAt}
+            createdAt={createdAtDate}
           />
 
           <div className="mt-4 text-center">
