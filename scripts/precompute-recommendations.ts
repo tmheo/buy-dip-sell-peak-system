@@ -22,14 +22,15 @@ const BATCH_SIZE = 100; // 배치 저장 크기
  */
 function showProgress(current: number, total: number, ticker: string): void {
   const percent = ((current / total) * 100).toFixed(1);
-  const bar = "█".repeat(Math.floor(current / total * 30)) + "░".repeat(30 - Math.floor(current / total * 30));
+  const filled = Math.floor((current / total) * 30);
+  const bar = "█".repeat(filled) + "░".repeat(30 - filled);
   process.stdout.write(`\r[${bar}] ${percent}% (${current}/${total}) - ${ticker}`);
 }
 
 /**
  * 특정 티커에 대한 추천 사전 계산
  */
-async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
+function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
   console.log(`\n\n=== ${ticker} 추천 사전 계산 시작 ===`);
 
   // 전체 가격 데이터 로드
@@ -48,9 +49,9 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
 
   // 날짜-인덱스 맵 생성
   const dateToIndexMap = new Map<string, number>();
-  allPrices.forEach((price, index) => {
-    dateToIndexMap.set(price.date, index);
-  });
+  for (let index = 0; index < allPrices.length; index++) {
+    dateToIndexMap.set(allPrices[index].date, index);
+  }
 
   // 인메모리 캐시 초기화
   clearRecommendationCache();
@@ -75,15 +76,7 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
         date: referenceDate,
         strategy: result.strategy,
         reason: result.reason,
-        metrics: {
-          rsi14: result.metrics.rsi14,
-          isGoldenCross: result.metrics.isGoldenCross,
-          maSlope: result.metrics.maSlope,
-          disparity: result.metrics.disparity,
-          roc12: result.metrics.roc12,
-          volatility20: result.metrics.volatility20,
-          goldenCross: result.metrics.goldenCross,
-        },
+        metrics: result.metrics,
       });
       cachedCount++;
 
@@ -110,7 +103,7 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
 /**
  * 메인 실행
  */
-async function main(): Promise<void> {
+function main(): void {
   console.log("=== 추천 전략 사전 계산 시작 ===");
   console.log(`시작 날짜: ${START_DATE}`);
   console.log(`대상 티커: ${TICKERS.join(", ")}`);
@@ -121,7 +114,7 @@ async function main(): Promise<void> {
   let totalCached = 0;
 
   for (const ticker of TICKERS) {
-    const count = await precomputeForTicker(ticker);
+    const count = precomputeForTicker(ticker);
     totalCached += count;
   }
 
@@ -136,4 +129,8 @@ async function main(): Promise<void> {
 }
 
 // 실행
-main().catch(console.error);
+try {
+  main();
+} catch (error) {
+  console.error(error);
+}

@@ -254,13 +254,13 @@ export function getQuickRecommendation(
 
   // 9. SOXL 전용: RSI >= 60 AND 역배열이면 전략 한 단계 하향
   if (ticker === "SOXL" && referenceMetrics.rsi14 >= 60 && !referenceMetrics.isGoldenCross) {
+    const downgradeMap: Record<StrategyName, StrategyName> = {
+      Pro3: "Pro2",
+      Pro2: "Pro1",
+      Pro1: "Pro1", // Pro1은 그대로 유지
+    };
     const originalStrategy = recommendedStrategy;
-    if (recommendedStrategy === "Pro3") {
-      recommendedStrategy = "Pro2";
-    } else if (recommendedStrategy === "Pro2") {
-      recommendedStrategy = "Pro1";
-    }
-    // Pro1은 그대로 유지
+    recommendedStrategy = downgradeMap[recommendedStrategy];
     if (originalStrategy !== recommendedStrategy) {
       reason = `${reason} (RSI≥60 & 역배열로 ${originalStrategy}→${recommendedStrategy} 하향)`;
     }
