@@ -113,3 +113,44 @@ SELECT date FROM daily_metrics WHERE ticker = ? ORDER BY date DESC LIMIT 1
 export const SELECT_METRICS_COUNT = `
 SELECT COUNT(*) as count FROM daily_metrics WHERE ticker = ?
 `;
+
+// =====================================================
+// recommendation_cache 테이블 (백테스트 추천 성능 개선)
+// =====================================================
+
+export const CREATE_RECOMMENDATION_CACHE_TABLE = `
+CREATE TABLE IF NOT EXISTS recommendation_cache (
+    ticker TEXT NOT NULL,
+    date TEXT NOT NULL,
+    strategy TEXT NOT NULL,
+    reason TEXT,
+    rsi14 REAL,
+    is_golden_cross INTEGER,
+    ma_slope REAL,
+    disparity REAL,
+    roc12 REAL,
+    volatility20 REAL,
+    golden_cross REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (ticker, date)
+)
+`;
+
+export const CREATE_RECOMMENDATION_CACHE_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_rec_cache_ticker_date ON recommendation_cache(ticker, date)
+`;
+
+export const INSERT_RECOMMENDATION_CACHE = `
+INSERT OR REPLACE INTO recommendation_cache (ticker, date, strategy, reason, rsi14, is_golden_cross, ma_slope, disparity, roc12, volatility20, golden_cross)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
+export const SELECT_RECOMMENDATION_BY_DATE = `
+SELECT ticker, date, strategy, reason, rsi14, is_golden_cross as isGoldenCross, ma_slope as maSlope, disparity, roc12, volatility20, golden_cross as goldenCross
+FROM recommendation_cache
+WHERE ticker = ? AND date = ?
+`;
+
+export const SELECT_RECOMMENDATION_COUNT = `
+SELECT COUNT(*) as count FROM recommendation_cache WHERE ticker = ?
+`;
