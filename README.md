@@ -6,6 +6,24 @@
 
 Yahoo Finance에서 일별 가격 데이터를 다운로드하여 SQLite에 저장하고 조회/분석하는 도구입니다.
 
+## 시스템 아키텍처
+
+![시스템 아키텍처](./docs/architecture/system-architecture.png)
+
+<details>
+<summary>레이어별 설명</summary>
+
+| 레이어 | 구성요소 | 역할 |
+|--------|----------|------|
+| 외부 시스템 | Yahoo Finance, Google OAuth | 데이터 소스, 인증 제공 |
+| 프론트엔드 | Next.js 15 페이지 4개 | 사용자 인터페이스 |
+| API | REST 엔드포인트 3개 | 비즈니스 로직 접근점 |
+| 비즈니스 로직 | 백테스트/추천 엔진 | 핵심 알고리즘 |
+| 서비스 | DataFetcher, MetricsCalculator | 데이터 수집/가공 |
+| 데이터 | SQLite 테이블 4종 | 영속성 |
+
+</details>
+
 ### 지원 티커
 
 | 티커 | 설명 | 상장일 |

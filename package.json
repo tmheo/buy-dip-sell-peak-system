@@ -22,7 +22,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "precompute": "tsx scripts/precompute-recommendations.ts"
+    "precompute": "tsx scripts/precompute-recommendations.ts",
+    "export:architecture": "npx @vraksha/excalidraw-cli docs/architecture/system-architecture.excalidraw docs/architecture/system-architecture.png --format png"
   },
   "keywords": [
     "soxl",
