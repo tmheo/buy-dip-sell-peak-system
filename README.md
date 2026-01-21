@@ -39,6 +39,12 @@ npm run dev update -- --ticker SOXL
 # 모든 티커 업데이트
 npm run dev update-all
 
+# 기술적 지표 일괄 계산 (기존 가격 데이터 기반)
+npm run dev init-metrics -- --ticker SOXL
+
+# 지표 계산 결과 검증
+npm run dev verify-metrics -- --ticker SOXL
+
 # 데이터 조회
 npm run dev query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ```
@@ -59,10 +65,12 @@ npm start query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 
 | 명령어 | 설명 |
 |--------|------|
-| `init` | 데이터베이스 초기화 및 전체 히스토리 다운로드 |
-| `init-all` | 모든 티커의 전체 히스토리 다운로드 |
-| `update` | 최신 데이터로 업데이트 (증분) |
-| `update-all` | 모든 티커 업데이트 |
+| `init` | 데이터베이스 초기화 및 전체 히스토리 다운로드 (지표 포함) |
+| `init-all` | 모든 티커의 전체 히스토리 다운로드 (지표 포함) |
+| `update` | 최신 데이터로 업데이트 (증분, 지표 포함) |
+| `update-all` | 모든 티커 업데이트 (지표 포함) |
+| `init-metrics` | 기존 가격 데이터로 기술적 지표 일괄 계산 |
+| `verify-metrics` | 지표 계산 결과 검증 |
 | `query` | 데이터 조회 |
 | `help` | 도움말 표시 |
 
@@ -78,13 +86,14 @@ npm start query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 
 ```
 src/
-├── index.ts              # CLI 진입점 - 6개 명령어 핸들링
+├── index.ts              # CLI 진입점 - 8개 명령어 핸들링
 ├── types/index.ts        # TypeScript 인터페이스 (DailyPrice, QueryOptions, Command)
 ├── database/
 │   ├── index.ts          # SQLite 연결 관리 및 CRUD 작업 (싱글톤 패턴)
-│   └── schema.ts         # daily_prices 테이블 스키마 정의
+│   └── schema.ts         # daily_prices, daily_metrics 테이블 스키마 정의
 └── services/
-    └── dataFetcher.ts    # Yahoo Finance API 연동 (재시도 로직 포함)
+    ├── dataFetcher.ts    # Yahoo Finance API 연동 (재시도 로직 포함)
+    └── metricsCalculator.ts  # 배치 기술적 지표 계산 (슬라이딩 윈도우 최적화)
 ```
 
 ## 기술 스택
