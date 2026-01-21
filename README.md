@@ -16,7 +16,7 @@ Yahoo Finance에서 일별 가격 데이터를 다운로드하여 SQLite에 저�
 | 레이어 | 구성요소 | 역할 |
 |--------|----------|------|
 | 외부 시스템 | Yahoo Finance, Google OAuth | 데이터 소스, 인증 제공 |
-| 프론트엔드 | Next.js 15 페이지 4개 | 사용자 인터페이스 |
+| 프론트엔드 | Next.js 15 페이지 5개 | 사용자 인터페이스 |
 | API | REST 엔드포인트 3개 | 비즈니스 로직 접근점 |
 | 비즈니스 로직 | 백테스트/추천 엔진 | 핵심 알고리즘 |
 | 서비스 | DataFetcher, MetricsCalculator | 데이터 수집/가공 |
@@ -448,11 +448,14 @@ src/
 │   │   ├── RecommendResultCard.tsx # 추천 결과 카드
 │   │   ├── StrategySummaryCards.tsx # 전략별 사용 통계 카드
 │   │   └── index.ts              # 컴포넌트 엔트리포인트
-│   └── recommend/                # 전략 추천 시각화 컴포넌트
-│       ├── ReferenceChart.tsx    # 기준일 분석 차트
-│       ├── SimilarPeriodCard.tsx # 유사 구간 카드
-│       ├── StrategyScoreTable.tsx# 전략 점수 테이블
-│       └── RecommendationCard.tsx# 추천 결과 카드
+│   ├── recommend/                # 전략 추천 시각화 컴포넌트
+│   │   ├── ReferenceChart.tsx    # 기준일 분석 차트
+│   │   ├── SimilarPeriodCard.tsx # 유사 구간 카드
+│   │   ├── StrategyScoreTable.tsx# 전략 점수 테이블
+│   │   └── RecommendationCard.tsx# 추천 결과 카드
+│   └── mypage/                   # 마이페이지 컴포넌트
+│       ├── UserProfile.tsx       # 사용자 프로필 카드
+│       └── DeleteAccountModal.tsx# 회원 탈퇴 확인 모달
 └── styles/
     └── globals.css               # 글로벌 스타일 + 커스텀 CSS
 ```
@@ -535,9 +538,11 @@ AUTH_GOOGLE_SECRET=your-google-client-secret
 | `/backtest` | ✅ | 백테스트 실행 페이지 |
 | `/recommend` | ✅ | 전략 추천 페이지 |
 | `/backtest-recommend` | ✅ | 추천 전략 백테스트 페이지 |
+| `/mypage` | ✅ | 마이페이지 (프로필, 회원 탈퇴) |
 | `/api/backtest` | ✅ | 백테스트 API |
 | `/api/recommend` | ✅ | 추천 API |
 | `/api/backtest-recommend` | ✅ | 추천 백테스트 API |
+| `/api/user/delete` | ✅ | 회원 탈퇴 API |
 
 ### 인증 흐름
 
@@ -554,17 +559,23 @@ src/
 ├── lib/auth/
 │   └── api-auth.ts            # API 인증 유틸리티 (requireAuth, isUnauthorized)
 └── app/
-    ├── api/auth/[...nextauth]/
-    │   └── route.ts           # NextAuth.js API 라우트
+    ├── api/
+    │   ├── auth/[...nextauth]/
+    │   │   └── route.ts       # NextAuth.js API 라우트
+    │   └── user/delete/
+    │       └── route.ts       # 회원 탈퇴 API
     ├── backtest/
     │   ├── page.tsx           # 서버 컴포넌트 (인증 체크)
     │   └── _client.tsx        # 클라이언트 컴포넌트 (UI)
     ├── recommend/
     │   ├── page.tsx           # 서버 컴포넌트 (인증 체크)
     │   └── _client.tsx        # 클라이언트 컴포넌트 (UI)
-    └── backtest-recommend/
-        ├── page.tsx           # 서버 컴포넌트 (인증 체크)
-        └── _client.tsx        # 클라이언트 컴포넌트 (UI)
+    ├── backtest-recommend/
+    │   ├── page.tsx           # 서버 컴포넌트 (인증 체크)
+    │   └── _client.tsx        # 클라이언트 컴포넌트 (UI)
+    └── mypage/
+        ├── page.tsx           # 서버 컴포넌트 (인증 체크, 사용자 정보 조회)
+        └── _client.tsx        # 클라이언트 컴포넌트 (프로필, 탈퇴 UI)
 ```
 
 ---
