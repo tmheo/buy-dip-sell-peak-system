@@ -8,8 +8,11 @@ import {
   CREATE_DAILY_PRICES_TABLE,
   CREATE_METRICS_INDEX,
   CREATE_TICKER_DATE_INDEX,
+  CREATE_RECOMMENDATION_CACHE_TABLE,
+  CREATE_RECOMMENDATION_CACHE_INDEX,
   INSERT_DAILY_METRIC,
   INSERT_DAILY_PRICE,
+  INSERT_RECOMMENDATION_CACHE,
   SELECT_ALL_PRICES,
   SELECT_ALL_PRICES_BY_TICKER,
   SELECT_COUNT,
@@ -20,6 +23,8 @@ import {
   SELECT_METRICS_COUNT,
   SELECT_PRICES_BY_DATE_RANGE,
   SELECT_TOTAL_COUNT,
+  SELECT_RECOMMENDATION_BY_DATE,
+  SELECT_RECOMMENDATION_COUNT,
 } from "./schema";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +65,8 @@ export function initTables(): void {
   database.exec(CREATE_TICKER_DATE_INDEX);
   database.exec(CREATE_DAILY_METRICS_TABLE);
   database.exec(CREATE_METRICS_INDEX);
+  database.exec(CREATE_RECOMMENDATION_CACHE_TABLE);
+  database.exec(CREATE_RECOMMENDATION_CACHE_INDEX);
   console.log("데이터베이스 테이블 초기화 완료");
 }
 
@@ -265,6 +272,140 @@ export function getLatestMetricDate(ticker: string = DEFAULT_TICKER): string | n
 export function getMetricsCount(ticker: string = DEFAULT_TICKER): number {
   const database = getConnection();
   const stmt = database.prepare(SELECT_METRICS_COUNT);
+  const result = stmt.get(ticker) as { count: number };
+  return result.count;
+}
+
+// =====================================================
+// recommendation_cache CRUD 함수 (백테스트 추천 성능 개선)
+// =====================================================
+
+/** 추천 캐시 row 타입 */
+export interface RecommendationCacheRow {
+  ticker: string;
+  date: string;
+  strategy: string;
+  reason: string | null;
+  rsi14: number | null;
+  isGoldenCross: boolean;
+  maSlope: number | null;
+  disparity: number | null;
+  roc12: number | null;
+  volatility20: number | null;
+  goldenCross: number | null;
+}
+
+/** SQLite에서 조회된 추천 캐시 row 타입 (boolean이 INTEGER로 저장됨) */
+type RecommendationCacheRowFromDb = Omit<RecommendationCacheRow, "isGoldenCross"> & {
+  isGoldenCross: number;
+};
+
+/**
+ * 추천 캐시에서 특정 날짜의 추천 조회
+ */
+export function getRecommendationFromCache(
+  ticker: string,
+  date: string
+): RecommendationCacheRow | null {
+  const database = getConnection();
+  const stmt = database.prepare(SELECT_RECOMMENDATION_BY_DATE);
+  const row = stmt.get(ticker, date) as RecommendationCacheRowFromDb | undefined;
+
+  if (!row) return null;
+
+  return {
+    ...row,
+    isGoldenCross: row.isGoldenCross === 1,
+  };
+}
+
+/**
+ * 추천 결과를 캐시에 저장
+ */
+export function saveRecommendationToCache(
+  ticker: string,
+  date: string,
+  strategy: string,
+  reason: string | null,
+  metrics: {
+    rsi14?: number;
+    isGoldenCross?: boolean;
+    maSlope?: number;
+    disparity?: number;
+    roc12?: number;
+    volatility20?: number;
+    goldenCross?: number;
+  }
+): void {
+  const database = getConnection();
+  const stmt = database.prepare(INSERT_RECOMMENDATION_CACHE);
+  stmt.run(
+    ticker,
+    date,
+    strategy,
+    reason,
+    metrics.rsi14 ?? null,
+    metrics.isGoldenCross ? 1 : 0,
+    metrics.maSlope ?? null,
+    metrics.disparity ?? null,
+    metrics.roc12 ?? null,
+    metrics.volatility20 ?? null,
+    metrics.goldenCross ?? null
+  );
+}
+
+/** 벌크 저장용 추천 캐시 아이템 */
+export interface RecommendationCacheItem {
+  ticker: string;
+  date: string;
+  strategy: string;
+  reason: string | null;
+  metrics: {
+    rsi14?: number;
+    isGoldenCross?: boolean;
+    maSlope?: number;
+    disparity?: number;
+    roc12?: number;
+    volatility20?: number;
+    goldenCross?: number;
+  };
+}
+
+/**
+ * 여러 추천 결과를 캐시에 일괄 저장 (트랜잭션)
+ */
+export function bulkSaveRecommendations(items: RecommendationCacheItem[]): number {
+  const database = getConnection();
+  const stmt = database.prepare(INSERT_RECOMMENDATION_CACHE);
+
+  const insertMany = database.transaction((cacheItems: RecommendationCacheItem[]) => {
+    for (const item of cacheItems) {
+      stmt.run(
+        item.ticker,
+        item.date,
+        item.strategy,
+        item.reason,
+        item.metrics.rsi14 ?? null,
+        item.metrics.isGoldenCross ? 1 : 0,
+        item.metrics.maSlope ?? null,
+        item.metrics.disparity ?? null,
+        item.metrics.roc12 ?? null,
+        item.metrics.volatility20 ?? null,
+        item.metrics.goldenCross ?? null
+      );
+    }
+  });
+
+  insertMany(items);
+  return items.length;
+}
+
+/**
+ * 특정 티커의 캐시된 추천 데이터 수 조회
+ */
+export function getRecommendationCacheCount(ticker: string = DEFAULT_TICKER): number {
+  const database = getConnection();
+  const stmt = database.prepare(SELECT_RECOMMENDATION_COUNT);
   const result = stmt.get(ticker) as { count: number };
   return result.count;
 }

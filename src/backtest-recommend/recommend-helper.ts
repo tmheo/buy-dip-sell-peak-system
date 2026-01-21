@@ -5,7 +5,11 @@
 import type { DailyPrice } from "@/types";
 import type { StrategyName, TechnicalMetrics } from "@/backtest/types";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
-import { getMetricsByDateRange } from "@/database";
+import {
+  getMetricsByDateRange,
+  getRecommendationFromCache,
+  saveRecommendationToCache,
+} from "@/database";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -18,8 +22,25 @@ import { BacktestEngine } from "@/backtest";
 
 import type { QuickRecommendResult } from "./types";
 
+/** getQuickRecommendation 옵션 */
+export interface QuickRecommendationOptions {
+  /** DB에 캐시 저장 여부 (기본값: true) */
+  persistToDb?: boolean;
+}
+
 /** 백테스트용 lookback 일수 */
 const LOOKBACK_DAYS = 90;
+
+/** 인메모리 메모이제이션 캐시 (ticker:date -> 추천 결과) */
+const recommendationCache = new Map<string, QuickRecommendResult>();
+
+/**
+ * 추천 캐시 초기화
+ * 새로운 백테스트 세션 시작 시 호출
+ */
+export function clearRecommendationCache(): void {
+  recommendationCache.clear();
+}
 
 /**
  * 기본 기술적 지표 생성 (데이터 부족 시 사용)
@@ -43,14 +64,45 @@ function createDefaultMetrics(): TechnicalMetrics {
  * @param referenceDate - 기준일
  * @param allPrices - 전체 가격 데이터 (성능 최적화를 위해 캐시된 데이터 사용)
  * @param dateToIndexMap - 날짜-인덱스 맵 (O(1) 조회용)
+ * @param options - 옵션 (persistToDb: DB 캐시 저장 여부, 기본값 true)
  * @returns 추천 전략 정보 또는 null (데이터 부족 시)
  */
 export function getQuickRecommendation(
   ticker: "SOXL" | "TQQQ",
   referenceDate: string,
   allPrices: DailyPrice[],
-  dateToIndexMap: Map<string, number>
+  dateToIndexMap: Map<string, number>,
+  options: QuickRecommendationOptions = {}
 ): QuickRecommendResult | null {
+  const { persistToDb = true } = options;
+  // 0. 메모이제이션 캐시 확인
+  const cacheKey = `${ticker}:${referenceDate}`;
+  const memoryCached = recommendationCache.get(cacheKey);
+  if (memoryCached) {
+    return memoryCached;
+  }
+
+  // 0-1. DB 캐시 확인
+  const dbCached = getRecommendationFromCache(ticker, referenceDate);
+  if (dbCached) {
+    const result: QuickRecommendResult = {
+      strategy: dbCached.strategy as StrategyName,
+      reason: dbCached.reason ?? "캐시된 추천",
+      metrics: {
+        goldenCross: dbCached.goldenCross ?? 0,
+        isGoldenCross: dbCached.isGoldenCross,
+        maSlope: dbCached.maSlope ?? 0,
+        disparity: dbCached.disparity ?? 0,
+        rsi14: dbCached.rsi14 ?? 50,
+        roc12: dbCached.roc12 ?? 0,
+        volatility20: dbCached.volatility20 ?? 0,
+      },
+    };
+    // 인메모리 캐시에도 저장
+    recommendationCache.set(cacheKey, result);
+    return result;
+  }
+
   // 1. 기준일 인덱스 찾기
   const referenceDateIndex = dateToIndexMap.get(referenceDate);
   if (referenceDateIndex === undefined || referenceDateIndex < 59) {
@@ -211,21 +263,37 @@ export function getQuickRecommendation(
 
   // 9. SOXL 전용: RSI >= 60 AND 역배열이면 전략 한 단계 하향
   if (ticker === "SOXL" && referenceMetrics.rsi14 >= 60 && !referenceMetrics.isGoldenCross) {
+    const downgradeMap: Record<StrategyName, StrategyName> = {
+      Pro3: "Pro2",
+      Pro2: "Pro1",
+      Pro1: "Pro1", // Pro1은 그대로 유지
+    };
     const originalStrategy = recommendedStrategy;
-    if (recommendedStrategy === "Pro3") {
-      recommendedStrategy = "Pro2";
-    } else if (recommendedStrategy === "Pro2") {
-      recommendedStrategy = "Pro1";
-    }
-    // Pro1은 그대로 유지
+    recommendedStrategy = downgradeMap[recommendedStrategy];
     if (originalStrategy !== recommendedStrategy) {
       reason = `${reason} (RSI≥60 & 역배열로 ${originalStrategy}→${recommendedStrategy} 하향)`;
     }
   }
 
-  return {
+  const result: QuickRecommendResult = {
     strategy: recommendedStrategy,
     reason,
     metrics: referenceMetrics,
   };
+
+  // 인메모리 캐시에 저장
+  recommendationCache.set(cacheKey, result);
+
+  // DB 캐시에 저장 (persistToDb가 true일 때만)
+  if (persistToDb) {
+    saveRecommendationToCache(
+      ticker,
+      referenceDate,
+      result.strategy,
+      result.reason,
+      result.metrics
+    );
+  }
+
+  return result;
 }
