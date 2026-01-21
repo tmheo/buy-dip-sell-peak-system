@@ -22,6 +22,12 @@ import { BacktestEngine } from "@/backtest";
 
 import type { QuickRecommendResult } from "./types";
 
+/** getQuickRecommendation 옵션 */
+export interface QuickRecommendationOptions {
+  /** DB에 캐시 저장 여부 (기본값: true) */
+  persistToDb?: boolean;
+}
+
 /** 백테스트용 lookback 일수 */
 const LOOKBACK_DAYS = 90;
 
@@ -58,14 +64,17 @@ function createDefaultMetrics(): TechnicalMetrics {
  * @param referenceDate - 기준일
  * @param allPrices - 전체 가격 데이터 (성능 최적화를 위해 캐시된 데이터 사용)
  * @param dateToIndexMap - 날짜-인덱스 맵 (O(1) 조회용)
+ * @param options - 옵션 (persistToDb: DB 캐시 저장 여부, 기본값 true)
  * @returns 추천 전략 정보 또는 null (데이터 부족 시)
  */
 export function getQuickRecommendation(
   ticker: "SOXL" | "TQQQ",
   referenceDate: string,
   allPrices: DailyPrice[],
-  dateToIndexMap: Map<string, number>
+  dateToIndexMap: Map<string, number>,
+  options: QuickRecommendationOptions = {}
 ): QuickRecommendResult | null {
+  const { persistToDb = true } = options;
   // 0. 메모이제이션 캐시 확인
   const cacheKey = `${ticker}:${referenceDate}`;
   const memoryCached = recommendationCache.get(cacheKey);
@@ -275,8 +284,16 @@ export function getQuickRecommendation(
   // 인메모리 캐시에 저장
   recommendationCache.set(cacheKey, result);
 
-  // DB 캐시에 저장
-  saveRecommendationToCache(ticker, referenceDate, result.strategy, result.reason, result.metrics);
+  // DB 캐시에 저장 (persistToDb가 true일 때만)
+  if (persistToDb) {
+    saveRecommendationToCache(
+      ticker,
+      referenceDate,
+      result.strategy,
+      result.reason,
+      result.metrics
+    );
+  }
 
   return result;
 }

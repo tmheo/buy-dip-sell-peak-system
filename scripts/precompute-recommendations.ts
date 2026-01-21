@@ -67,8 +67,10 @@ function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
   for (let i = startIndex; i < allPrices.length; i++) {
     const referenceDate = allPrices[i].date;
 
-    // 추천 계산
-    const result = getQuickRecommendation(ticker, referenceDate, allPrices, dateToIndexMap);
+    // 추천 계산 (DB 저장은 bulkSaveRecommendations에서 일괄 처리하므로 persistToDb: false)
+    const result = getQuickRecommendation(ticker, referenceDate, allPrices, dateToIndexMap, {
+      persistToDb: false,
+    });
 
     if (result) {
       cacheItems.push({
