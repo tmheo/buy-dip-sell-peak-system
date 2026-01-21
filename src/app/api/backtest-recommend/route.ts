@@ -13,14 +13,30 @@ import type { RecommendBacktestRequest } from "@/backtest-recommend";
 // 추천 백테스트용 lookback 시작일 (충분한 과거 데이터 확보)
 const RECOMMEND_LOOKBACK_START = "2010-01-01";
 
+// 엄격한 달력 날짜 검증 함수
+const isValidDateString = (value: string) => {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+};
+
 // 요청 스키마 정의
 const RecommendBacktestRequestSchema = z
   .object({
     ticker: z.enum(["SOXL", "TQQQ"], {
       message: "ticker must be SOXL or TQQQ",
     }),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "startDate must be in YYYY-MM-DD format"),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "endDate must be in YYYY-MM-DD format"),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "startDate must be in YYYY-MM-DD format")
+      .refine(isValidDateString, "startDate must be a valid calendar date"),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "endDate must be in YYYY-MM-DD format")
+      .refine(isValidDateString, "endDate must be a valid calendar date"),
     initialCapital: z.number().positive("initialCapital must be positive"),
   })
   .refine(
@@ -42,7 +58,12 @@ const RecommendBacktestRequestSchema = z
 export async function POST(request: Request) {
   try {
     // 요청 본문 파싱
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
+    }
 
     // 스키마 유효성 검사
     const parseResult = RecommendBacktestRequestSchema.safeParse(body);

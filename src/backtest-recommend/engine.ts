@@ -220,8 +220,12 @@ export class RecommendBacktestEngine {
         const todayStrategy = todayRecommend?.strategy ?? "Pro2";
         const todayReason = todayRecommend?.reason ?? "기본 전략";
 
-        // 전략이 변경되었으면 업데이트
+        // 전략이 변경되었으면 업데이트 (cycles 카운트도 조정)
         if (todayStrategy !== this.currentStrategyName) {
+          // 첫 매수 전이므로, 이전 전략의 cycles를 새 전략으로 이전
+          strategyStats[this.currentStrategyName].cycles--;
+          strategyStats[todayStrategy].cycles++;
+
           this.currentStrategyName = todayStrategy;
           this.currentStrategy = getStrategy(todayStrategy);
           cycleManager.setStrategy(this.currentStrategy);
