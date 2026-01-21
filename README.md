@@ -449,6 +449,7 @@ src/
 | Bootswatch Solar | 5.3.3 | 다크 테마 |
 | Recharts | 3.6 | 차트 라이브러리 |
 | Google Fonts | Noto Sans KR | 한글 폰트 |
+| NextAuth.js | 5 (beta) | 인증 라이브러리 |
 
 ### 백테스트 결과 시각화
 
@@ -487,6 +488,65 @@ Sidebar 컴포넌트는 SQLite 데이터베이스에서 실시간으로 SOXL 가
 
 ```
 SQLite (prices.db) → getLatestPrices() → Sidebar Component → UI 표시
+```
+
+---
+
+## 인증 시스템
+
+NextAuth.js v5 (Auth.js)를 사용한 Google OAuth 인증 시스템입니다.
+
+### 환경 변수 설정
+
+`.env.local` 파일에 다음 환경 변수를 설정합니다:
+
+```bash
+# NextAuth.js 설정
+AUTH_SECRET=your-auth-secret-key  # openssl rand -base64 32로 생성
+
+# Google OAuth
+AUTH_GOOGLE_ID=your-google-client-id
+AUTH_GOOGLE_SECRET=your-google-client-secret
+```
+
+### 접근 권한
+
+| 경로 | 인증 필요 | 설명 |
+|------|----------|------|
+| `/info` | ❌ | 서비스 소개 페이지 (공개) |
+| `/backtest` | ✅ | 백테스트 실행 페이지 |
+| `/recommend` | ✅ | 전략 추천 페이지 |
+| `/backtest-recommend` | ✅ | 추천 전략 백테스트 페이지 |
+| `/api/backtest` | ✅ | 백테스트 API |
+| `/api/recommend` | ✅ | 추천 API |
+| `/api/backtest-recommend` | ✅ | 추천 백테스트 API |
+
+### 인증 흐름
+
+1. 미인증 사용자가 보호된 페이지 접근 시 `/info`로 리다이렉트
+2. `/info` 페이지에서 Google 로그인 버튼 클릭
+3. Google OAuth 인증 완료 후 원래 페이지로 리다이렉트
+4. 세션은 SQLite 데이터베이스에 저장 (better-sqlite3)
+
+### 인증 모듈 구조
+
+```
+src/
+├── auth.ts                    # NextAuth.js 설정 (providers, adapter)
+├── lib/auth/
+│   └── api-auth.ts            # API 인증 유틸리티 (requireAuth, isUnauthorized)
+└── app/
+    ├── api/auth/[...nextauth]/
+    │   └── route.ts           # NextAuth.js API 라우트
+    ├── backtest/
+    │   ├── page.tsx           # 서버 컴포넌트 (인증 체크)
+    │   └── _client.tsx        # 클라이언트 컴포넌트 (UI)
+    ├── recommend/
+    │   ├── page.tsx           # 서버 컴포넌트 (인증 체크)
+    │   └── _client.tsx        # 클라이언트 컴포넌트 (UI)
+    └── backtest-recommend/
+        ├── page.tsx           # 서버 컴포넌트 (인증 체크)
+        └── _client.tsx        # 클라이언트 컴포넌트 (UI)
 ```
 
 ---

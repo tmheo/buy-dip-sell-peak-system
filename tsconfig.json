@@ -20,7 +20,8 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/auth": ["./auth"]
     },
     "plugins": [
       {
@@ -28,6 +29,6 @@
       }
     ]
   },
-  "include": ["src/**/*", "scripts/**/*", "next-env.d.ts", ".next/types/**/*.ts"],
+  "include": ["src/**/*", "scripts/**/*", "next-env.d.ts", ".next/types/**/*.ts", "auth.ts"],
   "exclude": ["node_modules", "dist"]
 }
