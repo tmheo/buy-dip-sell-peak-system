@@ -9,6 +9,7 @@ import { z } from "zod";
 import { getPricesByDateRange } from "@/database";
 import { BacktestEngine } from "@/backtest";
 import type { BacktestRequest, StrategyName } from "@/backtest";
+import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 
 // 요청 스키마 정의
 const BacktestRequestSchema = z
@@ -38,6 +39,12 @@ const BacktestRequestSchema = z
  */
 export async function POST(request: Request) {
   try {
+    // 인증 체크
+    const authResult = await requireAuth();
+    if (isUnauthorized(authResult)) {
+      return authResult;
+    }
+
     // 요청 본문 파싱
     const body = await request.json();
 

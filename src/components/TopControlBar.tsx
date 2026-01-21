@@ -1,7 +1,13 @@
 // TopControlBar 컴포넌트 - 상단 컨트롤 바
 // Server Component
 
-export default function TopControlBar() {
+import { auth } from "@/auth";
+import { LoginButton } from "./auth/LoginButton";
+import { LogoutButton } from "./auth/LogoutButton";
+
+export default async function TopControlBar() {
+  const session = await auth();
+
   return (
     <nav className="navbar navbar-expand-lg bg-dark border-bottom border-secondary">
       <div className="container-fluid">
@@ -27,7 +33,16 @@ export default function TopControlBar() {
 
         {/* 오른쪽: 사용자 정보 및 버튼들 */}
         <div className="d-flex align-items-center gap-2">
-          <span className="text-muted me-2">사용자명</span>
+          {session?.user ? (
+            <>
+              <span className="text-light me-2">
+                {session.user.name ?? session.user.email}
+              </span>
+              <LogoutButton />
+            </>
+          ) : (
+            <LoginButton />
+          )}
           <button className="btn btn-outline-info" type="button" disabled>
             Trading
           </button>

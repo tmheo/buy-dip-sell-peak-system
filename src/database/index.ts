@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
 import path from "path";
-import { fileURLToPath } from "url";
 
 import type { DailyMetricRow, DailyPrice, QueryOptions } from "@/types";
 import {
@@ -10,6 +9,12 @@ import {
   CREATE_TICKER_DATE_INDEX,
   CREATE_RECOMMENDATION_CACHE_TABLE,
   CREATE_RECOMMENDATION_CACHE_INDEX,
+  CREATE_USERS_TABLE,
+  CREATE_ACCOUNTS_TABLE,
+  CREATE_SESSIONS_TABLE,
+  CREATE_USERS_EMAIL_INDEX,
+  CREATE_ACCOUNTS_USER_INDEX,
+  CREATE_SESSIONS_USER_INDEX,
   INSERT_DAILY_METRIC,
   INSERT_DAILY_PRICE,
   INSERT_RECOMMENDATION_CACHE,
@@ -27,9 +32,7 @@ import {
   SELECT_RECOMMENDATION_COUNT,
 } from "./schema";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, "../../data/prices.db");
+const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "data", "prices.db");
 
 const DEFAULT_TICKER = "SOXL";
 
@@ -67,6 +70,13 @@ export function initTables(): void {
   database.exec(CREATE_METRICS_INDEX);
   database.exec(CREATE_RECOMMENDATION_CACHE_TABLE);
   database.exec(CREATE_RECOMMENDATION_CACHE_INDEX);
+  // Auth.js 테이블
+  database.exec(CREATE_USERS_TABLE);
+  database.exec(CREATE_ACCOUNTS_TABLE);
+  database.exec(CREATE_SESSIONS_TABLE);
+  database.exec(CREATE_USERS_EMAIL_INDEX);
+  database.exec(CREATE_ACCOUNTS_USER_INDEX);
+  database.exec(CREATE_SESSIONS_USER_INDEX);
   console.log("데이터베이스 테이블 초기화 완료");
 }
 

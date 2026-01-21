@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 import { BacktestEngine } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
@@ -120,6 +121,12 @@ function generateChartData(
 /** POST /api/recommend - 전략 추천 API */
 export async function POST(request: Request): Promise<Response> {
   try {
+    // 인증 체크
+    const authResult = await requireAuth();
+    if (isUnauthorized(authResult)) {
+      return authResult;
+    }
+
     // 요청 본문 파싱
     let body: unknown;
     try {

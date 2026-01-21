@@ -154,3 +154,61 @@ WHERE ticker = ? AND date = ?
 export const SELECT_RECOMMENDATION_COUNT = `
 SELECT COUNT(*) as count FROM recommendation_cache WHERE ticker = ?
 `;
+
+// =====================================================
+// Auth.js 테이블 (Google OAuth 인증)
+// =====================================================
+
+export const CREATE_USERS_TABLE = `
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    email TEXT UNIQUE,
+    email_verified INTEGER,
+    image TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
+export const CREATE_ACCOUNTS_TABLE = `
+CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    provider_account_id TEXT NOT NULL,
+    refresh_token TEXT,
+    access_token TEXT,
+    expires_at INTEGER,
+    token_type TEXT,
+    scope TEXT,
+    id_token TEXT,
+    session_state TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(provider, provider_account_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)
+`;
+
+export const CREATE_SESSIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS sessions (
+    session_token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    expires TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)
+`;
+
+export const CREATE_USERS_EMAIL_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
+`;
+
+export const CREATE_ACCOUNTS_USER_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)
+`;
+
+export const CREATE_SESSIONS_USER_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)
+`;
