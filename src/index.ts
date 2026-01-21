@@ -281,6 +281,10 @@ async function handleVerifyMetrics(ticker: SupportedTicker): Promise<void> {
     console.log(`${ticker}의 가격 데이터가 없습니다.`);
     return;
   }
+  if (prices.length <= 59) {
+    console.log(`${ticker}의 가격 데이터가 60일 미만입니다. (검증 불가)`);
+    return;
+  }
 
   const adjClosePrices = prices.map((p) => p.adjClose);
   const dates = prices.map((p) => p.date);

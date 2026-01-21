@@ -40,15 +40,11 @@ function calculateSMABatch(
   const firstValidIndex = Math.max(startIndex, period - 1);
 
   // startIndex부터 firstValidIndex-1까지는 null
-  for (let i = startIndex; i < firstValidIndex; i++) {
+  for (let i = startIndex; i < firstValidIndex && i <= endIndex; i++) {
     results.push(null);
   }
 
   if (firstValidIndex > endIndex) {
-    // 모든 인덱스가 데이터 부족
-    for (let i = firstValidIndex; i <= endIndex; i++) {
-      results.push(null);
-    }
     return results;
   }
 

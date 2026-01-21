@@ -274,10 +274,16 @@ export async function POST(request: Request): Promise<Response> {
           },
         });
       }
-    } else {
-      // Fallback: DB에 지표가 없으면 기존 방식으로 계산
-      console.warn(`No metrics in DB for ${ticker}, falling back to runtime calculation`);
+    }
+
+    if (historicalMetrics.length < 3) {
+      // Fallback: DB 지표가 부족하면 기존 방식으로 보완
+      console.warn(
+        `Metrics in DB are insufficient for ${ticker}, falling back to runtime calculation`
+      );
+      const existingIndex = new Set(historicalMetrics.map((m) => m.dateIndex));
       for (let i = 59; i <= maxHistoricalIndex; i++) {
+        if (existingIndex.has(i)) continue;
         const metrics = calculateTechnicalMetrics(adjClosePrices, i);
         if (metrics) {
           historicalMetrics.push({
