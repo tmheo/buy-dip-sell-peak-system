@@ -49,11 +49,15 @@ export default function AssetMddChart({ dailyHistory, initialCapital }: AssetMdd
         <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#073642" />
           <XAxis
-            dataKey="date"
+            dataKey="index"
             tick={{ fontSize: 10, fill: "#93a1a1" }}
             interval={tickInterval}
             axisLine={{ stroke: "#073642" }}
             tickLine={{ stroke: "#073642" }}
+            tickFormatter={(index) => {
+              const point = chartData[index];
+              return point ? point.date : "";
+            }}
           />
           <YAxis
             yAxisId="left"
