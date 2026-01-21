@@ -13,7 +13,7 @@ const navItems: NavItem[] = [
   { href: "/recommend", label: "추천전략" },
   { href: "/stats", label: "통계" },
   { href: "/backtest", label: "백테스트(기본)" },
-  { href: "/backtest-strategy", label: "백테스트(추천전략)" },
+  { href: "/backtest-recommend", label: "백테스트(추천전략)" },
   { href: "/update-note", label: "Update Note" },
 ];
 

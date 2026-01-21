@@ -384,6 +384,12 @@ export class BacktestEngine {
       return { buyTrade: null, buyOrder: null };
     }
 
+    // 현금이 충분한지 확인 (손절로 인해 현금이 줄어든 경우 대비)
+    const estimatedCost = new Decimal(currentClose).mul(shares);
+    if (estimatedCost.gt(cycleManager.getCash())) {
+      return { buyTrade: null, buyOrder: null };
+    }
+
     const orderAmount = new Decimal(buyLimitPrice)
       .mul(shares)
       .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)

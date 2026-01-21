@@ -244,7 +244,7 @@ export default function RecommendPage() {
           </div>
 
           {/* 전략 점수 테이블 */}
-          <StrategyScoreTable strategyScores={result.strategyScores} />
+          <StrategyScoreTable strategyScores={result.strategyScores} downgradeInfo={result.downgradeInfo} />
 
           {/* 추천 전략 카드 */}
           <RecommendationCard

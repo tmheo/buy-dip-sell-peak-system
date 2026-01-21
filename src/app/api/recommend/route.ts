@@ -25,6 +25,7 @@ import type {
   HistoricalMetrics,
   PeriodBacktestResult,
   ChartDataPoint,
+  DowngradeInfo,
 } from "@/recommend";
 
 const RecommendRequestSchema = z
@@ -490,7 +491,29 @@ export async function POST(request: Request): Promise<Response> {
     const strategyScores = calculateAllStrategyScores(similarPeriods, isGoldenCross);
 
     // 추천 전략 결정
-    const recommendedStrategyName = getRecommendedStrategy(strategyScores);
+    let recommendedStrategyName = getRecommendedStrategy(strategyScores);
+
+    // SOXL 전용: RSI >= 60 AND 역배열이면 전략 한 단계 하향
+    let downgradeInfo: DowngradeInfo = { applied: false, reasons: [] };
+    if (ticker === "SOXL" && referenceMetrics.rsi14 >= 60 && !isGoldenCross) {
+      const originalStrategy = recommendedStrategyName;
+      if (recommendedStrategyName === "Pro3") {
+        recommendedStrategyName = "Pro2";
+      } else if (recommendedStrategyName === "Pro2") {
+        recommendedStrategyName = "Pro1";
+      }
+      // Pro1은 그대로 유지
+
+      if (originalStrategy !== recommendedStrategyName) {
+        downgradeInfo = {
+          applied: true,
+          originalStrategy,
+          downgradedStrategy: recommendedStrategyName,
+          reasons: ["RSI≥60 & 역배열"],
+        };
+      }
+    }
+
     const tierRatios = getStrategyTierRatios(recommendedStrategyName);
     const reason = generateRecommendReason(recommendedStrategyName, strategyScores);
 
@@ -522,6 +545,7 @@ export async function POST(request: Request): Promise<Response> {
         tierRatios,
         reason,
       },
+      downgradeInfo: downgradeInfo.applied ? downgradeInfo : undefined,
     };
 
     return NextResponse.json(
