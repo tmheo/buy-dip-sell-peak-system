@@ -4,12 +4,9 @@
 
 import Database from "better-sqlite3";
 import path from "path";
-import { fileURLToPath } from "url";
 import type { AuthUser, AuthAccount, AuthSession } from "@/types/auth";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, "../../../data/prices.db");
+const DB_PATH = process.env.AUTH_DB_PATH ?? path.join(process.cwd(), "data", "prices.db");
 
 let db: Database.Database | null = null;
 let tablesInitialized = false;

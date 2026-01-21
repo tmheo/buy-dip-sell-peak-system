@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
 import path from "path";
-import { fileURLToPath } from "url";
 
 import type { DailyMetricRow, DailyPrice, QueryOptions } from "@/types";
 import {
@@ -33,9 +32,7 @@ import {
   SELECT_RECOMMENDATION_COUNT,
 } from "./schema";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, "../../data/prices.db");
+const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "data", "prices.db");
 
 const DEFAULT_TICKER = "SOXL";
 
