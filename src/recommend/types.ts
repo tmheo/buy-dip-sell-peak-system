@@ -79,6 +79,18 @@ export interface RecommendationDetail {
   reason: string;
 }
 
+/** 전략 하향 적용 정보 */
+export interface DowngradeInfo {
+  /** 하향 적용 여부 */
+  applied: boolean;
+  /** 원래 전략 (하향 적용 전) */
+  originalStrategy?: StrategyName;
+  /** 하향 적용된 전략 */
+  downgradedStrategy?: StrategyName;
+  /** 하향 사유 목록 */
+  reasons: string[];
+}
+
 /** 추천 결과 인터페이스 */
 export interface RecommendResult {
   /** 기준일 (YYYY-MM-DD) */
@@ -98,6 +110,8 @@ export interface RecommendResult {
   strategyScores: StrategyScore[];
   /** 추천 전략 */
   recommendedStrategy: RecommendationDetail;
+  /** SOXL 전용: 전략 하향 적용 정보 */
+  downgradeInfo?: DowngradeInfo;
 }
 
 /** 차트 데이터 포인트 (종가, MA20, MA60) */

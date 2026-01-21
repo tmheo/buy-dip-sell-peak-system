@@ -25,6 +25,21 @@ export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
 // ============================================================
 
 /**
+ * 전략 이름 타입
+ */
+export type StrategyName = "Pro1" | "Pro2" | "Pro3";
+
+/**
+ * 전략별 테마 색상
+ * UI 컴포넌트에서 일관된 색상 사용을 위한 상수
+ */
+export const STRATEGY_COLORS: Record<StrategyName, string> = {
+  Pro1: "#268bd2",
+  Pro2: "#2aa198",
+  Pro3: "#6c71c4",
+};
+
+/**
  * 기술적 지표 인터페이스
  * SPEC-METRICS-001
  */
@@ -44,11 +59,6 @@ export interface TechnicalMetrics {
   // 20일 일별 표준편차
   volatility20: number;
 }
-
-/**
- * 전략 이름 타입
- */
-export type StrategyName = "Pro1" | "Pro2" | "Pro3";
 
 /**
  * 전략 설정 인터페이스

@@ -13,21 +13,13 @@ import type { ReferenceChartProps } from "@/components/recommend/ReferenceChart"
 import type { SimilarPeriodCardProps } from "@/components/recommend/SimilarPeriodCard";
 import type { StrategyScoreTableProps } from "@/components/recommend/StrategyScoreTable";
 import type { RecommendationCardProps } from "@/components/recommend/RecommendationCard";
+import { getTodayDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화 - Recharts는 클라이언트에서만 동작)
 const ReferenceChart = dynamic<ReferenceChartProps>(() => import("@/components/recommend/ReferenceChart"), { ssr: false });
 const SimilarPeriodCard = dynamic<SimilarPeriodCardProps>(() => import("@/components/recommend/SimilarPeriodCard"), { ssr: false });
 const StrategyScoreTable = dynamic<StrategyScoreTableProps>(() => import("@/components/recommend/StrategyScoreTable"), { ssr: false });
 const RecommendationCard = dynamic<RecommendationCardProps>(() => import("@/components/recommend/RecommendationCard"), { ssr: false });
-
-/** 오늘 날짜를 YYYY-MM-DD 형식으로 반환 (로컬 타임존 기준) */
-function getTodayDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 interface RecommendForm {
   baseType: "today" | "specific";
@@ -244,7 +236,7 @@ export default function RecommendPage() {
           </div>
 
           {/* 전략 점수 테이블 */}
-          <StrategyScoreTable strategyScores={result.strategyScores} />
+          <StrategyScoreTable strategyScores={result.strategyScores} downgradeInfo={result.downgradeInfo} />
 
           {/* 추천 전략 카드 */}
           <RecommendationCard

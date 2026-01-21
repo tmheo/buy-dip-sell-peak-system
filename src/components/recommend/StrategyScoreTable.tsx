@@ -4,19 +4,15 @@
  * 전략 점수 테이블 컴포넌트
  * 전략별 종합 점수 표시
  */
-import type { StrategyScore } from "@/recommend/types";
+import type { StrategyScore, DowngradeInfo } from "@/recommend/types";
+import { STRATEGY_COLORS } from "@/backtest";
 
 export interface StrategyScoreTableProps {
   strategyScores: StrategyScore[];
+  downgradeInfo?: DowngradeInfo;
 }
 
-const STRATEGY_COLORS: Record<string, string> = {
-  Pro1: "#268bd2",
-  Pro2: "#2aa198",
-  Pro3: "#6c71c4",
-};
-
-export default function StrategyScoreTable({ strategyScores }: StrategyScoreTableProps): React.ReactElement {
+export default function StrategyScoreTable({ strategyScores, downgradeInfo }: StrategyScoreTableProps): React.ReactElement {
   const validScores = strategyScores.filter((s) => !s.excluded);
   const maxScore = validScores.length > 0 ? Math.max(...validScores.map((s) => s.averageScore)) : 0;
 
@@ -74,6 +70,38 @@ export default function StrategyScoreTable({ strategyScores }: StrategyScoreTabl
               })}
             </tbody>
           </table>
+
+          {/* SOXL 전용: 하향 적용 경고 */}
+          {downgradeInfo?.applied && (
+            <div
+              style={{
+                backgroundColor: "rgba(220, 53, 69, 0.15)",
+                borderTop: "1px solid rgba(220, 53, 69, 0.3)",
+                padding: "0.75rem 1rem",
+              }}
+            >
+              <div style={{ color: "#f8d7da", marginBottom: "0.5rem" }}>
+                <strong>⚠ 주의:</strong> 리스크 탐지로 하향 적용(사유 {downgradeInfo.reasons.length}개)
+              </div>
+              <div style={{ marginBottom: "0.5rem" }}>
+                {downgradeInfo.reasons.map((reason, idx) => (
+                  <span
+                    key={idx}
+                    className="badge me-1"
+                    style={{
+                      backgroundColor: "#dc3545",
+                      color: "#fff",
+                      fontSize: "0.8rem",
+                      padding: "0.3rem 0.5rem",
+                    }}
+                  >
+                    {reason}
+                  </span>
+                ))}
+              </div>
+              <small style={{ color: "#adb5bd" }}>* SOXL 전용 옵션</small>
+            </div>
+          )}
         </div>
         </div>
       </div>

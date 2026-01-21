@@ -290,4 +290,21 @@ export class CycleManager {
   getCycleInitialCapital(): number {
     return this.cycleInitialCapital.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
   }
+
+  /**
+   * 전략 설정 변경
+   * 추천 전략 백테스트에서 사이클 경계에서 전략을 동적으로 변경할 때 사용
+   *
+   * @param strategy - 새로운 전략 설정
+   */
+  setStrategy(strategy: StrategyConfig): void {
+    this.strategy = strategy;
+  }
+
+  /**
+   * 현재 전략 설정 반환
+   */
+  getStrategy(): StrategyConfig {
+    return this.strategy;
+  }
 }
