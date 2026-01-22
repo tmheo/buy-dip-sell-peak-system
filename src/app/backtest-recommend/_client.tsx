@@ -4,11 +4,13 @@
  * 백테스트 (추천 전략) 페이지 (클라이언트 컴포넌트)
  * 원본 UI와 동일한 레이아웃으로 구현
  */
-import { useState, FormEvent } from "react";
+import type { FormEvent, ChangeEvent } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
+
 import type { RecommendBacktestResult } from "@/backtest-recommend";
-import { STRATEGY_COLORS } from "@/backtest";
 import type { StrategyName } from "@/backtest/types";
+import { STRATEGY_COLORS } from "@/backtest";
 import { getTodayDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화)
@@ -35,9 +37,14 @@ export default function BacktestRecommendPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<RecommendBacktestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDailyHistoryOpen, setIsDailyHistoryOpen] = useState(false);
 
-  // 백테스트 실행
-  const runBacktest = async (): Promise<RecommendBacktestResult | null> => {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setResult(null);
+
     try {
       const response = await fetch("/api/backtest-recommend", {
         method: "POST",
@@ -52,58 +59,32 @@ export default function BacktestRecommendPageClient() {
 
       if (response.status === 401) {
         window.location.href = "/info";
-        return null;
-      }
-
-      if (!response.ok) {
-        const text = await response.text();
-        let errorMessage = "백테스트 실행 실패";
-        try {
-          const data = JSON.parse(text);
-          errorMessage = data.error || data.message || errorMessage;
-        } catch {
-          // Non-JSON response
-        }
-        throw new Error(errorMessage);
+        return;
       }
 
       const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || data.message || "백테스트 실행 실패");
+
+      if (!response.ok || !data.success) {
+        setError(data.error || data.message || "백테스트 실행 실패");
+        return;
       }
 
-      return data.data as RecommendBacktestResult;
+      setResult(data.data as RecommendBacktestResult);
     } catch (err) {
       console.error("Recommend backtest error:", err);
-      throw err;
-    }
-  };
-
-  // 폼 제출 핸들러
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const backtestResult = await runBacktest();
-      setResult(backtestResult);
-    } catch (err) {
-      console.error("Backtest error:", err);
-      setError(err instanceof Error ? err.message : "백테스트 중 오류가 발생했습니다.");
+      setError("백테스트 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  function handleInputChange(e: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void {
     const { name, value, type } = e.target;
     setForm((prev) => ({
       ...prev,
       [name]: type === "number" ? Number(value) : value,
     }));
-  };
+  }
 
   // 수익금 계산
   const profit = result ? result.finalAsset - result.initialCapital : 0;
@@ -112,88 +93,95 @@ export default function BacktestRecommendPageClient() {
     <div className="backtest-recommend-page">
       {/* 헤더 */}
       <section className="info-section">
-        <h1 className="mb-1">
-          <span role="img" aria-label="robot">🤖</span> 백테스트(추천전략)
-        </h1>
-        <p className="text-muted small mb-3">
-          선택한 전략에 대한 기간별 백테스트 결과를 보여줍니다. 매수/매도 신호와 수익률을 확인하세요.
-        </p>
+        <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h1 className="mb-1">
+              <span role="img" aria-label="robot">🤖</span> 백테스트(추천전략)
+            </h1>
+            <p className="lead mb-0">
+              추천된 전략으로 진행했을 경우를 백테스트합니다.
+            </p>
+          </div>
 
-        {/* 입력 폼 */}
-        <form onSubmit={handleSubmit} className="row g-2 align-items-end mb-3">
-          <div className="col-auto">
-            <label htmlFor="startDate" className="form-label small mb-1">시작일</label>
-            <input
-              type="date"
-              className="form-control form-control-sm"
-              id="startDate"
-              name="startDate"
-              value={form.startDate}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              style={{ width: "130px" }}
-            />
-          </div>
-          <div className="col-auto">
-            <label htmlFor="endDate" className="form-label small mb-1">종료일</label>
-            <input
-              type="date"
-              className="form-control form-control-sm"
-              id="endDate"
-              name="endDate"
-              value={form.endDate}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              style={{ width: "130px" }}
-            />
-          </div>
-          <div className="col-auto">
-            <label htmlFor="symbol" className="form-label small mb-1">종목</label>
-            <select
-              className="form-select form-select-sm"
-              id="symbol"
-              name="symbol"
-              value={form.symbol}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              style={{ width: "90px" }}
-            >
-              <option value="SOXL">SOXL</option>
-              <option value="TQQQ">TQQQ</option>
-            </select>
-          </div>
-          <div className="col-auto">
-            <label htmlFor="initialCapital" className="form-label small mb-1">초기자본</label>
-            <input
-              type="number"
-              className="form-control form-control-sm"
-              id="initialCapital"
-              name="initialCapital"
-              value={form.initialCapital}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              min={1000}
-              step={1000}
-              style={{ width: "100px" }}
-            />
-          </div>
-          <div className="col-auto">
-            <button
-              type="submit"
-              className="btn btn-primary btn-sm"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                  분석중...
-                </>
-              ) : (
-                "실행"
-              )}
-            </button>
-          </div>
-        </form>
+          {/* 인라인 폼 */}
+          <form onSubmit={handleSubmit} className="d-flex align-items-end gap-2 flex-wrap">
+            <div>
+              <label htmlFor="startDate" className="form-label small mb-1">시작일</label>
+              <input
+                type="date"
+                className="form-control form-control-sm"
+                id="startDate"
+                name="startDate"
+                value={form.startDate}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                required
+                style={{ width: "140px" }}
+              />
+            </div>
+            <div>
+              <label htmlFor="endDate" className="form-label small mb-1">종료일</label>
+              <input
+                type="date"
+                className="form-control form-control-sm"
+                id="endDate"
+                name="endDate"
+                value={form.endDate}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                required
+                style={{ width: "140px" }}
+              />
+            </div>
+            <div>
+              <label htmlFor="symbol" className="form-label small mb-1">종목 선택</label>
+              <select
+                className="form-select form-select-sm"
+                id="symbol"
+                name="symbol"
+                value={form.symbol}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                style={{ width: "100px" }}
+              >
+                <option value="SOXL">SOXL</option>
+                <option value="TQQQ">TQQQ</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="initialCapital" className="form-label small mb-1">초기자본</label>
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                id="initialCapital"
+                name="initialCapital"
+                value={form.initialCapital}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                min={1000}
+                step={1000}
+                style={{ width: "100px" }}
+              />
+            </div>
+            <div>
+              <button
+                type="submit"
+                className="btn btn-success btn-sm"
+                disabled={isLoading}
+                style={{ height: "31px" }}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    분석 중...
+                  </>
+                ) : (
+                  "🚀 백테스트 실행"
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
 
       {/* 에러 메시지 */}
@@ -389,7 +377,18 @@ export default function BacktestRecommendPageClient() {
 
           {/* 일별 내역 테이블 */}
           <section className="info-section">
-            <h5 className="mb-2">📋 일별 내역</h5>
+            <h5
+              className="mb-2 d-flex align-items-center"
+              style={{ cursor: "pointer", userSelect: "none" }}
+              onClick={() => setIsDailyHistoryOpen(!isDailyHistoryOpen)}
+            >
+              <span style={{ display: "inline-block", width: "1em", marginRight: "0.25em" }}>
+                {isDailyHistoryOpen ? "▼" : "▶"}
+              </span>
+              📋 일별 내역
+              <small className="text-muted ms-2">({result.dailyHistory.length}일)</small>
+            </h5>
+            {isDailyHistoryOpen && (
             <div className="table-responsive" style={{ maxHeight: "calc(100vh - 400px)", overflowY: "auto" }}>
               <table className="table table-sm table-dark table-hover mb-0 daily-history-table" style={{ fontSize: "0.75rem" }}>
                 <thead style={{ position: "sticky", top: 0, backgroundColor: "#073642", zIndex: 1 }}>
@@ -535,6 +534,7 @@ export default function BacktestRecommendPageClient() {
                 </tbody>
               </table>
             </div>
+            )}
           </section>
         </>
       )}
