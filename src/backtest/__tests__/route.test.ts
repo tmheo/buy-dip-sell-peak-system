@@ -6,6 +6,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST } from "@/app/api/backtest/route";
 import type { DailyPrice } from "@/types";
 
+// Mock 인증 모듈 (next-auth ESM 호환성 문제 해결)
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/api-auth", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ user: { id: "test-user" } }),
+  isUnauthorized: vi.fn().mockReturnValue(false),
+}));
+
 // Mock 데이터베이스 함수
 vi.mock("@/database", () => ({
   getPricesByDateRange: vi.fn(),
