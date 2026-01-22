@@ -18,10 +18,10 @@ const STRATEGY_COLORS: Record<string, string> = {
   Pro3: "#6c71c4",
 };
 
-const STRATEGY_CONDITIONS: Record<string, { buy: string; sell: string }> = {
-  Pro1: { buy: "전일 종가 대비 -0.01%", sell: "매수가 대비 +0.01%" },
-  Pro2: { buy: "전일 종가 대비 -0.01%", sell: "매수가 대비 +1.50%" },
-  Pro3: { buy: "전일 종가 대비 -0.10%", sell: "매수가 대비 +2.00%" },
+const STRATEGY_CONDITIONS: Record<string, { buy: string; sell: string; stopLossDays: number }> = {
+  Pro1: { buy: "전일 종가 대비 -0.01%", sell: "매수가 대비 +0.01%", stopLossDays: 10 },
+  Pro2: { buy: "전일 종가 대비 -0.01%", sell: "매수가 대비 +1.50%", stopLossDays: 10 },
+  Pro3: { buy: "전일 종가 대비 -0.10%", sell: "매수가 대비 +2.00%", stopLossDays: 12 },
 };
 
 export default function RecommendationCard({ recommendation, referenceDate, isGoldenCross }: RecommendationCardProps): React.ReactElement {
@@ -97,7 +97,7 @@ export default function RecommendationCard({ recommendation, referenceDate, isGo
               border: "1px solid #2aa198",
             }}
           >
-            6분할 10일 손절
+            6분할 {conditions.stopLossDays}일 손절
           </button>
           <button
             type="button"
