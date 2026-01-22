@@ -329,6 +329,12 @@ export class RecommendBacktestEngine {
     // 마지막 사이클 정보 업데이트 (진행 중인 경우)
     if (currentCycleInfo.endDate === null) {
       const lastSnapshot = dailyHistory[dailyHistory.length - 1];
+
+      // 마지막 날에 사이클이 완료된 경우 endDate 설정
+      if (cycleCompletedToday) {
+        currentCycleInfo.endDate = prices[prices.length - 1].date;
+      }
+
       currentCycleInfo.finalAsset = lastSnapshot.totalAsset;
       currentCycleInfo.returnRate =
         (currentCycleInfo.finalAsset - currentCycleInfo.initialCapital) /
