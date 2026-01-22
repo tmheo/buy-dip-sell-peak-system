@@ -514,7 +514,7 @@ export default function BacktestRecommendPageClient() {
                               <span className="text-muted">-</span>
                             )}
                           </td>
-                          <td className="text-end">{snapshot.activeTiers}</td>
+                          <td className="text-end">{snapshot.totalShares}</td>
                           <td className="text-end">${snapshot.holdingsValue.toLocaleString()}</td>
                           <td className="text-end">${snapshot.cash.toLocaleString()}</td>
                           <td className="text-end">${snapshot.totalAsset.toLocaleString()}</td>

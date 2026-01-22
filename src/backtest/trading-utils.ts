@@ -256,10 +256,12 @@ export function createSnapshot(
 ): DailySnapshot {
   const activeTiers = cycleManager.getActiveTiers();
   let holdingsValue = new Decimal(0);
+  let totalShares = 0;
   // 보유 자산 평가: adjClose(수정종가) 사용 - 배당/분할 반영된 실제 투자 성과
   const adjClosePrice = new Decimal(price.adjClose);
   for (const tier of activeTiers) {
     holdingsValue = holdingsValue.add(adjClosePrice.mul(tier.shares));
+    totalShares += tier.shares;
   }
 
   const cash = cycleManager.getCash();
@@ -286,6 +288,7 @@ export function createSnapshot(
     trades,
     orders,
     activeTiers: activeTiers.length,
+    totalShares,
     cycleNumber: cycleManager.getCycleNumber(),
     ma20,
     ma60,

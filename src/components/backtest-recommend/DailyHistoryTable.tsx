@@ -47,8 +47,8 @@ export default function DailyHistoryTable({ dailyHistory, initialCapital }: Dail
               }
               const mdd = peak > 0 ? ((snapshot.totalAsset - peak) / peak) * 100 : 0;
 
-              // 보유 수량 계산
-              const holdingShares = snapshot.activeTiers;
+              // 보유 주식 수
+              const holdingShares = snapshot.totalShares;
 
               // 거래 정보 포맷
               const tradeInfo = formatTradeInfo(snapshot.trades);

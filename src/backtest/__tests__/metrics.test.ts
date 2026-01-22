@@ -31,6 +31,7 @@ function createSnapshot(date: string, totalAsset: number): DailySnapshot {
     trades: [],
     orders: [],
     activeTiers: 0,
+    totalShares: 0,
     cycleNumber: 1,
     ma20: null,
     ma60: null,

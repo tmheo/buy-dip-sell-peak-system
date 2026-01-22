@@ -242,6 +242,8 @@ export interface DailySnapshot {
   orders: OrderAction[];
   // 활성 티어 수
   activeTiers: number;
+  // 총 보유 주식 수
+  totalShares: number;
   // 현재 사이클 번호
   cycleNumber: number;
   // 20일 단순이동평균 (데이터 부족 시 null) - SPEC-METRICS-001
