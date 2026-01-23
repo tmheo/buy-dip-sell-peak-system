@@ -73,15 +73,17 @@ export default function AssetSummary({
             </div>
           </div>
           <div className="col-md-6 col-lg-4">
-            <div className="p-3 bg-secondary bg-opacity-25 rounded">
+            <div className="p-3 bg-secondary bg-opacity-25 rounded h-100">
               <div className="text-secondary small mb-1">예수금</div>
               <div className="h4 mb-0 text-light">{formatCurrency(cashBalance)}</div>
             </div>
           </div>
-          <div className="col-md-12 col-lg-8">
-            <div className="p-3 bg-secondary bg-opacity-25 rounded">
-              <div className="text-secondary small mb-2">투자비중</div>
-              <InvestmentRatioBar cashRatio={cashRatio} stockRatio={stockRatio} />
+          <div className="col-md-6 col-lg-4">
+            <div className="p-3 bg-secondary bg-opacity-25 rounded h-100 d-flex flex-column">
+              <div className="text-secondary small mb-1">투자비중</div>
+              <div className="mt-auto">
+                <InvestmentRatioBar cashRatio={cashRatio} stockRatio={stockRatio} />
+              </div>
             </div>
           </div>
         </div>

@@ -19,14 +19,10 @@ export default function InvestmentRatioBar({
   return (
     <div className="investment-ratio-container">
       <div className="d-flex justify-content-between mb-1">
-        <small className="text-secondary">
-          현금 {cashRatio.toFixed(1)}%
-        </small>
-        <small className="text-secondary">
-          주식 {stockRatio.toFixed(1)}%
-        </small>
+        <small className="text-info">현금 {cashRatio.toFixed(1)}%</small>
+        <small className="text-danger">주식 {stockRatio.toFixed(1)}%</small>
       </div>
-      <div className="progress" style={{ height: "20px" }}>
+      <div className="progress" style={{ height: "16px" }}>
         <div
           className="progress-bar bg-info"
           role="progressbar"
@@ -35,9 +31,7 @@ export default function InvestmentRatioBar({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={`현금 ${cashRatio.toFixed(1)}%`}
-        >
-          {cashRatio >= 15 && `${cashRatio.toFixed(0)}%`}
-        </div>
+        />
         <div
           className="progress-bar bg-danger"
           role="progressbar"
@@ -46,13 +40,7 @@ export default function InvestmentRatioBar({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={`주식 ${stockRatio.toFixed(1)}%`}
-        >
-          {stockRatio >= 15 && `${stockRatio.toFixed(0)}%`}
-        </div>
-      </div>
-      <div className="d-flex justify-content-center gap-3 mt-2">
-        <span className="badge bg-info">현금</span>
-        <span className="badge bg-danger">주식</span>
+        />
       </div>
     </div>
   );
