@@ -25,7 +25,8 @@ const TICKER_OPTIONS: Ticker[] = ["SOXL", "TQQQ"];
 const STRATEGY_OPTIONS: Strategy[] = ["Pro1", "Pro2", "Pro3"];
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("ko-KR", {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "long",
     day: "numeric",
