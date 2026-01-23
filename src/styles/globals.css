@@ -224,3 +224,159 @@ body {
   padding-bottom: 0.5rem;
   margin-bottom: 1rem;
 }
+
+/* =====================================================
+   Trading Page Styles (PRD-TRADING-001)
+   ===================================================== */
+
+/* Trading Color Scheme */
+:root {
+  --trading-buy: #d73a49;
+  --trading-sell: #0366d6;
+  --trading-profit: #28a745;
+  --trading-loss: #dc3545;
+}
+
+/* Trading Buy/Sell Badges */
+.trading-buy {
+  background-color: var(--trading-buy) !important;
+  color: #fff !important;
+}
+
+.trading-sell {
+  background-color: var(--trading-sell) !important;
+  color: #fff !important;
+}
+
+/* Trading Text Colors */
+.text-trading-profit,
+.table .text-trading-profit,
+.table-dark .text-trading-profit {
+  color: var(--trading-profit) !important;
+}
+
+.text-trading-loss,
+.table .text-trading-loss,
+.table-dark .text-trading-loss {
+  color: var(--trading-loss) !important;
+}
+
+/* Investment Ratio Bar */
+.investment-ratio-container {
+  padding: 0.5rem 0;
+}
+
+.investment-ratio-container .progress {
+  background-color: #073642;
+  border-radius: 0.5rem;
+}
+
+/* Trading Tables */
+.trading-table {
+  margin-bottom: 0;
+}
+
+.trading-table th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trading-table td {
+  vertical-align: middle;
+}
+
+/* Trading Card Styles */
+.trading-card {
+  transition: border-color 0.2s ease;
+}
+
+.trading-card:hover {
+  border-color: #2aa198;
+}
+
+/* Form Styles for Trading */
+.trading-form .form-control:focus,
+.trading-form .form-select:focus {
+  border-color: #2aa198;
+  box-shadow: 0 0 0 0.2rem rgba(42, 161, 152, 0.25);
+}
+
+/* Trading Stats Cards */
+.trading-stat-card {
+  background-color: rgba(7, 54, 66, 0.5);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.trading-stat-card:hover {
+  background-color: rgba(7, 54, 66, 0.8);
+}
+
+.trading-stat-card .stat-label {
+  font-size: 0.875rem;
+  color: #93a1a1;
+  margin-bottom: 0.25rem;
+}
+
+.trading-stat-card .stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fdf6e3;
+}
+
+/* Tier Badge Styles */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 0.875rem;
+}
+
+.tier-badge.active {
+  background-color: var(--trading-profit);
+  color: #fff;
+}
+
+.tier-badge.inactive {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+/* Mobile Card Layout for Trading Tables */
+@media (max-width: 768px) {
+  .trading-mobile-card {
+    display: block !important;
+  }
+
+  .trading-mobile-card .card {
+    margin-bottom: 1rem;
+  }
+
+  .trading-desktop-table {
+    display: none !important;
+  }
+
+  /* Smaller padding for trading cards on mobile */
+  .trading-stat-card {
+    padding: 0.75rem;
+  }
+
+  .trading-stat-card .stat-value {
+    font-size: 1.25rem;
+  }
+}
+
+@media (min-width: 769px) {
+  .trading-mobile-card {
+    display: none !important;
+  }
+
+  .trading-desktop-table {
+    display: block !important;
+  }
+}
