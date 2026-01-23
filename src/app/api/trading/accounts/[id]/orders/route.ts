@@ -5,12 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  getTradingAccountById,
-  getDailyOrders,
-  getTierHoldings,
-  generateDailyOrders,
-} from "@/database/trading";
+import { getTradingAccountById, getTierHoldings, generateDailyOrders } from "@/database/trading";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -47,21 +42,16 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  // 기존 주문 조회
-  let orders = getDailyOrders(id, date);
-
-  // 주문이 없으면 자동 생성
-  if (orders.length === 0) {
-    const holdings = getTierHoldings(id);
-    orders = generateDailyOrders(
-      id,
-      date,
-      account.ticker,
-      account.strategy,
-      account.seedCapital,
-      holdings
-    );
-  }
+  // 현재 보유 현황 기반으로 주문 생성 (항상 최신 상태 반영)
+  const holdings = getTierHoldings(id);
+  const orders = generateDailyOrders(
+    id,
+    date,
+    account.ticker,
+    account.strategy,
+    account.seedCapital,
+    holdings
+  );
 
   return NextResponse.json({
     date,
