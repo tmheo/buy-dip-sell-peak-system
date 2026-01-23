@@ -478,7 +478,7 @@ export function deleteDailyOrders(accountId: string, date: string): void {
 
 /**
  * 당일 주문 자동 생성
- * - 미보유 티어: 매수 주문 생성
+ * - 티어 고정 방식: 가장 낮은 빈 티어에만 매수 주문 (한 번에 하나의 티어만)
  * - 보유 티어: 매도 주문 생성
  */
 export function generateDailyOrders(
@@ -506,15 +506,9 @@ export function generateDailyOrders(
   // 기존 주문 삭제
   deleteDailyOrders(accountId, date);
 
+  // 1. 보유 중인 티어들의 매도 주문 생성
   for (const holding of holdings) {
-    const tierIndex = holding.tier - 1;
-    const tierRatio = tierRatios[tierIndex] / 100;
-    const allocatedSeed = seedCapital * tierRatio;
-
-    if (allocatedSeed <= 0) continue; // 예비 티어(0%) 스킵
-
     if (holding.shares > 0 && holding.buyPrice) {
-      // 보유 중: 매도 주문
       const sellPrice = Math.round(holding.buyPrice * (1 + sellThreshold) * 100) / 100;
       const order = createDailyOrder(accountId, {
         date,
@@ -525,15 +519,25 @@ export function generateDailyOrders(
         shares: holding.shares,
       });
       orders.push(order);
-    } else {
-      // 미보유: 매수 주문
+    }
+  }
+
+  // 2. 다음 매수할 티어 찾기 (티어 고정 방식: 가장 낮은 빈 티어)
+  const nextBuyTier = getNextBuyTier(holdings);
+
+  if (nextBuyTier !== null) {
+    const tierIndex = nextBuyTier - 1;
+    const tierRatio = tierRatios[tierIndex] / 100;
+    const allocatedSeed = seedCapital * tierRatio;
+
+    if (allocatedSeed > 0) {
       const buyPrice = Math.round(closePrice * (1 + buyThreshold) * 100) / 100;
       const shares = Math.floor(allocatedSeed / buyPrice);
 
       if (shares > 0) {
         const order = createDailyOrder(accountId, {
           date,
-          tier: holding.tier,
+          tier: nextBuyTier,
           type: "BUY" as OrderType,
           orderMethod: "LOC" as OrderMethod,
           limitPrice: buyPrice,
@@ -545,6 +549,33 @@ export function generateDailyOrders(
   }
 
   return orders;
+}
+
+/**
+ * 다음 매수할 티어 번호 반환 (티어 고정 방식)
+ * 티어 1-6 중 가장 낮은 빈 티어를 반환
+ * 티어 1-6이 모두 활성화되고 예수금이 있으면 티어 7(예비) 반환
+ */
+function getNextBuyTier(holdings: TierHolding[]): number | null {
+  const BASE_TIER_COUNT = 6;
+  const RESERVE_TIER_NUMBER = 7;
+
+  // 보유 중인 티어 Set
+  const activeTiers = new Set(holdings.filter((h) => h.shares > 0).map((h) => h.tier));
+
+  // 티어 1-6 중 가장 낮은 빈 티어 찾기
+  for (let i = 1; i <= BASE_TIER_COUNT; i++) {
+    if (!activeTiers.has(i)) {
+      return i;
+    }
+  }
+
+  // 티어 1-6 모두 보유 중이면 예비 티어(7) 반환
+  if (!activeTiers.has(RESERVE_TIER_NUMBER)) {
+    return RESERVE_TIER_NUMBER;
+  }
+
+  return null; // 모든 티어 보유 중
 }
 
 /**
