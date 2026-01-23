@@ -12,6 +12,7 @@ interface TierHoldingsTableProps {
   holdings: TierHolding[];
   seedCapital: number;
   strategy: Strategy;
+  cashBalance: number;
 }
 
 function formatCurrency(value: number | null): string {
@@ -55,6 +56,7 @@ export default function TierHoldingsTable({
   holdings,
   seedCapital,
   strategy,
+  cashBalance,
 }: TierHoldingsTableProps): React.ReactElement {
   const ratios = TIER_RATIOS[strategy];
   const holdingsByTier = new Map(holdings.map((h) => [h.tier, h]));
@@ -84,7 +86,8 @@ export default function TierHoldingsTable({
               {Array.from({ length: TIER_COUNT }, (_, i) => i + 1).map((tier) => {
                 const holding = holdingsByTier.get(tier);
                 const ratio = ratios[tier - 1];
-                const allocatedSeed = (seedCapital * ratio) / 100;
+                const isReserveTier = tier === 7;
+                const allocatedSeed = isReserveTier ? cashBalance : (seedCapital * ratio) / 100;
                 const hasShares = holding && holding.shares > 0;
 
                 return (
@@ -94,7 +97,7 @@ export default function TierHoldingsTable({
                         {getTierLabel(tier)}
                       </span>
                     </td>
-                    <td className="text-center">{ratio}%</td>
+                    <td className="text-center">{isReserveTier ? "-" : `${ratio.toFixed(1)}%`}</td>
                     <td className="text-end">{formatCurrency(allocatedSeed)}</td>
                     <td className="text-center">{formatDate(holding?.buyDate ?? null)}</td>
                     <td className="text-end">

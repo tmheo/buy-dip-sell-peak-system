@@ -223,6 +223,7 @@ export default function TradingDetailClient({
         holdings={account.holdings}
         seedCapital={account.seedCapital}
         strategy={account.strategy}
+        cashBalance={assetValues.cashBalance}
       />
 
       {/* Daily Orders Section */}
