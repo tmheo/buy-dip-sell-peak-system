@@ -75,8 +75,8 @@ export default function AccountForm({
       newErrors.name = "계좌 이름을 입력하세요.";
     }
 
-    if (formData.seedCapital < 100) {
-      newErrors.seedCapital = "시드 자금은 최소 $100 이상이어야 합니다.";
+    if (formData.seedCapital < 2000) {
+      newErrors.seedCapital = "시드 자금은 최소 $2,000 이상이어야 합니다.";
     }
 
     if (!formData.cycleStartDate) {
@@ -153,8 +153,8 @@ export default function AccountForm({
             name="seedCapital"
             value={formData.seedCapital}
             onChange={handleChange}
-            min="100"
-            step="100"
+            min="2000"
+            step="1"
             disabled={isSubmitting}
           />
           {errors.seedCapital && (
