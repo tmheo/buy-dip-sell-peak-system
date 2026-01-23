@@ -3,6 +3,7 @@
  */
 
 import Database from "better-sqlite3";
+import Decimal from "decimal.js";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -502,8 +503,9 @@ export function generateDailyOrders(
     return []; // 가격 데이터 없으면 주문 생성 불가
   }
 
-  const buyThreshold = BUY_THRESHOLDS[strategy] / 100;
-  const sellThreshold = SELL_THRESHOLDS[strategy] / 100;
+  // Decimal로 threshold 계산 (부동소수점 오차 방지)
+  const buyThreshold = new Decimal(BUY_THRESHOLDS[strategy]).div(100).toNumber();
+  const sellThreshold = new Decimal(SELL_THRESHOLDS[strategy]).div(100).toNumber();
   const tierRatios = TIER_RATIOS[strategy];
 
   const orders: DailyOrder[] = [];
@@ -532,8 +534,9 @@ export function generateDailyOrders(
 
   if (nextBuyTier !== null) {
     const tierIndex = nextBuyTier - 1;
-    const tierRatio = tierRatios[tierIndex] / 100;
-    const allocatedSeed = seedCapital * tierRatio;
+    // Decimal로 티어 비율 및 할당 금액 계산
+    const tierRatio = new Decimal(tierRatios[tierIndex]).div(100);
+    const allocatedSeed = new Decimal(seedCapital).mul(tierRatio).toNumber();
 
     if (allocatedSeed > 0) {
       const buyPrice = calculateBuyLimitPrice(closePrice, buyThreshold);
@@ -670,7 +673,9 @@ export function processOrderExecution(
 
       if (order.type === "BUY") {
         // 매수 체결: 티어에 보유 정보 추가
-        const sellThreshold = SELL_THRESHOLDS[getAccountStrategy(accountId)] / 100;
+        const sellThreshold = new Decimal(SELL_THRESHOLDS[getAccountStrategy(accountId)])
+          .div(100)
+          .toNumber();
         const sellTargetPrice = calculateSellLimitPrice(closePrice, sellThreshold);
 
         updateTierHolding(accountId, order.tier, {
