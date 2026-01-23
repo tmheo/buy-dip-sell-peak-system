@@ -338,7 +338,7 @@ src/
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
-│   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가)
+│   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가 SOXL/TQQQ)
 │   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
 │   ├── FlowChart.tsx             # 사용법 플로우차트
 │   ├── PremiumModal.tsx          # 프리미엄 모달
@@ -365,7 +365,7 @@ src/
 |----------|--------|------|
 | TopControlBar | `TopControlBar.tsx` | 상단 사용자 네비게이션 (제품군 드롭다운, 사용자명, 메뉴 버튼) |
 | MainNavigation | `MainNavigation.tsx` | 메인 메뉴 (로고 + 7개 메뉴 링크) |
-| Sidebar | `Sidebar.tsx` | 우측 최근 주가 패널 (고정 위치, 반응형 숨김) |
+| Sidebar | `Sidebar.tsx` | 우측 최근 주가 패널 (SOXL/TQQQ 테이블, 고정 위치, 반응형 숨김) |
 | StrategyCard | `StrategyCard.tsx` | Pro1/Pro2/Pro3 전략 카드 (분할 비율, 설정값) |
 | FlowChart | `FlowChart.tsx` | 사용법 5단계 플로우차트 (가로 배치, 화살표) |
 | PremiumModal | `PremiumModal.tsx` | 프리미엄 기능 안내 모달 (Bootstrap Modal) |
