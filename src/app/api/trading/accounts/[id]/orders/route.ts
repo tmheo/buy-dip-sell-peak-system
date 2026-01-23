@@ -60,6 +60,21 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // 기존 주문 조회
   let orders = getDailyOrders(id, date);
 
+  // 계좌 설정 변경 감지: 미체결 주문이 있고, 계좌가 주문 생성 이후 수정되었으면 재생성
+  if (orders.length > 0) {
+    const hasExecutedOrder = orders.some((order) => order.executed);
+    const oldestOrderCreatedAt = orders.reduce(
+      (min, order) => (order.createdAt < min ? order.createdAt : min),
+      orders[0].createdAt
+    );
+
+    // 체결된 주문이 없고, 계좌가 주문 생성 이후 수정되었으면 재생성
+    if (!hasExecutedOrder && account.updatedAt > oldestOrderCreatedAt) {
+      deleteDailyOrders(id, date);
+      orders = [];
+    }
+  }
+
   // 주문이 없으면 자동 생성
   if (orders.length === 0) {
     const holdings = getTierHoldings(id);
