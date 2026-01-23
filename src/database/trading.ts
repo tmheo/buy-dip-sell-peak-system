@@ -18,7 +18,7 @@ import type {
   OrderType,
   OrderMethod,
 } from "@/types/trading";
-import { TIER_COUNT } from "@/types/trading";
+import { TIER_COUNT, TIER_RATIOS, BUY_THRESHOLDS, SELL_THRESHOLDS } from "@/types/trading";
 import {
   CREATE_TRADING_ACCOUNTS_TABLE,
   CREATE_TRADING_ACCOUNTS_USER_INDEX,
@@ -453,4 +453,111 @@ export function updateOrderExecuted(orderId: string, executed: boolean): boolean
   );
   const result = stmt.run(executed ? 1 : 0, orderId);
   return result.changes > 0;
+}
+
+/**
+ * 특정 날짜의 종가 조회
+ */
+export function getClosingPrice(ticker: Ticker, date: string): number | null {
+  const database = getConnection();
+  const stmt = database.prepare(
+    "SELECT adj_close FROM daily_prices WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1"
+  );
+  const result = stmt.get(ticker, date) as { adj_close: number } | undefined;
+  return result?.adj_close ?? null;
+}
+
+/**
+ * 당일 주문 삭제 (재생성 용)
+ */
+export function deleteDailyOrders(accountId: string, date: string): void {
+  const database = getConnection();
+  const stmt = database.prepare("DELETE FROM daily_orders WHERE account_id = ? AND date = ?");
+  stmt.run(accountId, date);
+}
+
+/**
+ * 당일 주문 자동 생성
+ * - 미보유 티어: 매수 주문 생성
+ * - 보유 티어: 매도 주문 생성
+ */
+export function generateDailyOrders(
+  accountId: string,
+  date: string,
+  ticker: Ticker,
+  strategy: Strategy,
+  seedCapital: number,
+  holdings: TierHolding[]
+): DailyOrder[] {
+  // 전일 종가 조회 (주문 생성일 기준 이전 거래일)
+  const prevDate = getPreviousTradingDate(date);
+  const closePrice = getClosingPrice(ticker, prevDate);
+
+  if (!closePrice) {
+    return []; // 가격 데이터 없으면 주문 생성 불가
+  }
+
+  const buyThreshold = BUY_THRESHOLDS[strategy] / 100;
+  const sellThreshold = SELL_THRESHOLDS[strategy] / 100;
+  const tierRatios = TIER_RATIOS[strategy];
+
+  const orders: DailyOrder[] = [];
+
+  // 기존 주문 삭제
+  deleteDailyOrders(accountId, date);
+
+  for (const holding of holdings) {
+    const tierIndex = holding.tier - 1;
+    const tierRatio = tierRatios[tierIndex] / 100;
+    const allocatedSeed = seedCapital * tierRatio;
+
+    if (allocatedSeed <= 0) continue; // 예비 티어(0%) 스킵
+
+    if (holding.shares > 0 && holding.buyPrice) {
+      // 보유 중: 매도 주문
+      const sellPrice = Math.round(holding.buyPrice * (1 + sellThreshold) * 100) / 100;
+      const order = createDailyOrder(accountId, {
+        date,
+        tier: holding.tier,
+        type: "SELL" as OrderType,
+        orderMethod: "LOC" as OrderMethod,
+        limitPrice: sellPrice,
+        shares: holding.shares,
+      });
+      orders.push(order);
+    } else {
+      // 미보유: 매수 주문
+      const buyPrice = Math.round(closePrice * (1 + buyThreshold) * 100) / 100;
+      const shares = Math.floor(allocatedSeed / buyPrice);
+
+      if (shares > 0) {
+        const order = createDailyOrder(accountId, {
+          date,
+          tier: holding.tier,
+          type: "BUY" as OrderType,
+          orderMethod: "LOC" as OrderMethod,
+          limitPrice: buyPrice,
+          shares,
+        });
+        orders.push(order);
+      }
+    }
+  }
+
+  return orders;
+}
+
+/**
+ * 이전 거래일 계산 (주말 제외)
+ */
+function getPreviousTradingDate(date: string): string {
+  const d = new Date(date);
+  d.setDate(d.getDate() - 1);
+
+  // 주말이면 금요일로
+  const day = d.getDay();
+  if (day === 0) d.setDate(d.getDate() - 2); // 일요일 -> 금요일
+  if (day === 6) d.setDate(d.getDate() - 1); // 토요일 -> 금요일
+
+  return d.toISOString().split("T")[0];
 }
