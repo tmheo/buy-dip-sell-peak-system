@@ -13,7 +13,6 @@ const navItems: NavItem[] = [
   { href: "/recommend", label: "추천전략" },
   { href: "/backtest", label: "백테스트(기본)" },
   { href: "/backtest-recommend", label: "백테스트(추천전략)" },
-  { href: "/trading", label: "트레이딩" },
 ];
 
 export default function MainNavigation() {

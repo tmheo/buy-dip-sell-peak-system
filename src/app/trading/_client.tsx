@@ -90,11 +90,8 @@ export default function TradingListClient(): React.ReactElement {
 
   return (
     <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="mb-4">
         <h2 className="text-light mb-0">트레이딩 계좌</h2>
-        <Link href="/trading/new" className="btn btn-primary">
-          새 계좌 만들기
-        </Link>
       </div>
 
       {isLoading ? (
