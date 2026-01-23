@@ -325,6 +325,12 @@ src/
 │   │   └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
 │   ├── backtest-recommend/
 │   │   └── page.tsx              # 백테스트 추천 페이지
+│   ├── trading/
+│   │   ├── page.tsx              # 트레이딩 계좌 목록 페이지
+│   │   ├── new/
+│   │   │   └── page.tsx          # 새 계좌 생성 페이지
+│   │   └── [accountId]/
+│   │       └── page.tsx          # 계좌 상세 페이지 (티어 보유현황, 당일 주문표)
 │   └── mypage/
 │       ├── page.tsx              # 마이페이지 서버 컴포넌트 (인증 체크)
 │       └── _client.tsx           # 마이페이지 클라이언트 컴포넌트
@@ -346,11 +352,22 @@ src/
 │   │   ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60)
 │   │   ├── MetricsCharts.tsx     # 6개 기술적 지표 차트
 │   │   └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
+│   ├── trading/                  # 트레이딩 컴포넌트
+│   │   ├── AccountForm.tsx       # 계좌 생성/수정 폼
+│   │   ├── AccountListTable.tsx  # 계좌 목록 테이블
+│   │   ├── AccountSettingsCard.tsx # 계좌 설정 카드
+│   │   ├── AssetSummary.tsx      # 자산 요약 카드
+│   │   ├── DailyOrdersTable.tsx  # 당일 주문표 테이블
+│   │   ├── TierHoldingsTable.tsx # 티어별 보유현황 테이블
+│   │   ├── InvestmentRatioBar.tsx # 투자 비율 막대 그래프
+│   │   └── DeleteAccountModal.tsx # 계좌 삭제 확인 모달
 │   └── mypage/                   # 마이페이지 컴포넌트
 │       ├── UserProfile.tsx       # 사용자 프로필 카드 (이미지, 이름, 이메일, 가입일)
 │       └── DeleteAccountModal.tsx # 회원 탈퇴 확인 모달
 ├── lib/                          # 유틸리티 및 공통 모듈
 │   ├── date.ts                   # 날짜 포맷팅 유틸리티
+│   ├── validations/              # 입력값 검증 스키마
+│   │   └── trading.ts            # 트레이딩 관련 Zod 스키마
 │   └── auth/                     # 인증 관련 모듈
 │       ├── adapter.ts            # NextAuth.js SQLite 어댑터
 │       ├── api-auth.ts           # API 인증 유틸리티
@@ -371,6 +388,14 @@ src/
 | PremiumModal | `PremiumModal.tsx` | 프리미엄 기능 안내 모달 (Bootstrap Modal) |
 | UserProfile | `mypage/UserProfile.tsx` | 사용자 프로필 카드 (이미지, 이름, 이메일, 가입일) |
 | DeleteAccountModal | `mypage/DeleteAccountModal.tsx` | 회원 탈퇴 확인 모달 (확인 후 계정 삭제) |
+| AccountForm | `trading/AccountForm.tsx` | 계좌 생성/수정 폼 (전략, 시드캐피털, 손절일 설정) |
+| AccountListTable | `trading/AccountListTable.tsx` | 계좌 목록 테이블 (상태, 자산, 수익률 표시) |
+| AccountSettingsCard | `trading/AccountSettingsCard.tsx` | 계좌 설정 카드 (전략 정보, 티어 비율 표시) |
+| AssetSummary | `trading/AssetSummary.tsx` | 자산 요약 카드 (총 자산, 현금, 보유 주식 가치) |
+| DailyOrdersTable | `trading/DailyOrdersTable.tsx` | 당일 주문표 테이블 (LOC/MOC 주문 목록) |
+| TierHoldingsTable | `trading/TierHoldingsTable.tsx` | 티어별 보유현황 테이블 (수량, 매수가, 보유일수) |
+| InvestmentRatioBar | `trading/InvestmentRatioBar.tsx` | 투자 비율 막대 그래프 (티어별 투자 현황) |
+| DeleteAccountModal | `trading/DeleteAccountModal.tsx` | 계좌 삭제 확인 모달 |
 
 ### Frontend 아키텍처 다이어그램
 
@@ -403,6 +428,10 @@ src/
 │  │  │ FlowChart        │  │ PremiumModal     │             │    │
 │  │  │ (플로우차트)     │  │ (프리미엄 모달)  │             │    │
 │  │  └──────────────────┘  └──────────────────┘             │    │
+│  │  ┌──────────────────┐  ┌──────────────────┐             │    │
+│  │  │ Trading 컴포넌트 │  │ TierHoldings     │             │    │
+│  │  │ (계좌/주문 관리) │  │ (티어 보유현황)  │             │    │
+│  │  └──────────────────┘  └──────────────────┘             │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -417,6 +446,41 @@ src/
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 트레이딩 모듈 구조
+
+### 핵심 모듈
+
+| 파일 | 설명 |
+|------|------|
+| `src/types/trading.ts` | 트레이딩 타입 정의 (TradingAccount, TierHolding, DailyOrder, 전략 상수) |
+| `src/database/trading.ts` | 트레이딩 CRUD 및 주문 생성/체결 로직 |
+| `src/utils/trading-core.ts` | 공통 트레이딩 유틸리티 (가격 계산, 체결 판정, 날짜 유틸리티) |
+| `src/lib/validations/trading.ts` | 입력값 검증 스키마 (Zod) |
+
+### API 엔드포인트
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/trading/accounts` | 계좌 생성 |
+| GET | `/api/trading/accounts` | 계좌 목록 조회 |
+| GET | `/api/trading/accounts/[id]` | 계좌 상세 조회 |
+| PUT | `/api/trading/accounts/[id]` | 계좌 수정 |
+| DELETE | `/api/trading/accounts/[id]` | 계좌 삭제 |
+| GET | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 조회 |
+| PUT | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 수정 |
+| GET | `/api/trading/accounts/[id]/orders` | 당일 주문 조회 |
+| POST | `/api/trading/accounts/[id]/orders` | 주문 생성 |
+
+### 데이터베이스 테이블
+
+| 테이블 | 설명 |
+|--------|------|
+| `trading_accounts` | 트레이딩 계좌 (userId, ticker, strategy, seedCapital, stopLossDays) |
+| `tier_holdings` | 티어별 보유현황 (accountId, tierNumber, quantity, buyPrice, buyDate) |
+| `daily_orders` | 당일 주문 (accountId, orderType, tierNumber, price, quantity, status) |
 
 ---
 

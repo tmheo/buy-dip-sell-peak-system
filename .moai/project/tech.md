@@ -114,6 +114,37 @@
 - `src/lib/auth/adapter.ts` - SQLite 커스텀 어댑터
 - `src/lib/auth/queries.ts` - 사용자/계정 DB 쿼리
 
+### Zod (입력값 검증)
+
+**선택 이유:**
+- TypeScript 친화적인 스키마 정의
+- 런타임 검증과 타입 추론 동시 지원
+- API 요청 데이터 검증에 최적화
+
+**주요 활용:**
+| 용도 | 파일 | 설명 |
+|------|------|------|
+| 트레이딩 검증 | `src/lib/validations/trading.ts` | 계좌 생성/수정, 주문 생성 스키마 |
+
+**검증 예시:**
+- 계좌 생성 시 ticker, strategy, seedCapital, stopLossDays 검증
+- 주문 생성 시 orderType, tierNumber, price, quantity 검증
+- 티어 보유현황 수정 시 수량, 매수가, 보유일수 검증
+
+### Decimal.js (정밀 연산)
+
+**선택 이유:**
+- JavaScript 부동소수점 오차 방지
+- 투자 알고리즘의 정확한 가격/수량 계산 필수
+- 소수점 버림/올림 등 정밀 제어
+
+**주요 활용:**
+| 용도 | 설명 |
+|------|------|
+| 매수/매도가 계산 | 전일종가 × (1 + 임계값) |
+| 수량 계산 | 티어 배분금액 ÷ 매수가 (버림) |
+| 체결 판정 | LOC/MOC 주문 체결 여부 |
+
 ---
 
 ## 핵심 기술

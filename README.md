@@ -409,6 +409,12 @@ src/
 │   │   └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
 │   ├── backtest-recommend/
 │   │   └── page.tsx              # 추천 전략 백테스트 페이지
+│   ├── trading/
+│   │   ├── page.tsx              # 트레이딩 계좌 목록 페이지
+│   │   ├── new/
+│   │   │   └── page.tsx          # 새 계좌 생성 페이지
+│   │   └── [accountId]/
+│   │       └── page.tsx          # 계좌 상세 페이지 (티어 보유현황, 당일 주문표)
 │   └── recommend/
 │       └── page.tsx              # Recommend 페이지 (전략 추천)
 ├── backtest/                     # 백테스트 엔진 모듈
@@ -428,8 +434,16 @@ src/
 │   ├── recommend-helper.ts       # 빠른 전략 추천 헬퍼
 │   ├── types.ts                  # 추천 백테스트 전용 타입
 │   └── index.ts                  # 모듈 엔트리포인트
+├── types/
+│   └── trading.ts                # 트레이딩 타입 정의 (계좌, 티어, 주문, 전략 상수)
+├── database/
+│   └── trading.ts                # 트레이딩 CRUD 및 주문 생성/체결 로직
+├── utils/
+│   └── trading-core.ts           # 공통 트레이딩 유틸리티 (가격 계산, 체결 판정)
 ├── lib/                          # 공유 유틸리티
-│   └── date.ts                   # 날짜 유틸리티 함수
+│   ├── date.ts                   # 날짜 유틸리티 함수
+│   └── validations/
+│       └── trading.ts            # 트레이딩 입력값 검증 스키마 (Zod)
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
@@ -453,6 +467,15 @@ src/
 │   │   ├── SimilarPeriodCard.tsx # 유사 구간 카드
 │   │   ├── StrategyScoreTable.tsx# 전략 점수 테이블
 │   │   └── RecommendationCard.tsx# 추천 결과 카드
+│   ├── trading/                  # 트레이딩 컴포넌트
+│   │   ├── AccountForm.tsx       # 계좌 생성/수정 폼
+│   │   ├── AccountListTable.tsx  # 계좌 목록 테이블
+│   │   ├── AccountSettingsCard.tsx # 계좌 설정 카드
+│   │   ├── AssetSummary.tsx      # 자산 요약 카드
+│   │   ├── DailyOrdersTable.tsx  # 당일 주문표 테이블
+│   │   ├── TierHoldingsTable.tsx # 티어별 보유현황 테이블
+│   │   ├── InvestmentRatioBar.tsx # 투자 비율 막대 그래프
+│   │   └── DeleteAccountModal.tsx # 계좌 삭제 확인 모달
 │   └── mypage/                   # 마이페이지 컴포넌트
 │       ├── UserProfile.tsx       # 사용자 프로필 카드
 │       └── DeleteAccountModal.tsx# 회원 탈퇴 확인 모달
@@ -543,6 +566,12 @@ AUTH_GOOGLE_SECRET=your-google-client-secret
 | `/api/recommend` | ✅ | 추천 API |
 | `/api/backtest-recommend` | ✅ | 추천 백테스트 API |
 | `/api/user/delete` | ✅ | 회원 탈퇴 API |
+| `/trading` | ✅ | 트레이딩 계좌 목록 페이지 |
+| `/trading/new` | ✅ | 새 계좌 생성 페이지 |
+| `/trading/[accountId]` | ✅ | 계좌 상세 페이지 |
+| `/api/trading/accounts` | ✅ | 계좌 CRUD API |
+| `/api/trading/accounts/[id]/holdings` | ✅ | 티어 보유현황 API |
+| `/api/trading/accounts/[id]/orders` | ✅ | 당일 주문 API |
 
 ### 인증 흐름
 
@@ -576,6 +605,61 @@ src/
     └── mypage/
         ├── page.tsx           # 서버 컴포넌트 (인증 체크, 사용자 정보 조회)
         └── _client.tsx        # 클라이언트 컴포넌트 (프로필, 탈퇴 UI)
+```
+
+---
+
+## 트레이딩 계좌 관리 시스템 (PRD-TRADING-001)
+
+떨사오팔 Pro 전략을 실제 매매에 적용하기 위한 트레이딩 계좌 관리 시스템입니다.
+
+### 핵심 기능
+
+- **계좌 관리**: 트레이딩 계좌 생성, 조회, 수정, 삭제 (CRUD)
+- **티어 고정 방식**: 7개 티어(1~6 + 예비티어7) 자동 생성 및 관리
+- **당일 주문 자동 생성**: LOC(지정가) 매수/매도, MOC(시장가) 손절 주문
+- **주문 체결 처리**: 종가 기준 체결 여부 판정 및 티어 업데이트
+- **손절 처리**: 보유일 >= 손절일 시 MOC 주문으로 전량 청산
+- **사이클 보호**: 사이클 진행 중 계좌 설정 변경 방지
+
+### 주문 유형
+
+| 유형 | 설명 | 체결 조건 |
+|------|------|----------|
+| LOC 매수 | 지정가 매수 주문 | 종가 <= 지정가 |
+| LOC 매도 | 지정가 매도 주문 | 종가 >= 지정가 |
+| MOC 손절 | 시장가 전량 매도 | 무조건 체결 |
+
+### 가격 계산
+
+- **매수가**: 전일종가 × (1 + 매수임계값), 소수점 셋째자리 버림
+- **매도가**: 매수가 × (1 + 매도목표), 소수점 셋째자리 버림
+- **수량**: 티어 배분금액 ÷ 매수가, 소수점 버림
+
+### 사용법
+
+1. `/trading` 페이지 접속
+2. "새 계좌" 버튼 클릭
+3. 전략(Pro1/Pro2/Pro3), 종목(SOXL/TQQQ), 시드캐피털, 손절일 입력
+4. 계좌 상세 페이지에서 티어 보유현황 및 당일 주문표 확인
+5. 주문 생성 및 체결 처리
+
+### 트레이딩 모듈 구조
+
+```
+src/
+├── types/trading.ts              # 트레이딩 타입 정의
+├── database/trading.ts           # 트레이딩 CRUD 및 주문 로직
+├── utils/trading-core.ts         # 가격 계산, 체결 판정 유틸리티
+├── lib/validations/trading.ts    # Zod 입력값 검증 스키마
+├── components/trading/           # 트레이딩 UI 컴포넌트
+└── app/
+    ├── trading/                  # 트레이딩 페이지
+    │   ├── page.tsx              # 계좌 목록 페이지
+    │   ├── new/page.tsx          # 새 계좌 생성 페이지
+    │   └── [accountId]/page.tsx  # 계좌 상세 페이지
+    └── api/trading/              # 트레이딩 API
+        └── accounts/             # 계좌 CRUD API
 ```
 
 ---
