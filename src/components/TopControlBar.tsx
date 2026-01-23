@@ -44,9 +44,15 @@ export default async function TopControlBar() {
           ) : (
             <LoginButton />
           )}
-          <button className="btn btn-outline-info" type="button" disabled>
-            Trading
-          </button>
+          {session?.user ? (
+            <Link href="/trading" className="btn btn-outline-info">
+              Trading
+            </Link>
+          ) : (
+            <button className="btn btn-outline-info" type="button" disabled>
+              Trading
+            </button>
+          )}
           <button className="btn btn-outline-warning" type="button" disabled>
             My Custom
           </button>
