@@ -53,9 +53,6 @@ export default async function TopControlBar() {
               Trading
             </button>
           )}
-          <button className="btn btn-outline-warning" type="button" disabled>
-            My Custom
-          </button>
           {session?.user ? (
             <Link href="/mypage" className="btn btn-outline-secondary">
               My Page

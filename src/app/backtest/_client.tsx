@@ -243,14 +243,6 @@ export default function BacktestPageClient() {
               />
             </div>
 
-            {/* Pro/Custom 선택 */}
-            <div>
-              <label className="form-label small mb-1">Pro/Custom</label>
-              <select className="form-select form-select-sm" disabled style={{ width: "100px" }}>
-                <option value="Pro">Pro</option>
-              </select>
-            </div>
-
             {/* 백테스트 실행 버튼 */}
             <div>
               <button
