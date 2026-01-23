@@ -20,6 +20,11 @@ import type {
 } from "@/types/trading";
 import { TIER_COUNT, TIER_RATIOS, BUY_THRESHOLDS, SELL_THRESHOLDS } from "@/types/trading";
 import {
+  calculateBuyLimitPrice,
+  calculateSellLimitPrice,
+  calculateBuyQuantity,
+} from "@/backtest/order";
+import {
   CREATE_TRADING_ACCOUNTS_TABLE,
   CREATE_TRADING_ACCOUNTS_USER_INDEX,
   CREATE_TIER_HOLDINGS_TABLE,
@@ -509,7 +514,7 @@ export function generateDailyOrders(
   // 1. 보유 중인 티어들의 매도 주문 생성
   for (const holding of holdings) {
     if (holding.shares > 0 && holding.buyPrice) {
-      const sellPrice = Math.round(holding.buyPrice * (1 + sellThreshold) * 100) / 100;
+      const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
       const order = createDailyOrder(accountId, {
         date,
         tier: holding.tier,
@@ -531,8 +536,8 @@ export function generateDailyOrders(
     const allocatedSeed = seedCapital * tierRatio;
 
     if (allocatedSeed > 0) {
-      const buyPrice = Math.round(closePrice * (1 + buyThreshold) * 100) / 100;
-      const shares = Math.floor(allocatedSeed / buyPrice);
+      const buyPrice = calculateBuyLimitPrice(closePrice, buyThreshold);
+      const shares = calculateBuyQuantity(allocatedSeed, buyPrice);
 
       if (shares > 0) {
         const order = createDailyOrder(accountId, {
@@ -666,7 +671,7 @@ export function processOrderExecution(
       if (order.type === "BUY") {
         // 매수 체결: 티어에 보유 정보 추가
         const sellThreshold = SELL_THRESHOLDS[getAccountStrategy(accountId)] / 100;
-        const sellTargetPrice = Math.round(closePrice * (1 + sellThreshold) * 100) / 100;
+        const sellTargetPrice = calculateSellLimitPrice(closePrice, sellThreshold);
 
         updateTierHolding(accountId, order.tier, {
           buyPrice: closePrice,
