@@ -134,6 +134,16 @@ export const SELL_THRESHOLDS: Record<Strategy, number> = {
 };
 
 /**
+ * Pro 전략 손절일 (보유일 수)
+ * 각 티어 매수일 기준으로 보유일 >= 손절일이면 MOC 매도
+ */
+export const STOP_LOSS_DAYS: Record<Strategy, number> = {
+  Pro1: 10,
+  Pro2: 10,
+  Pro3: 12,
+};
+
+/**
  * 티어 수
  */
 export const TIER_COUNT = 7;

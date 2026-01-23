@@ -19,7 +19,13 @@ import type {
   OrderType,
   OrderMethod,
 } from "@/types/trading";
-import { TIER_COUNT, TIER_RATIOS, BUY_THRESHOLDS, SELL_THRESHOLDS } from "@/types/trading";
+import {
+  TIER_COUNT,
+  TIER_RATIOS,
+  BUY_THRESHOLDS,
+  SELL_THRESHOLDS,
+  STOP_LOSS_DAYS,
+} from "@/types/trading";
 import {
   calculateBuyLimitPrice,
   calculateSellLimitPrice,
@@ -513,19 +519,38 @@ export function generateDailyOrders(
   // 기존 주문 삭제
   deleteDailyOrders(accountId, date);
 
-  // 1. 보유 중인 티어들의 매도 주문 생성
+  const stopLossDay = STOP_LOSS_DAYS[strategy];
+
+  // 1. 보유 중인 티어들의 매도 주문 생성 (손절 또는 일반 매도)
   for (const holding of holdings) {
-    if (holding.shares > 0 && holding.buyPrice) {
-      const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
-      const order = createDailyOrder(accountId, {
-        date,
-        tier: holding.tier,
-        type: "SELL" as OrderType,
-        orderMethod: "LOC" as OrderMethod,
-        limitPrice: sellPrice,
-        shares: holding.shares,
-      });
-      orders.push(order);
+    if (holding.shares > 0 && holding.buyPrice && holding.buyDate) {
+      // 보유일 계산 (거래일 기준)
+      const holdingDays = calculateTradingDays(holding.buyDate, date);
+
+      if (holdingDays >= stopLossDay) {
+        // 손절일 도달: MOC 주문 (시장가, 무조건 체결)
+        const order = createDailyOrder(accountId, {
+          date,
+          tier: holding.tier,
+          type: "SELL" as OrderType,
+          orderMethod: "MOC" as OrderMethod,
+          limitPrice: closePrice, // MOC는 시장가이므로 종가로 설정
+          shares: holding.shares,
+        });
+        orders.push(order);
+      } else {
+        // 일반 매도: LOC 주문 (지정가)
+        const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
+        const order = createDailyOrder(accountId, {
+          date,
+          tier: holding.tier,
+          type: "SELL" as OrderType,
+          orderMethod: "LOC" as OrderMethod,
+          limitPrice: sellPrice,
+          shares: holding.shares,
+        });
+        orders.push(order);
+      }
     }
   }
 
@@ -601,6 +626,31 @@ function getPreviousTradingDate(date: string): string {
   return d.toISOString().split("T")[0];
 }
 
+/**
+ * 두 날짜 사이의 거래일 수 계산 (주말 제외)
+ * 매수일 다음날부터 현재일까지의 거래일 수
+ * 예: 월요일 매수 → 다음 월요일 = 5 거래일 (화~금 + 월)
+ */
+function calculateTradingDays(startDate: string, endDate: string): number {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  let tradingDays = 0;
+  const current = new Date(start);
+  current.setDate(current.getDate() + 1); // 매수일 다음날부터 계산
+
+  while (current <= end) {
+    const day = current.getDay();
+    // 주말(토요일=6, 일요일=0)이 아니면 거래일
+    if (day !== 0 && day !== 6) {
+      tradingDays++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return tradingDays;
+}
+
 // =====================================================
 // 주문 체결 처리
 // =====================================================
@@ -659,7 +709,10 @@ export function processOrderExecution(
 
     let shouldExecute = false;
 
-    if (order.type === "BUY") {
+    if (order.orderMethod === "MOC") {
+      // MOC 주문: 무조건 체결 (손절용)
+      shouldExecute = true;
+    } else if (order.type === "BUY") {
       // LOC 매수: 종가 <= 지정가 → 체결
       shouldExecute = closePrice <= order.limitPrice;
     } else {
