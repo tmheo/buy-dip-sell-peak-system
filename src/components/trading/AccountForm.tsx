@@ -47,7 +47,7 @@ export default function AccountForm({
   const [formData, setFormData] = useState<AccountFormData>({
     name: initialData?.name ?? "",
     ticker: initialData?.ticker ?? "SOXL",
-    seedCapital: initialData?.seedCapital ?? 2000,
+    seedCapital: initialData?.seedCapital ?? 10000,
     strategy: initialData?.strategy ?? "Pro1",
     cycleStartDate: initialData?.cycleStartDate ?? getToday(),
   });
