@@ -592,3 +592,119 @@ function getPreviousTradingDate(date: string): string {
 
   return d.toISOString().split("T")[0];
 }
+
+// =====================================================
+// 주문 체결 처리
+// =====================================================
+
+export interface ExecutionResult {
+  orderId: string;
+  tier: number;
+  type: "BUY" | "SELL";
+  executed: boolean;
+  limitPrice: number;
+  closePrice: number;
+  shares: number;
+}
+
+/**
+ * 당일 주문 체결 처리
+ * - 종가 기준으로 체결 여부 판정
+ * - 체결된 주문은 tier_holdings 업데이트
+ * - LOC 매수: 종가 <= 지정가 → 체결 (종가로 매수)
+ * - LOC 매도: 종가 >= 지정가 → 체결 (종가로 매도)
+ *
+ * @param accountId - 계좌 ID
+ * @param date - 체결 처리할 날짜
+ * @param ticker - 종목
+ * @returns 체결 결과 목록
+ */
+export function processOrderExecution(
+  accountId: string,
+  date: string,
+  ticker: Ticker
+): ExecutionResult[] {
+  // 당일 종가 조회
+  const closePrice = getClosingPrice(ticker, date);
+  if (!closePrice) {
+    return []; // 종가 데이터 없으면 체결 처리 불가
+  }
+
+  // 당일 주문 조회
+  const orders = getDailyOrders(accountId, date);
+  const results: ExecutionResult[] = [];
+
+  for (const order of orders) {
+    // 이미 체결된 주문은 스킵
+    if (order.executed) {
+      results.push({
+        orderId: order.id,
+        tier: order.tier,
+        type: order.type,
+        executed: true,
+        limitPrice: order.limitPrice,
+        closePrice,
+        shares: order.shares,
+      });
+      continue;
+    }
+
+    let shouldExecute = false;
+
+    if (order.type === "BUY") {
+      // LOC 매수: 종가 <= 지정가 → 체결
+      shouldExecute = closePrice <= order.limitPrice;
+    } else {
+      // LOC 매도: 종가 >= 지정가 → 체결
+      shouldExecute = closePrice >= order.limitPrice;
+    }
+
+    if (shouldExecute) {
+      // 주문 체결 처리
+      updateOrderExecuted(order.id, true);
+
+      if (order.type === "BUY") {
+        // 매수 체결: 티어에 보유 정보 추가
+        const sellThreshold = SELL_THRESHOLDS[getAccountStrategy(accountId)] / 100;
+        const sellTargetPrice = Math.round(closePrice * (1 + sellThreshold) * 100) / 100;
+
+        updateTierHolding(accountId, order.tier, {
+          buyPrice: closePrice,
+          shares: order.shares,
+          buyDate: date,
+          sellTargetPrice,
+        });
+      } else {
+        // 매도 체결: 티어 보유 정보 초기화
+        updateTierHolding(accountId, order.tier, {
+          buyPrice: null,
+          shares: 0,
+          buyDate: null,
+          sellTargetPrice: null,
+        });
+      }
+    }
+
+    results.push({
+      orderId: order.id,
+      tier: order.tier,
+      type: order.type,
+      executed: shouldExecute,
+      limitPrice: order.limitPrice,
+      closePrice,
+      shares: order.shares,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * 계좌의 전략 조회 (내부 헬퍼)
+ */
+function getAccountStrategy(accountId: string): Strategy {
+  const database = getConnection();
+  const stmt = database.prepare("SELECT strategy FROM trading_accounts WHERE id = ?");
+  const result = stmt.get(accountId) as { strategy: string } | undefined;
+  return (result?.strategy as Strategy) || "Pro1";
+}
