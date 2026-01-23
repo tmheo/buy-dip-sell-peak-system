@@ -7,8 +7,6 @@
 - **전략 추천 시스템**: 기술적 지표 기반 유사 구간 분석으로 최적 전략 추천
 - **트레이딩 계좌 관리**: 티어 기반 LOC/MOC 주문 및 손절 처리
 
-![시스템 아키텍처](./docs/architecture/system-architecture.png)
-
 ---
 
 ## 목차
@@ -142,6 +140,8 @@ npx tsx scripts/precompute-recommendations.ts
 ---
 
 ## 시스템 아키텍처
+
+![시스템 아키텍처](./docs/architecture/system-architecture.png)
 
 <details>
 <summary>레이어별 설명</summary>
