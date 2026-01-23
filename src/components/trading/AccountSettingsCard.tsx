@@ -116,8 +116,8 @@ export default function AccountSettingsCard({
                 name="seedCapital"
                 value={formData.seedCapital}
                 onChange={handleChange}
-                min="1"
-                step="100"
+                min="2000"
+                step="1"
                 disabled={isSaving}
               />
             </div>
