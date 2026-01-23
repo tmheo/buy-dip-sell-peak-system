@@ -17,7 +17,7 @@ body {
   position: fixed;
   top: 120px;
   right: 20px;
-  width: 200px;
+  width: 250px;
   z-index: 1000;
   max-height: calc(100vh - 140px);
   overflow-y: auto;
@@ -49,6 +49,7 @@ body {
 #fixedSidebar .table td:last-child,
 #fixedSidebar .table th:last-child {
   width: auto;
+  white-space: nowrap;
 }
 
 /* Price Colors - Bootstrap table-dark 오버라이드를 위해 specificity 강화 */
