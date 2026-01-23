@@ -6,7 +6,12 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { createTradingAccount, getTradingAccountsByUserId } from "@/database/trading";
+import {
+  createTradingAccount,
+  getTradingAccountsByUserId,
+  getTierHoldings,
+  getTotalShares,
+} from "@/database/trading";
 import { CreateTradingAccountSchema } from "@/lib/validations/trading";
 
 /**
@@ -21,7 +26,12 @@ export async function GET(): Promise<NextResponse> {
   }
 
   const accounts = getTradingAccountsByUserId(session.user.id);
-  return NextResponse.json({ accounts });
+  const accountsWithHoldings = accounts.map((account) => ({
+    ...account,
+    holdings: getTierHoldings(account.id),
+    totalShares: getTotalShares(account.id),
+  }));
+  return NextResponse.json({ accounts: accountsWithHoldings });
 }
 
 /**
