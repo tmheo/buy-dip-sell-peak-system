@@ -110,9 +110,27 @@ export interface TradingAccountWithHoldings extends TradingAccount {
  * Pro 전략 티어별 비율 (%)
  */
 export const TIER_RATIOS: Record<Strategy, number[]> = {
-  Pro1: [10, 15, 20, 25, 20, 10, 0], // 예비티어(7)는 0%
+  Pro1: [5, 10, 15, 20, 25, 25, 0], // 예비티어(7)는 0%
   Pro2: [10, 15, 20, 25, 20, 10, 0],
-  Pro3: [10, 15, 20, 25, 20, 10, 0],
+  Pro3: [16.7, 16.7, 16.7, 16.7, 16.7, 16.7, 0], // 균등 분할
+};
+
+/**
+ * Pro 전략 매수 임계값 (전일 종가 대비 %)
+ */
+export const BUY_THRESHOLDS: Record<Strategy, number> = {
+  Pro1: -0.01,
+  Pro2: -0.01,
+  Pro3: -0.1,
+};
+
+/**
+ * Pro 전략 매도 목표 (매수가 대비 %)
+ */
+export const SELL_THRESHOLDS: Record<Strategy, number> = {
+  Pro1: 0.01,
+  Pro2: 1.5,
+  Pro3: 2.0,
 };
 
 /**
