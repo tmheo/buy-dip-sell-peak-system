@@ -729,5 +729,8 @@ function getAccountStrategy(accountId: string): Strategy {
   const database = getConnection();
   const stmt = database.prepare("SELECT strategy FROM trading_accounts WHERE id = ?");
   const result = stmt.get(accountId) as { strategy: string } | undefined;
-  return (result?.strategy as Strategy) || "Pro1";
+  if (!result) {
+    throw new Error(`Account not found: ${accountId}`);
+  }
+  return result.strategy as Strategy;
 }

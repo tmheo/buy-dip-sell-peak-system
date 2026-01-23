@@ -26,7 +26,9 @@ function formatCurrency(value: number | null): string {
 
 function formatDate(date: string | null): string {
   if (!date) return "-";
-  return new Date(date).toLocaleDateString("ko-KR", {
+  const [year, month, day] = date.split("-");
+  const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+  return localDate.toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -35,8 +37,10 @@ function formatDate(date: string | null): string {
 
 function calculateHoldingDays(buyDate: string | null): string {
   if (!buyDate) return "-";
-  const buy = new Date(buyDate);
+  const [y, m, d] = buyDate.split("-").map(Number);
+  const buy = new Date(Date.UTC(y, m - 1, d));
   const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
   const diffTime = today.getTime() - buy.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   return `${diffDays}일`;

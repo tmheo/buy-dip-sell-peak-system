@@ -114,24 +114,27 @@ export function shouldExecuteSell(closePrice: number, limitPrice: number): boole
 
 /**
  * 이전 거래일 계산 (주말 제외)
+ * UTC 기준으로 계산하여 타임존 문제 방지
  *
  * @param date - 기준 날짜 (YYYY-MM-DD)
  * @returns 이전 거래일 (YYYY-MM-DD)
  */
 export function getPreviousTradingDate(date: string): string {
-  const d = new Date(date);
-  d.setDate(d.getDate() - 1);
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
 
-  const day = d.getDay();
-  if (day === 0) d.setDate(d.getDate() - 2); // 일요일 -> 금요일
-  if (day === 6) d.setDate(d.getDate() - 1); // 토요일 -> 금요일
+  const day = dt.getUTCDay();
+  if (day === 0) dt.setUTCDate(dt.getUTCDate() - 2); // 일요일 -> 금요일
+  if (day === 6) dt.setUTCDate(dt.getUTCDate() - 1); // 토요일 -> 금요일
 
-  return d.toISOString().split("T")[0];
+  return dt.toISOString().slice(0, 10);
 }
 
 /**
  * 두 날짜 사이의 거래일 수 계산 (주말 제외)
  * 시작일 다음날부터 종료일까지의 거래일 수
+ * UTC 기준으로 계산하여 타임존 문제 방지
  * 예: 월요일 시작 → 다음 월요일 종료 = 5 거래일 (화~금 + 월)
  *
  * @param startDate - 시작 날짜 (YYYY-MM-DD)
@@ -139,19 +142,21 @@ export function getPreviousTradingDate(date: string): string {
  * @returns 거래일 수
  */
 export function calculateTradingDays(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const [ey, em, ed] = endDate.split("-").map(Number);
+  const start = new Date(Date.UTC(sy, sm - 1, sd));
+  const end = new Date(Date.UTC(ey, em - 1, ed));
 
   let tradingDays = 0;
   const current = new Date(start);
-  current.setDate(current.getDate() + 1); // 시작일 다음날부터 계산
+  current.setUTCDate(current.getUTCDate() + 1); // 시작일 다음날부터 계산
 
   while (current <= end) {
-    const day = current.getDay();
+    const day = current.getUTCDay();
     if (day !== 0 && day !== 6) {
       tradingDays++;
     }
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return tradingDays;

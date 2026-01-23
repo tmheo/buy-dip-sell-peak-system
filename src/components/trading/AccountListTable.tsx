@@ -28,7 +28,9 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("ko-KR", {
+  const [year, month, day] = date.split("-");
+  const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+  return localDate.toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

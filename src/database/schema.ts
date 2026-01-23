@@ -262,7 +262,7 @@ CREATE TABLE IF NOT EXISTS daily_orders (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL,
     date TEXT NOT NULL,
-    tier INTEGER NOT NULL,
+    tier INTEGER NOT NULL CHECK(tier >= 1 AND tier <= 7),
     type TEXT NOT NULL CHECK(type IN ('BUY', 'SELL')),
     order_method TEXT NOT NULL CHECK(order_method IN ('LOC', 'MOC')),
     limit_price REAL NOT NULL,

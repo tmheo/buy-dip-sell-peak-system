@@ -28,14 +28,23 @@ interface OrdersResponse {
   orders: DailyOrder[];
 }
 
+function getTodayLocal(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function TradingDetailClient({
   accountId,
 }: TradingDetailClientProps): React.ReactElement {
   const router = useRouter();
   const [account, setAccount] = useState<TradingAccountWithHoldings | null>(null);
   const [orders, setOrders] = useState<DailyOrder[]>([]);
-  const [orderDate, setOrderDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [orderDate, setOrderDate] = useState<string>(getTodayLocal());
   const [isLoading, setIsLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -60,10 +69,14 @@ export default function TradingDetailClient({
       const accountData: AccountResponse = await accountRes.json();
       setAccount(accountData.account);
 
+      setOrdersError(null);
       if (ordersRes.ok) {
         const ordersData: OrdersResponse = await ordersRes.json();
         setOrders(ordersData.orders);
         setOrderDate(ordersData.date);
+      } else {
+        setOrdersError("주문 정보를 불러오는데 실패했습니다.");
+        setOrders([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -213,6 +226,11 @@ export default function TradingDetailClient({
       />
 
       {/* Daily Orders Section */}
+      {ordersError && (
+        <div className="alert alert-warning mb-4" role="alert">
+          {ordersError}
+        </div>
+      )}
       <DailyOrdersTable orders={orders} ticker={account.ticker} date={orderDate} />
     </div>
   );

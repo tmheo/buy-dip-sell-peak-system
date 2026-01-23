@@ -38,8 +38,10 @@ export default function AssetSummary({
   profitRate,
   ticker,
 }: AssetSummaryProps): React.ReactElement {
-  const cashRatio = totalAssets > 0 ? (cashBalance / totalAssets) * 100 : 100;
-  const stockRatio = totalAssets > 0 ? (stockValue / totalAssets) * 100 : 0;
+  const cashRatioRaw = totalAssets > 0 ? (cashBalance / totalAssets) * 100 : 100;
+  const stockRatioRaw = totalAssets > 0 ? (stockValue / totalAssets) * 100 : 0;
+  const cashRatio = Math.min(100, Math.max(0, cashRatioRaw));
+  const stockRatio = Math.min(100, Math.max(0, stockRatioRaw));
   const profitClass = profitRate >= 0 ? "text-success" : "text-danger";
 
   return (

@@ -68,8 +68,12 @@ export default function AccountSettingsCard({
   }
 
   async function handleSave(): Promise<void> {
-    await onSave(formData);
-    setIsEditing(false);
+    try {
+      await onSave(formData);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save account settings:", error);
+    }
   }
 
   return (
