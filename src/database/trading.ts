@@ -30,7 +30,12 @@ import {
   calculateBuyLimitPrice,
   calculateSellLimitPrice,
   calculateBuyQuantity,
-} from "@/backtest/order";
+  shouldExecuteBuy,
+  shouldExecuteSell,
+  getPreviousTradingDate,
+  calculateTradingDays,
+  percentToThreshold,
+} from "@/utils/trading-core";
 import {
   CREATE_TRADING_ACCOUNTS_TABLE,
   CREATE_TRADING_ACCOUNTS_USER_INDEX,
@@ -509,9 +514,8 @@ export function generateDailyOrders(
     return []; // 가격 데이터 없으면 주문 생성 불가
   }
 
-  // Decimal로 threshold 계산 (부동소수점 오차 방지)
-  const buyThreshold = new Decimal(BUY_THRESHOLDS[strategy]).div(100).toNumber();
-  const sellThreshold = new Decimal(SELL_THRESHOLDS[strategy]).div(100).toNumber();
+  const buyThreshold = percentToThreshold(BUY_THRESHOLDS[strategy]);
+  const sellThreshold = percentToThreshold(SELL_THRESHOLDS[strategy]);
   const tierRatios = TIER_RATIOS[strategy];
 
   const orders: DailyOrder[] = [];
@@ -611,46 +615,6 @@ function getNextBuyTier(holdings: TierHolding[]): number | null {
   return null; // 모든 티어 보유 중
 }
 
-/**
- * 이전 거래일 계산 (주말 제외)
- */
-function getPreviousTradingDate(date: string): string {
-  const d = new Date(date);
-  d.setDate(d.getDate() - 1);
-
-  // 주말이면 금요일로
-  const day = d.getDay();
-  if (day === 0) d.setDate(d.getDate() - 2); // 일요일 -> 금요일
-  if (day === 6) d.setDate(d.getDate() - 1); // 토요일 -> 금요일
-
-  return d.toISOString().split("T")[0];
-}
-
-/**
- * 두 날짜 사이의 거래일 수 계산 (주말 제외)
- * 매수일 다음날부터 현재일까지의 거래일 수
- * 예: 월요일 매수 → 다음 월요일 = 5 거래일 (화~금 + 월)
- */
-function calculateTradingDays(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  let tradingDays = 0;
-  const current = new Date(start);
-  current.setDate(current.getDate() + 1); // 매수일 다음날부터 계산
-
-  while (current <= end) {
-    const day = current.getDay();
-    // 주말(토요일=6, 일요일=0)이 아니면 거래일
-    if (day !== 0 && day !== 6) {
-      tradingDays++;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  return tradingDays;
-}
-
 // =====================================================
 // 주문 체결 처리
 // =====================================================
@@ -713,11 +677,9 @@ export function processOrderExecution(
       // MOC 주문: 무조건 체결 (손절용)
       shouldExecute = true;
     } else if (order.type === "BUY") {
-      // LOC 매수: 종가 <= 지정가 → 체결
-      shouldExecute = closePrice <= order.limitPrice;
+      shouldExecute = shouldExecuteBuy(closePrice, order.limitPrice);
     } else {
-      // LOC 매도: 종가 >= 지정가 → 체결
-      shouldExecute = closePrice >= order.limitPrice;
+      shouldExecute = shouldExecuteSell(closePrice, order.limitPrice);
     }
 
     if (shouldExecute) {
@@ -726,9 +688,7 @@ export function processOrderExecution(
 
       if (order.type === "BUY") {
         // 매수 체결: 티어에 보유 정보 추가
-        const sellThreshold = new Decimal(SELL_THRESHOLDS[getAccountStrategy(accountId)])
-          .div(100)
-          .toNumber();
+        const sellThreshold = percentToThreshold(SELL_THRESHOLDS[getAccountStrategy(accountId)]);
         const sellTargetPrice = calculateSellLimitPrice(closePrice, sellThreshold);
 
         updateTierHolding(accountId, order.tier, {
