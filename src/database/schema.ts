@@ -212,3 +212,68 @@ CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)
 export const CREATE_SESSIONS_USER_INDEX = `
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)
 `;
+
+// =====================================================
+// Trading 테이블 (PRD-TRADING-001)
+// =====================================================
+
+export const CREATE_TRADING_ACCOUNTS_TABLE = `
+CREATE TABLE IF NOT EXISTS trading_accounts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    ticker TEXT NOT NULL CHECK(ticker IN ('SOXL', 'TQQQ')),
+    seed_capital REAL NOT NULL,
+    strategy TEXT NOT NULL CHECK(strategy IN ('Pro1', 'Pro2', 'Pro3')),
+    cycle_start_date TEXT NOT NULL,
+    cycle_number INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)
+`;
+
+export const CREATE_TRADING_ACCOUNTS_USER_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_trading_accounts_user_id ON trading_accounts(user_id)
+`;
+
+export const CREATE_TIER_HOLDINGS_TABLE = `
+CREATE TABLE IF NOT EXISTS tier_holdings (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    tier INTEGER NOT NULL CHECK(tier >= 1 AND tier <= 7),
+    buy_price REAL,
+    shares INTEGER NOT NULL DEFAULT 0,
+    buy_date TEXT,
+    sell_target_price REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(account_id, tier),
+    FOREIGN KEY (account_id) REFERENCES trading_accounts(id) ON DELETE CASCADE
+)
+`;
+
+export const CREATE_TIER_HOLDINGS_ACCOUNT_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_tier_holdings_account_id ON tier_holdings(account_id)
+`;
+
+export const CREATE_DAILY_ORDERS_TABLE = `
+CREATE TABLE IF NOT EXISTS daily_orders (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    tier INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('BUY', 'SELL')),
+    order_method TEXT NOT NULL CHECK(order_method IN ('LOC', 'MOC')),
+    limit_price REAL NOT NULL,
+    shares INTEGER NOT NULL,
+    executed INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES trading_accounts(id) ON DELETE CASCADE
+)
+`;
+
+export const CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_daily_orders_account_date ON daily_orders(account_id, date)
+`;

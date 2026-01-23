@@ -30,6 +30,12 @@ import {
   SELECT_TOTAL_COUNT,
   SELECT_RECOMMENDATION_BY_DATE,
   SELECT_RECOMMENDATION_COUNT,
+  CREATE_TRADING_ACCOUNTS_TABLE,
+  CREATE_TRADING_ACCOUNTS_USER_INDEX,
+  CREATE_TIER_HOLDINGS_TABLE,
+  CREATE_TIER_HOLDINGS_ACCOUNT_INDEX,
+  CREATE_DAILY_ORDERS_TABLE,
+  CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX,
 } from "./schema";
 
 const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "data", "prices.db");
@@ -77,6 +83,13 @@ export function initTables(): void {
   database.exec(CREATE_USERS_EMAIL_INDEX);
   database.exec(CREATE_ACCOUNTS_USER_INDEX);
   database.exec(CREATE_SESSIONS_USER_INDEX);
+  // Trading 테이블
+  database.exec(CREATE_TRADING_ACCOUNTS_TABLE);
+  database.exec(CREATE_TRADING_ACCOUNTS_USER_INDEX);
+  database.exec(CREATE_TIER_HOLDINGS_TABLE);
+  database.exec(CREATE_TIER_HOLDINGS_ACCOUNT_INDEX);
+  database.exec(CREATE_DAILY_ORDERS_TABLE);
+  database.exec(CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX);
   console.log("데이터베이스 테이블 초기화 완료");
 }
 
