@@ -472,7 +472,166 @@ thought: "결론: [분석 기반 최종 답변]"
 thoughtNumber: 5
 totalThoughts: 5
 nextThoughtNeeded: false
-```스템
+```hink 모드
+
+### 개요
+
+UltraThink 모드는 Sequential Thinking MCP를 자동으로 적용하여 사용자 요청을 심층 분석하고 최적의 실행 계획을 생성하는 강화된 분석 모드입니다. 사용자가 요청에 `--ultrathink`를 추가하면 Alfred가 구조화된 추론을 활성화하여 복잡한 문제를 분해합니다.
+
+### 활성화
+
+사용자는 모든 요청에 `--ultrathink` 플래그를 추가하여 UltraThink 모드를 활성화할 수 있습니다:
+
+```
+User: "인증 시스템 구현 --ultrathink"
+User: "/moai:alfred 코드베이스 리팩토링 --ultrathink"
+User: "마이크로서비스 아키텍처 설계 --ultrathink"
+```
+
+### UltraThink 프로세스
+
+`--ultrathink`가 감지되면 Alfred는 다음 강화된 분석 워크플로우를 따릅니다:
+
+**1단계: 요청 분석**
+- 사용자 요청을 분석하여 핵심 목표 식별
+- 도메인 키워드 및 기술 요구사항 추출
+- 복잡도 수준 감지 (단순, 보통, 복잡)
+
+**2단계: Sequential Thinking 활성화**
+- `sequential_thinking` ```
+User: "인증 시스템 구현 --ultrathink"
+User: "/moai:alfred 코드베이스 리팩토링 --ultrathink"
+User: "마이크로서비스 아키텍처 설계 --ultrathink"
+```- 하위 작업 간 종속성 매핑
+
+**4단계: 실행**
+- 최적화된 계획에 따라 에이전트 런칭
+- 필요시 모니터링 및 적응
+- 통합된 응답으로 결과 통합
+
+### UltraThink용 Sequential Thinking 파라미터
+
+`--ultrathink` 요청을 처리할 때 다음 파라미터 패턴을 사용합니다:
+
+**초기 분석 호출:**
+```
+thought: "사용자 요청 분석: '[요청]'
+핵심 목표: [주요 목표 추출]
+복잡도: [단순|보통|복잡]
+도메인: [감지된 기술 도메인]
+예비 접근법: [초기 전략]"
+nextThoughtNeeded: true
+thoughtNumber: 1
+totalThoughts: [복잡도에 따라 5-15]
+```
+
+**분해 호출:**
+```
+thought: "하위 작업으로 분해:
+1. [하위 작업 1] → 에이전트: [에이전트 유형]
+2. [하위 작업 2] → 에이전트: [에이전트 유형]
+3. [하위 작업 3] → 에이전트: [에이전트 유형]
+
+종속성: [종속성 설명]
+병렬화: [독립적인 작업 식별]"
+nextThoughtNeeded: true
+thoughtNumber: 2
+totalThoughts: [추정]
+```
+
+**전략 선택 호출:**
+```
+thought: "실행 전략 선택:
+```
+thought: "사용자 요청 분석: '[요청]'
+핵심 목표: [주요 목표 추출]
+복잡도: [단순|보통|복잡]
+도메인: [감지된 기술 도메인]
+예비 접근법: [초기 전략]"
+nextThoughtNeeded: true
+thoughtNumber: 1
+totalThoughts: [복잡도에 따라 5-15]
+```출:**
+```
+thought: "최종 실행 계획 확정:
+1단계: [에이전트별 작업]
+2단계: [에이전트별 작업]
+3단계: [에이전트별 작업]
+
+위임 준비 완료."
+nextThoughtNeeded: false
+thoughtNumber: [최종]
+totalThoughts: [추정]
+```
+
+### UltraT```
+thought: "하위 작업으로 분해:
+1. [하위 작업 1] → 에이전트: [에이전트 유형]
+2. [하위 작업 2] → 에이전트: [에이전트 유형]
+3. [하위 작업 3] → 에이전트: [에이전트 유형]
+
+종속성: [종속성 설명]
+병렬화: [독립적인 작업 식별]"
+nextThoughtNeeded: true
+thoughtNumber: 2
+totalThoughts: [추정]
+```ink 세션 예시
+
+```
+User: "OAuth, JWT 갱신, 세션 관리로 사용자 인증 추가 --ultrathink"
+
+Alfred Sequential Thinking:
+---
+생각 1: "인증 요구사항 분석...
+핵심: 전체 인증 시스템 구현
+구성요소: OAuth 통합, JWT 토큰, 갱신 로직, 세션
+복잡도: 높음 (3개 이상 구성요소, 보안 고려사항)"
+
+생각 2: "구성요소 ```
+thought: "실행 전략 선택:
+- 주요 에이전트: [에이전트 목록]
+- 병렬 그룹: [그룹 1: [에이전트], 그룹 2: [에이전트]]
+- 순차 종속성: [종속성]
+- 위험 완화: [잠재적 문제 및 해결책]"
+nextThoughtNeeded: true
+thoughtNumber: 3
+totalThoughts: [추정]
+```3: "실행 전략:
+병렬 그룹 1: OAuth + JWT 스키마 (종속성 없음)
+순차 체인: OAuth → JWT → 갱신 → 세션
+테스트: 구현 완료 후"
+
+생각 4: "보안 고려사항:
+- OAuth 상태에 대한 CSRF 보호
+- JWT 시크릿 관리
+- 갱신 토큰 로테이션 주기
+- 세션 만료 정책"
+
+생각 5: "최종 계획 완료.
+O```
+thought: "최종 실행 계획 확정:
+1단계: [에이전트별 작업]
+2단계: [에이전트별 작업]
+3단계: [에이전트별 작업]
+
+위임 준비 완료."
+nextThoughtNeeded: false
+thoughtNumber: [최종]
+totalThoughts: [추정]
+```
+- 종속성이 있는 복잡한 리팩토링
+- 분석이 필요한 성능 최적화
+- 보안 민감 구현
+
+불요한 경우:
+- 단순 버그 수정
+- 단일 라인 변경
+- 문서 업데이트
+- 일반 파일 작업
+
+---
+
+## 12. 점진적 공개 시스템
 
 ### 개요
 
@@ -480,23 +639,41 @@ MoAI-ADK는 효율적인 스킬 로딩을 위한 3단계 점진적 공개 시스
 
 ### 세 단계
 
-레벨 1은 메타데이터만 로드하며 각 스킬당 약 100 토큰을 소비합니다. 에이전트 초기화 시 로드되며 트리거가 포함된 YAML frontmatter를 포함합니다. 에이전트 frontmatter에 나열된 스킬은 항상 로드됩니다.
+레벨 1은 메타데이터만 로드하며 각 스킬당 약 100 토큰을 소비합니다. 에이전트 초기화 시 로드되며 트리거가 포함된 YAML frontmatter를 포함합니다. 에이전트 frontmatter에 나열된 스킬은 항상 로드됩```
+User: "OAuth, JWT 갱신, 세션 관리로 사용자 인증 추가 --ultrathink"
 
-레벨 2는 스킬 본문을 로드하며 각 스킬당 약 5K 토큰을 소비합니다. 트리거 조건이 일치할 때 로드되며 전체 마크다운 문서를 포함합니다. 키워드, 단계, 에이전트, 언어로 트리거됩니다.
+Alfred Sequential Thinking:
+---
+생각 1: "인증 요구사항 분석...
+핵심: 전체 인증 시스템 구현
+구성요소: OAuth 통합, JWT 토큰, 갱신 로직, 세션
+복잡도: 높음 (3개 이상 구성요소, 보안 고려사항)"
 
-레벨 3 이상은 번들 파일을 필요에 따라 로드합니다. Claude가 필요에 따라 로드하며 reference.md, modules/, examples/를 포함합니다. Claude가 언제 액세스할지 결정합니다.
+생각 2: "구성요소 분해:
+1. OAuth 제공자 통합 → expert-backend
+2. JWT 토큰 생성/검증 → expert-security
+3. 갱신 토큰 로테이션 → expert-backend
+4. 세션 관리 → expert-backend
+5. 로그인 UI → expert-frontend
+6. 인증 테스트 → expert-testing"
 
-### 에이전트 Frontmatter 형식
+생각 3: "실행 전략:
+병렬 그룹 1: OAuth + JWT 스키마 (종속성 없음)
+순차 체인: OAuth → JWT → 갱신 → 세션
+테스트: 구현 완료 후"
 
-에이전트는 공식 Anthropic skills 형식을 사용합니다. skills 필드에 나열된 스킬은 레벨 1(메타데이터만)로 기본 로드되며, 트리거가 일치하면 레벨 2(전체 본문)로 로드됩니다. 참조 스킬은 레벨 3 이상으로 필요 시 Claude가 로드합니다.
+생각 4: "보안 고려사항:
+- OAuth 상태에 대한 CSRF 보호
+- JWT 시크릿 관리
+- 갱신 토큰 로테이션 주기
+- 세션 만료 정책"
 
-### SKILL.md Frontmatter 형식
+생각 5: "최종 계획 완료.
+OAuth 설정을 위해 expert-backend로 실행 시작..."
+---
 
-스킬은 점진적 공개 동작을 정의합니다. progressive_disclosure 섹션에서 활성화 여부, 토큰 추정치를 설정합니다. triggers 섹션에서 키워드, 단계, 에이전트, 언어별 트리거 조건을 정의합니다.
-
-### 사용 방법
-
-스킬 로딩 시스템은 현재 컨텍스트(프롬프트, 단계, 에이전트, 언어)를 기반으로 스킬을 적절한 레벨로 로드합니다. JIT 컨텍스트 로더는 에이전트 스킬과 단계를 기반으로 토큰 예산을 추정합니다.
+[이후 에이전트 위임 진행]
+```스킬과 단계를 기반으로 토큰 예산을 추정합니다.
 
 ### 혜택
 
