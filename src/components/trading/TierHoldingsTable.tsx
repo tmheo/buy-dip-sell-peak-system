@@ -61,6 +61,12 @@ export default function TierHoldingsTable({
   const ratios = TIER_RATIOS[strategy];
   const holdingsByTier = new Map(holdings.map((h) => [h.tier, h]));
 
+  // 티어 1~6이 모두 매수되었는지 확인
+  const allMainTiersFilled = Array.from({ length: 6 }, (_, i) => i + 1).every((tier) => {
+    const holding = holdingsByTier.get(tier);
+    return holding && holding.shares > 0;
+  });
+
   return (
     <div className="card bg-dark border-secondary mb-4">
       <div className="card-header border-secondary">
@@ -87,7 +93,10 @@ export default function TierHoldingsTable({
                 const holding = holdingsByTier.get(tier);
                 const ratio = ratios[tier - 1];
                 const isReserveTier = tier === 7;
-                const allocatedSeed = isReserveTier ? cashBalance : (seedCapital * ratio) / 100;
+                // 예비 티어는 티어 1~6이 모두 매수된 경우에만 남은 예수금 표시
+                const allocatedSeed = isReserveTier
+                  ? (allMainTiersFilled ? cashBalance : 0)
+                  : (seedCapital * ratio) / 100;
                 const hasShares = holding && holding.shares > 0;
 
                 return (
