@@ -158,3 +158,56 @@ export const STOP_LOSS_DAYS: Record<Strategy, number> = {
  * 티어 수
  */
 export const TIER_COUNT = 7;
+
+// =====================================================
+// 수익 기록 타입 (SPEC-TRADING-002)
+// =====================================================
+
+/**
+ * 매도 체결 시 수익 기록
+ */
+export interface ProfitRecord {
+  id: string;
+  accountId: string;
+  tier: number;
+  ticker: Ticker;
+  strategy: Strategy;
+  buyDate: string;
+  buyPrice: number;
+  buyQuantity: number;
+  sellDate: string;
+  sellPrice: number;
+  buyAmount: number;
+  sellAmount: number;
+  profit: number;
+  profitRate: number;
+  createdAt: string;
+}
+
+/**
+ * 월별 수익 요약
+ */
+export interface MonthlyProfitSummary {
+  yearMonth: string;
+  records: ProfitRecord[];
+  totalTrades: number;
+  totalBuyAmount: number;
+  totalSellAmount: number;
+  totalProfit: number;
+  averageProfitRate: number;
+}
+
+/**
+ * 수익 현황 API 응답
+ */
+export interface ProfitStatusResponse {
+  accountId: string;
+  months: MonthlyProfitSummary[];
+  grandTotal: {
+    totalTrades: number;
+    totalBuyAmount: number;
+    totalSellAmount: number;
+    totalProfit: number;
+    averageProfitRate: number;
+  };
+}

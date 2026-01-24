@@ -277,3 +277,49 @@ CREATE TABLE IF NOT EXISTS daily_orders (
 export const CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX = `
 CREATE INDEX IF NOT EXISTS idx_daily_orders_account_date ON daily_orders(account_id, date)
 `;
+
+// =====================================================
+// profit_records 테이블 (SPEC-TRADING-002)
+// 매도 체결 시 수익 기록 저장
+// =====================================================
+
+export const CREATE_PROFIT_RECORDS_TABLE = `
+CREATE TABLE IF NOT EXISTS profit_records (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    tier INTEGER NOT NULL CHECK(tier >= 1 AND tier <= 7),
+    ticker TEXT NOT NULL CHECK(ticker IN ('SOXL', 'TQQQ')),
+    strategy TEXT NOT NULL CHECK(strategy IN ('Pro1', 'Pro2', 'Pro3')),
+    buy_date TEXT NOT NULL,
+    buy_price REAL NOT NULL,
+    buy_quantity INTEGER NOT NULL,
+    sell_date TEXT NOT NULL,
+    sell_price REAL NOT NULL,
+    buy_amount REAL NOT NULL,
+    sell_amount REAL NOT NULL,
+    profit REAL NOT NULL,
+    profit_rate REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES trading_accounts(id) ON DELETE CASCADE
+)
+`;
+
+export const CREATE_PROFIT_RECORDS_ACCOUNT_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_profit_records_account_id ON profit_records(account_id)
+`;
+
+export const CREATE_PROFIT_RECORDS_SELL_DATE_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_profit_records_sell_date ON profit_records(account_id, sell_date DESC)
+`;
+
+export const INSERT_PROFIT_RECORD = `
+INSERT INTO profit_records (id, account_id, tier, ticker, strategy, buy_date, buy_price, buy_quantity, sell_date, sell_price, buy_amount, sell_amount, profit, profit_rate)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
+export const SELECT_PROFIT_RECORDS_BY_ACCOUNT = `
+SELECT id, account_id, tier, ticker, strategy, buy_date, buy_price, buy_quantity, sell_date, sell_price, buy_amount, sell_amount, profit, profit_rate, created_at
+FROM profit_records
+WHERE account_id = ?
+ORDER BY sell_date DESC, tier ASC
+`;

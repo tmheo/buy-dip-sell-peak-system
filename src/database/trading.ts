@@ -18,6 +18,9 @@ import type {
   Strategy,
   OrderType,
   OrderMethod,
+  ProfitRecord,
+  MonthlyProfitSummary,
+  ProfitStatusResponse,
 } from "@/types/trading";
 import {
   TIER_COUNT,
@@ -48,6 +51,11 @@ import {
   CREATE_TIER_HOLDINGS_ACCOUNT_INDEX,
   CREATE_DAILY_ORDERS_TABLE,
   CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX,
+  CREATE_PROFIT_RECORDS_TABLE,
+  CREATE_PROFIT_RECORDS_ACCOUNT_INDEX,
+  CREATE_PROFIT_RECORDS_SELL_DATE_INDEX,
+  INSERT_PROFIT_RECORD,
+  SELECT_PROFIT_RECORDS_BY_ACCOUNT,
 } from "./schema";
 
 const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "data", "prices.db");
@@ -80,6 +88,9 @@ function initTradingTables(database: Database.Database): void {
   database.exec(CREATE_TIER_HOLDINGS_ACCOUNT_INDEX);
   database.exec(CREATE_DAILY_ORDERS_TABLE);
   database.exec(CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX);
+  database.exec(CREATE_PROFIT_RECORDS_TABLE);
+  database.exec(CREATE_PROFIT_RECORDS_ACCOUNT_INDEX);
+  database.exec(CREATE_PROFIT_RECORDS_SELL_DATE_INDEX);
 
   tablesInitialized = true;
 }
@@ -125,6 +136,24 @@ interface DailyOrderRow {
   executed: number;
   created_at: string;
   updated_at: string;
+}
+
+interface ProfitRecordRow {
+  id: string;
+  account_id: string;
+  tier: number;
+  ticker: string;
+  strategy: string;
+  buy_date: string;
+  buy_price: number;
+  buy_quantity: number;
+  sell_date: string;
+  sell_price: number;
+  buy_amount: number;
+  sell_amount: number;
+  profit: number;
+  profit_rate: number;
+  created_at: string;
 }
 
 // =====================================================
@@ -173,6 +202,26 @@ function mapDailyOrderRow(row: DailyOrderRow): DailyOrder {
     executed: row.executed === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapProfitRecordRow(row: ProfitRecordRow): ProfitRecord {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    tier: row.tier,
+    ticker: row.ticker as Ticker,
+    strategy: row.strategy as Strategy,
+    buyDate: row.buy_date,
+    buyPrice: row.buy_price,
+    buyQuantity: row.buy_quantity,
+    sellDate: row.sell_date,
+    sellPrice: row.sell_price,
+    buyAmount: row.buy_amount,
+    sellAmount: row.sell_amount,
+    profit: row.profit,
+    profitRate: row.profit_rate,
+    createdAt: row.created_at,
   };
 }
 
@@ -699,7 +748,27 @@ export function processOrderExecution(
           sellTargetPrice,
         });
       } else {
-        // 매도 체결: 티어 보유 정보 초기화
+        // 매도 체결: 수익 기록 생성 후 티어 보유 정보 초기화
+        // 티어 초기화 전에 현재 보유 정보로 수익 기록 생성
+        const holdings = getTierHoldings(accountId);
+        const tierHolding = holdings.find((h) => h.tier === order.tier);
+
+        if (tierHolding && tierHolding.buyPrice && tierHolding.buyDate && tierHolding.shares > 0) {
+          const strategy = getAccountStrategy(accountId);
+          createProfitRecord({
+            accountId,
+            tier: order.tier,
+            ticker,
+            strategy,
+            buyDate: tierHolding.buyDate,
+            buyPrice: tierHolding.buyPrice,
+            buyQuantity: tierHolding.shares,
+            sellDate: date,
+            sellPrice: closePrice,
+          });
+        }
+
+        // 티어 보유 정보 초기화
         updateTierHolding(accountId, order.tier, {
           buyPrice: null,
           shares: 0,
@@ -855,4 +924,187 @@ function getNextTradingDate(date: string): string {
   }
 
   return d.toISOString().split("T")[0];
+}
+
+// =====================================================
+// Profit Records CRUD (SPEC-TRADING-002)
+// =====================================================
+
+/**
+ * 수익 기록 생성
+ * 매도 체결 시 호출되어 수익 기록을 저장
+ * Decimal.js로 정밀한 금융 계산 수행
+ */
+export function createProfitRecord(data: {
+  accountId: string;
+  tier: number;
+  ticker: Ticker;
+  strategy: Strategy;
+  buyDate: string;
+  buyPrice: number;
+  buyQuantity: number;
+  sellDate: string;
+  sellPrice: number;
+}): ProfitRecord {
+  const database = getConnection();
+  const id = randomUUID();
+
+  // Decimal.js로 정밀한 금융 계산
+  const buyAmount = new Decimal(data.buyPrice)
+    .mul(data.buyQuantity)
+    .toDecimalPlaces(2, Decimal.ROUND_DOWN)
+    .toNumber();
+
+  const sellAmount = new Decimal(data.sellPrice)
+    .mul(data.buyQuantity)
+    .toDecimalPlaces(2, Decimal.ROUND_DOWN)
+    .toNumber();
+
+  const profit = new Decimal(sellAmount)
+    .minus(buyAmount)
+    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+    .toNumber();
+
+  // 수익률 계산: (매도금액 - 매수금액) / 매수금액 * 100
+  const profitRate = new Decimal(profit)
+    .div(buyAmount)
+    .mul(100)
+    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+    .toNumber();
+
+  const stmt = database.prepare(INSERT_PROFIT_RECORD);
+  stmt.run(
+    id,
+    data.accountId,
+    data.tier,
+    data.ticker,
+    data.strategy,
+    data.buyDate,
+    data.buyPrice,
+    data.buyQuantity,
+    data.sellDate,
+    data.sellPrice,
+    buyAmount,
+    sellAmount,
+    profit,
+    profitRate
+  );
+
+  return {
+    id,
+    accountId: data.accountId,
+    tier: data.tier,
+    ticker: data.ticker,
+    strategy: data.strategy,
+    buyDate: data.buyDate,
+    buyPrice: data.buyPrice,
+    buyQuantity: data.buyQuantity,
+    sellDate: data.sellDate,
+    sellPrice: data.sellPrice,
+    buyAmount,
+    sellAmount,
+    profit,
+    profitRate,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 계좌의 모든 수익 기록 조회
+ */
+export function getProfitRecords(accountId: string): ProfitRecord[] {
+  const database = getConnection();
+  const stmt = database.prepare(SELECT_PROFIT_RECORDS_BY_ACCOUNT);
+  const rows = stmt.all(accountId) as ProfitRecordRow[];
+  return rows.map(mapProfitRecordRow);
+}
+
+/**
+ * 수익 기록을 월별로 그룹화하여 요약 생성
+ */
+export function groupProfitsByMonth(accountId: string): ProfitStatusResponse {
+  const records = getProfitRecords(accountId);
+
+  // 월별로 그룹화
+  const monthlyMap = new Map<string, ProfitRecord[]>();
+
+  for (const record of records) {
+    // YYYY-MM-DD에서 YYYY-MM 추출
+    const yearMonth = record.sellDate.substring(0, 7);
+    if (!monthlyMap.has(yearMonth)) {
+      monthlyMap.set(yearMonth, []);
+    }
+    monthlyMap.get(yearMonth)!.push(record);
+  }
+
+  // 월별 요약 생성 (최신 월 우선)
+  const months: MonthlyProfitSummary[] = [];
+  const sortedMonths = Array.from(monthlyMap.keys()).sort().reverse();
+
+  for (const yearMonth of sortedMonths) {
+    const monthRecords = monthlyMap.get(yearMonth)!;
+
+    // Decimal.js로 집계
+    let totalBuyAmount = new Decimal(0);
+    let totalSellAmount = new Decimal(0);
+    let totalProfit = new Decimal(0);
+
+    for (const record of monthRecords) {
+      totalBuyAmount = totalBuyAmount.plus(record.buyAmount);
+      totalSellAmount = totalSellAmount.plus(record.sellAmount);
+      totalProfit = totalProfit.plus(record.profit);
+    }
+
+    // 평균 수익률: 총수익 / 총매수금액 * 100
+    const averageProfitRate = totalBuyAmount.isZero()
+      ? 0
+      : totalProfit
+          .div(totalBuyAmount)
+          .mul(100)
+          .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+          .toNumber();
+
+    months.push({
+      yearMonth,
+      records: monthRecords,
+      totalTrades: monthRecords.length,
+      totalBuyAmount: totalBuyAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      totalSellAmount: totalSellAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      totalProfit: totalProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      averageProfitRate,
+    });
+  }
+
+  // 전체 총계 계산
+  let grandTotalBuyAmount = new Decimal(0);
+  let grandTotalSellAmount = new Decimal(0);
+  let grandTotalProfit = new Decimal(0);
+  let grandTotalTrades = 0;
+
+  for (const month of months) {
+    grandTotalBuyAmount = grandTotalBuyAmount.plus(month.totalBuyAmount);
+    grandTotalSellAmount = grandTotalSellAmount.plus(month.totalSellAmount);
+    grandTotalProfit = grandTotalProfit.plus(month.totalProfit);
+    grandTotalTrades += month.totalTrades;
+  }
+
+  const grandAverageProfitRate = grandTotalBuyAmount.isZero()
+    ? 0
+    : grandTotalProfit
+        .div(grandTotalBuyAmount)
+        .mul(100)
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .toNumber();
+
+  return {
+    accountId,
+    months,
+    grandTotal: {
+      totalTrades: grandTotalTrades,
+      totalBuyAmount: grandTotalBuyAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      totalSellAmount: grandTotalSellAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      totalProfit: grandTotalProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      averageProfitRate: grandAverageProfitRate,
+    },
+  };
 }
