@@ -58,7 +58,7 @@ function MonthSection({ summary, isExpanded, onToggle }: MonthSectionProps): Rea
         role="button"
         aria-expanded={isExpanded}
       >
-        <i className={`bi bi-caret-${isExpanded ? "down" : "right"}-fill me-2 text-secondary`}></i>
+        <span className="me-2 text-secondary">{isExpanded ? "▼" : "▶"}</span>
         <span className="text-secondary">{summary.yearMonth} 상세 내역</span>
       </div>
 
