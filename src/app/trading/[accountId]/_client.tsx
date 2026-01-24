@@ -36,6 +36,45 @@ function getTodayLocal(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+interface AssetValues {
+  totalAssets: number;
+  totalShares: number;
+  stockValue: number;
+  cashBalance: number;
+  profitRate: number;
+}
+
+/**
+ * 자산 가치 계산
+ * - 투자 금액은 보유 수량 × 매수가의 합계
+ * - 현재가 데이터가 없으므로 매수가를 기준으로 평가 (수익률 0%)
+ */
+function calculateAssetValues(account: TradingAccountWithHoldings): AssetValues {
+  const totalShares = account.totalShares;
+
+  // 투자 금액 계산 (각 티어의 보유수량 × 매수가 합계)
+  let investedAmount = 0;
+  for (const holding of account.holdings) {
+    if (holding.shares > 0 && holding.buyPrice) {
+      investedAmount += holding.shares * holding.buyPrice;
+    }
+  }
+
+  // 매수가 기준 평가 (실시간 시세 연동 전까지 수익률 0%)
+  const stockValue = investedAmount;
+  const cashBalance = account.seedCapital - investedAmount;
+  const totalAssets = cashBalance + stockValue;
+  const profitRate = investedAmount > 0 ? ((stockValue - investedAmount) / investedAmount) * 100 : 0;
+
+  return {
+    totalAssets,
+    totalShares,
+    stockValue,
+    cashBalance,
+    profitRate,
+  };
+}
+
 export default function TradingDetailClient({
   accountId,
 }: TradingDetailClientProps): React.ReactElement {
@@ -112,42 +151,6 @@ export default function TradingDetailClient({
     } finally {
       setIsSaving(false);
     }
-  }
-
-  // Calculate asset values
-  function calculateAssetValues(acc: TradingAccountWithHoldings): {
-    totalAssets: number;
-    totalShares: number;
-    stockValue: number;
-    cashBalance: number;
-    profitRate: number;
-  } {
-    const totalShares = acc.totalShares;
-
-    // Calculate invested amount (sum of shares × buyPrice for each holding)
-    let investedAmount = 0;
-    for (const holding of acc.holdings) {
-      if (holding.shares > 0 && holding.buyPrice) {
-        investedAmount += holding.shares * holding.buyPrice;
-      }
-    }
-
-    // Use invested amount as stock value (buyPrice as proxy for current price)
-    // This shows 0% profit rate until we have real-time price data
-    // When real-time prices are available, replace with: shares × currentPrice
-    const stockValue = investedAmount;
-
-    const cashBalance = acc.seedCapital - investedAmount;
-    const totalAssets = cashBalance + stockValue;
-    const profitRate = investedAmount > 0 ? ((stockValue - investedAmount) / investedAmount) * 100 : 0;
-
-    return {
-      totalAssets,
-      totalShares,
-      stockValue,
-      cashBalance,
-      profitRate,
-    };
   }
 
   if (isLoading) {

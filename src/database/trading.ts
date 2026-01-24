@@ -26,6 +26,11 @@ import {
   SELL_THRESHOLDS,
   STOP_LOSS_DAYS,
 } from "@/types/trading";
+
+// 티어 관련 상수
+const BASE_TIER_COUNT = 6;
+const RESERVE_TIER_NUMBER = 7;
+
 import {
   calculateBuyLimitPrice,
   calculateSellLimitPrice,
@@ -594,10 +599,6 @@ export function generateDailyOrders(
  * 티어 1-6이 모두 활성화되고 예수금이 있으면 티어 7(예비) 반환
  */
 function getNextBuyTier(holdings: TierHolding[]): number | null {
-  const BASE_TIER_COUNT = 6;
-  const RESERVE_TIER_NUMBER = 7;
-
-  // 보유 중인 티어 Set
   const activeTiers = new Set(holdings.filter((h) => h.shares > 0).map((h) => h.tier));
 
   // 티어 1-6 중 가장 낮은 빈 티어 찾기
