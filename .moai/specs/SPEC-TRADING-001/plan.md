@@ -98,19 +98,19 @@ export async function GET(request: Request, { params }: RouteParams) {
   // ... 인증 및 계좌 확인 ...
 
   // [NEW] 이전 거래일 미체결 주문 체결 처리
-  const prevExecutionResults = processPreviousDayExecution(
+  const prevExecutionResults = await processPreviousDayExecution(
     id,
     date,
     account.ticker
   );
 
   // 기존 주문 조회 (체결 처리 후)
-  let orders = getDailyOrders(id, date);
+  let orders = await getDailyOrders(id, date);
 
   // 주문이 없으면 자동 생성 (업데이트된 holdings 기반)
   if (orders.length === 0) {
-    const holdings = getTierHoldings(id); // 체결로 업데이트된 holdings
-    orders = generateDailyOrders(...);
+    const holdings = await getTierHoldings(id); // 체결로 업데이트된 holdings
+    orders = await generateDailyOrders(...);
   }
 
   return NextResponse.json({
@@ -129,21 +129,21 @@ export async function GET(request: Request, { params }: RouteParams) {
 /**
  * 이전 거래일 미체결 주문 체결 처리
  */
-export function processPreviousDayExecution(
+export async function processPreviousDayExecution(
   accountId: string,
   currentDate: string,
   ticker: Ticker
-): ExecutionResult[] {
+): Promise<ExecutionResult[]> {
   const prevDate = getPreviousTradingDate(currentDate);
 
   // 종가 데이터 확인
-  const closePrice = getClosingPrice(ticker, prevDate);
+  const closePrice = await getClosingPrice(ticker, prevDate);
   if (!closePrice) {
     return [];
   }
 
   // 이전 거래일 미체결 주문 확인
-  const orders = getDailyOrders(accountId, prevDate);
+  const orders = await getDailyOrders(accountId, prevDate);
   const hasUnexecutedOrders = orders.some(o => !o.executed);
 
   if (!hasUnexecutedOrders) {
@@ -151,7 +151,7 @@ export function processPreviousDayExecution(
   }
 
   // 체결 처리
-  return processOrderExecution(accountId, prevDate, ticker);
+  return await processOrderExecution(accountId, prevDate, ticker);
 }
 ```
 
