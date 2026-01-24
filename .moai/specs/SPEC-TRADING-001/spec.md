@@ -6,7 +6,7 @@
 |------|------|
 | **SPEC ID** | SPEC-TRADING-001 |
 | **제목** | 트레이딩 주문 체결 로직 및 보유 현황 표시 수정 |
-| **상태** | Planned |
+| **상태** | Completed |
 | **우선순위** | High |
 | **생성일** | 2026-01-24 |
 | **라이프사이클** | spec-anchored |
@@ -310,3 +310,4 @@ function processPreviousDayExecution(
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |------|------|--------|----------|
 | 1.0 | 2026-01-24 | manager-spec | 초기 SPEC 작성 |
+| 1.1 | 2026-01-24 | manager-docs | 구현 완료 - 상태를 Completed로 변경 |
