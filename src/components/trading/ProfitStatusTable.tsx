@@ -35,16 +35,6 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function formatYearMonth(yearMonth: string): string {
-  const [year, month] = yearMonth.split("-");
-  return `${year}년 ${parseInt(month, 10)}월`;
-}
-
-function getTierLabel(tier: number): string {
-  if (tier === 7) return "예비";
-  return `${tier}`;
-}
-
 function getProfitColorClass(profit: number): string {
   if (profit > 0) return "text-success";
   if (profit < 0) return "text-danger";
@@ -59,87 +49,64 @@ interface MonthSectionProps {
 
 function MonthSection({ summary, isExpanded, onToggle }: MonthSectionProps): React.ReactElement {
   return (
-    <div className="mb-3">
-      {/* Month Header (Collapsible) */}
-      <button
-        type="button"
-        className="btn btn-dark w-100 text-start d-flex justify-content-between align-items-center border-secondary"
+    <div className="mb-2">
+      {/* Month Header (Clickable Toggle) */}
+      <div
+        className="d-flex align-items-center py-2 px-3 border-bottom border-secondary"
+        style={{ cursor: "pointer" }}
         onClick={onToggle}
+        role="button"
         aria-expanded={isExpanded}
       >
-        <span className="fw-bold">{formatYearMonth(summary.yearMonth)}</span>
-        <div className="d-flex align-items-center gap-3">
-          <span className="text-secondary small">
-            {summary.totalTrades}건
-          </span>
-          <span className={`fw-bold ${getProfitColorClass(summary.totalProfit)}`}>
-            {formatCurrency(summary.totalProfit)}
-          </span>
-          <span className={`small ${getProfitColorClass(summary.averageProfitRate)}`}>
-            ({formatPercent(summary.averageProfitRate)})
-          </span>
-          <i className={`bi bi-chevron-${isExpanded ? "up" : "down"}`}></i>
-        </div>
-      </button>
+        <i className={`bi bi-caret-${isExpanded ? "down" : "right"}-fill me-2 text-secondary`}></i>
+        <span className="text-secondary">{summary.yearMonth} 상세 내역</span>
+      </div>
 
-      {/* Month Details (Collapsible Content) */}
+      {/* Expanded: Show detail records */}
       {isExpanded && (
-        <div className="border border-secondary border-top-0 rounded-bottom">
-          <div className="table-responsive">
-            <table className="table table-dark table-striped table-hover mb-0 small">
-              <thead>
-                <tr>
-                  <th className="text-center">티어</th>
-                  <th className="text-center">매수일</th>
-                  <th className="text-end">매수가</th>
-                  <th className="text-center">매도일</th>
-                  <th className="text-end">매도가</th>
-                  <th className="text-end">수량</th>
-                  <th className="text-end">매수금액</th>
-                  <th className="text-end">매도금액</th>
-                  <th className="text-end">수익</th>
-                  <th className="text-end">수익률</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.records.map((record: ProfitRecord) => (
-                  <tr key={record.id}>
-                    <td className="text-center">
-                      <span className="badge bg-secondary">{getTierLabel(record.tier)}</span>
-                    </td>
-                    <td className="text-center">{formatDate(record.buyDate)}</td>
-                    <td className="text-end">{formatCurrency(record.buyPrice)}</td>
-                    <td className="text-center">{formatDate(record.sellDate)}</td>
-                    <td className="text-end">{formatCurrency(record.sellPrice)}</td>
-                    <td className="text-end">{record.buyQuantity.toLocaleString()}</td>
-                    <td className="text-end">{formatCurrency(record.buyAmount)}</td>
-                    <td className="text-end">{formatCurrency(record.sellAmount)}</td>
-                    <td className={`text-end fw-bold ${getProfitColorClass(record.profit)}`}>
-                      {formatCurrency(record.profit)}
-                    </td>
-                    <td className={`text-end ${getProfitColorClass(record.profitRate)}`}>
-                      {formatPercent(record.profitRate)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-top">
-                <tr className="fw-bold">
-                  <td colSpan={6} className="text-end">월 합계</td>
-                  <td className="text-end">{formatCurrency(summary.totalBuyAmount)}</td>
-                  <td className="text-end">{formatCurrency(summary.totalSellAmount)}</td>
-                  <td className={`text-end ${getProfitColorClass(summary.totalProfit)}`}>
-                    {formatCurrency(summary.totalProfit)}
+        <div className="table-responsive">
+          <table className="table table-dark table-hover mb-0 small">
+            <tbody>
+              {summary.records.map((record: ProfitRecord) => (
+                <tr key={record.id}>
+                  <td className="text-center" style={{ width: "120px" }}>{formatDate(record.sellDate)}</td>
+                  <td className="text-center" style={{ width: "80px" }}>
+                    <span className="badge bg-secondary">{record.strategy}</span>
                   </td>
-                  <td className={`text-end ${getProfitColorClass(summary.averageProfitRate)}`}>
-                    {formatPercent(summary.averageProfitRate)}
+                  <td className="text-end" style={{ width: "120px" }}>{formatCurrency(record.buyAmount)}</td>
+                  <td className={`text-end fw-bold ${getProfitColorClass(record.profit)}`} style={{ width: "140px" }}>
+                    {formatCurrency(record.profit)}
+                  </td>
+                  <td className={`text-end ${getProfitColorClass(record.profitRate)}`} style={{ width: "100px" }}>
+                    {formatPercent(record.profitRate)}
                   </td>
                 </tr>
-              </tfoot>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
+
+      {/* Subtotal Row (Always visible) */}
+      <div className="table-responsive">
+        <table className="table table-dark mb-0 small" style={{ backgroundColor: "#3a5a5a" }}>
+          <tbody>
+            <tr style={{ backgroundColor: "#3a5a5a" }}>
+              <td className="text-center fw-bold text-info" style={{ width: "120px" }}>
+                {summary.yearMonth} 소계
+              </td>
+              <td style={{ width: "80px" }}></td>
+              <td className="text-end fw-bold" style={{ width: "120px" }}>{formatCurrency(summary.totalBuyAmount)}</td>
+              <td className={`text-end fw-bold ${getProfitColorClass(summary.totalProfit)}`} style={{ width: "140px" }}>
+                {formatCurrency(summary.totalProfit)}
+              </td>
+              <td className={`text-end fw-bold ${getProfitColorClass(summary.averageProfitRate)}`} style={{ width: "100px" }}>
+                {formatPercent(summary.averageProfitRate)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
