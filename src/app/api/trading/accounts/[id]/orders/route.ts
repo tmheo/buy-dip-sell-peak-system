@@ -13,6 +13,7 @@ import {
   generateDailyOrders,
   processOrderExecution,
   deleteDailyOrders,
+  processHistoricalOrders,
 } from "@/database/trading";
 
 interface RouteParams {
@@ -52,12 +53,25 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  // regenerate 옵션이면 기존 주문 삭제
-  if (regenerate) {
+  // [REQ-001] 사이클 시작일부터 어제까지의 모든 주문 처리
+  // - 각 거래일에 대해 주문 생성 및 체결 조건 확인
+  // - 체결 결과에 따라 holdings 업데이트
+  const executedPreviousOrders = processHistoricalOrders(
+    id,
+    account.cycleStartDate,
+    date,
+    account.ticker,
+    account.strategy,
+    account.seedCapital
+  );
+
+  // 이전 거래일 체결이 발생했으면 오늘 주문 재생성 필요 (holdings가 변경됨)
+  // regenerate 옵션이 있어도 마찬가지로 삭제
+  if (executedPreviousOrders.length > 0 || regenerate) {
     deleteDailyOrders(id, date);
   }
 
-  // 기존 주문 조회
+  // 기존 주문 조회 (체결 처리로 업데이트된 holdings 기반)
   let orders = getDailyOrders(id, date);
 
   // 계좌 설정 변경 감지: 미체결 주문이 있고, 계좌가 주문 생성 이후 수정되었으면 재생성
@@ -91,6 +105,7 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   return NextResponse.json({
     date,
     orders,
+    executedPreviousOrders, // [REQ-001] 이전 거래일 체결 결과
   });
 }
 

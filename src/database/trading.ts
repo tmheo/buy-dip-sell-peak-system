@@ -26,6 +26,11 @@ import {
   SELL_THRESHOLDS,
   STOP_LOSS_DAYS,
 } from "@/types/trading";
+
+// 티어 관련 상수
+const BASE_TIER_COUNT = 6;
+const RESERVE_TIER_NUMBER = 7;
+
 import {
   calculateBuyLimitPrice,
   calculateSellLimitPrice,
@@ -594,10 +599,6 @@ export function generateDailyOrders(
  * 티어 1-6이 모두 활성화되고 예수금이 있으면 티어 7(예비) 반환
  */
 function getNextBuyTier(holdings: TierHolding[]): number | null {
-  const BASE_TIER_COUNT = 6;
-  const RESERVE_TIER_NUMBER = 7;
-
-  // 보유 중인 티어 Set
   const activeTiers = new Set(holdings.filter((h) => h.shares > 0).map((h) => h.tier));
 
   // 티어 1-6 중 가장 낮은 빈 티어 찾기
@@ -733,4 +734,125 @@ function getAccountStrategy(accountId: string): Strategy {
     throw new Error(`Account not found: ${accountId}`);
   }
   return result.strategy as Strategy;
+}
+
+/**
+ * 이전 거래일 미체결 주문 체결 처리
+ * REQ-001: 오늘 주문 조회 시 이전 거래일 미체결 주문 자동 체결
+ * CON-001: 종가 데이터가 없으면 체결하지 않음
+ * CON-002: 이미 체결된 주문은 다시 체결하지 않음 (processOrderExecution에서 처리)
+ *
+ * @param accountId - 계좌 ID
+ * @param currentDate - 현재 날짜 (YYYY-MM-DD)
+ * @param ticker - 종목
+ * @returns 체결 결과 목록
+ */
+export function processPreviousDayExecution(
+  accountId: string,
+  currentDate: string,
+  ticker: Ticker
+): ExecutionResult[] {
+  // 1. 이전 거래일 계산 (주말 제외)
+  const prevDate = getPreviousTradingDate(currentDate);
+
+  // 2. 이전 거래일 종가 확인 (CON-001 준수: 종가 없으면 체결 불가)
+  const closePrice = getClosingPrice(ticker, prevDate);
+  if (!closePrice) {
+    return [];
+  }
+
+  // 3. 이전 거래일 미체결 주문 조회
+  const orders = getDailyOrders(accountId, prevDate);
+  const hasUnexecutedOrders = orders.some((o) => !o.executed);
+
+  if (!hasUnexecutedOrders) {
+    return [];
+  }
+
+  // 4. 체결 처리 (기존 함수 재사용, CON-002 준수: 이미 체결된 주문은 스킵됨)
+  return processOrderExecution(accountId, prevDate, ticker);
+}
+
+/**
+ * 사이클 시작일부터 어제까지의 모든 주문을 순차적으로 처리
+ * - 각 거래일에 대해 주문이 없으면 생성하고, 체결 조건을 확인하여 처리
+ * - 체결 결과에 따라 holdings가 업데이트되므로 순차 처리 필수
+ *
+ * @param accountId - 계좌 ID
+ * @param cycleStartDate - 사이클 시작일 (YYYY-MM-DD)
+ * @param currentDate - 현재 날짜 (YYYY-MM-DD)
+ * @param ticker - 종목
+ * @param strategy - 전략
+ * @param seedCapital - 시드 캐피털
+ * @returns 전체 체결 결과 목록
+ */
+export function processHistoricalOrders(
+  accountId: string,
+  cycleStartDate: string,
+  currentDate: string,
+  ticker: Ticker,
+  strategy: Strategy,
+  seedCapital: number
+): ExecutionResult[] {
+  const allResults: ExecutionResult[] = [];
+
+  // 사이클 시작일부터 어제까지의 모든 거래일 순회
+  let processingDate = cycleStartDate;
+  const yesterday = getPreviousTradingDate(currentDate);
+
+  // 종료 조건: processingDate > yesterday
+  while (processingDate <= yesterday) {
+    // 1. 해당 날짜의 종가 확인
+    const closePrice = getClosingPrice(ticker, processingDate);
+
+    if (closePrice) {
+      // 2. 해당 날짜의 주문 조회
+      let orders = getDailyOrders(accountId, processingDate);
+
+      // 3. 주문이 없으면 생성 (현재 holdings 상태 기준)
+      if (orders.length === 0) {
+        const holdings = getTierHoldings(accountId);
+        orders = generateDailyOrders(
+          accountId,
+          processingDate,
+          ticker,
+          strategy,
+          seedCapital,
+          holdings
+        );
+      }
+
+      // 4. 미체결 주문이 있으면 체결 처리
+      const hasUnexecutedOrders = orders.some((o) => !o.executed);
+      if (hasUnexecutedOrders) {
+        const results = processOrderExecution(accountId, processingDate, ticker);
+        allResults.push(...results);
+      }
+    }
+
+    // 5. 다음 거래일로 이동
+    processingDate = getNextTradingDate(processingDate);
+  }
+
+  return allResults;
+}
+
+/**
+ * 다음 거래일 계산 (주말 제외)
+ */
+function getNextTradingDate(date: string): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setDate(d.getDate() + 1);
+
+  // 주말이면 월요일로 이동
+  const dayOfWeek = d.getUTCDay();
+  if (dayOfWeek === 0) {
+    // Sunday -> Monday
+    d.setDate(d.getDate() + 1);
+  } else if (dayOfWeek === 6) {
+    // Saturday -> Monday
+    d.setDate(d.getDate() + 2);
+  }
+
+  return d.toISOString().split("T")[0];
 }
