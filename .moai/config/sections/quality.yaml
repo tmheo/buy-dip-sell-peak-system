@@ -25,6 +25,48 @@ constitution:
     characterization_tests: true
     behavior_snapshots: true
     max_transformation_size: small
+  lsp_quality_gates:
+    enabled: true
+    plan:
+      require_baseline: true
+    run:
+      max_errors: 0
+      max_type_errors: 0
+      max_lint_errors: 0
+      allow_regression: false
+    sync:
+      max_errors: 0
+      max_warnings: 10
+      require_clean_lsp: true
+    cache_ttl_seconds: 5
+    timeout_seconds: 3
+  lsp_integration:
+    truct5_integration:
+      tested:
+      - unit_tests_pass
+      - lsp_type_errors == 0
+      - lsp_errors == 0
+      readable:
+      - naming_conventions_followed
+      - lsp_lint_errors == 0
+      understandable:
+      - documentation_complete
+      - code_complexity_acceptable
+      - lsp_warnings < threshold
+      secured:
+      - security_scan_pass
+      - lsp_security_warnings == 0
+      trackable:
+      - logs_structured
+      - lsp_diagnostic_history_tracked
+    diagnostic_sources:
+    - typecheck
+    - lint
+    - security
+    regression_detection:
+      error_increase_threshold: 0
+      warning_increase_threshold: 10
+      type_error_increase_threshold: 0
 report_generation:
   enabled: true
   auto_create: false
@@ -35,3 +77,17 @@ tag_validation:
   mode: warn
   check_spec_exists: true
   max_tags_per_file: 100
+lsp_state_tracking:
+  enabled: true
+  capture_points:
+  - phase_start
+  - post_transformation
+  - pre_sync
+  comparison:
+    baseline: phase_start
+    regression_threshold: 0
+  logging:
+    log_lsp_state_changes: true
+    log_regression_detection: true
+    log_completion_markers: true
+    include_lsp_in_reports: true

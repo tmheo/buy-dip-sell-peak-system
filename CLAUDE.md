@@ -292,6 +292,156 @@ manager-ddd는 동작 보존 초점의 새로운 기능 생성, 기존 코드 �
 
 시행: 전문 지식이 필요할 때, Alfred는 최적의 결과를 위해 해당 에이전트를 호출해야 합니다.
 
+### LSP 품질 게이트
+
+MoAI-ADK는 자동화된 코드 품질 검증을 위한 LSP 기반 품질 게이트를 구현합니다:
+
+**단계별 임계값:**
+
+- **plan**: 단계 시작 시 LSP 베이스라인 캡처
+- **run**: 0 오류, 0 타입 오류, 0 린트 오류 필요; 베이스라인에서의 회귀 불가
+- **sync**: 0 오류, 최대 10 경고, sync/PR 전 깨끗한 LSP 필요
+
+**LSP 상태 추적:**
+
+- 캡처 지점: phase_start, post_transformation, pre_sync
+- 베이스라인 비교: phase_start를 베이스라인으로 사용
+- 회귀 임계값: 오류 증가는 회귀로 간주
+- 로깅: 상태 변경, 회귀 감지, 완료 마커 추적
+
+**구성:** # Quality & Constitution Settings
+# TRUST 5 Framework: Tested, Readable, Unified, Secured, Trackable
+
+constitution:
+  # Development methodology - DDD only
+  development_mode: ddd
+  # ddd: Domain-Driven Development (ANALYZE-PRESERVE-IMPROVE)
+  # - Refactoring with behavior preservation
+  # - Characterization tests for legacy code
+  # - Incremental improvements
+
+  # TRUST 5 quality framework enforcement
+  enforce_quality: true # Enable TRUST 5 quality principles
+  test_coverage_target: 85 # Target: 85% coverage for AI-assisted development
+
+  # DDD settings (Domain-Driven Development)
+  ddd_settings:
+    require_existing_tests: true # Require existing tests before refactoring
+    characterization_tests: true # Create characterization tests for uncovered code
+    behavior_snapshots: true # Use snapshot testing for complex outputs
+    max_transformation_size: small # small | medium | large - controls change granularity
+
+  # Coverage exemptions (discouraged - use sparingly with justification)
+  coverage_exemptions:
+    enabled: false # Allow coverage exemptions (default: false)
+    require_justification: true # Require justification for exemptions
+    max_exempt_percentage: 5 # Maximum 5% of codebase can be exempted
+
+  # Test quality criteria (Quality > Numbers principle)
+  test_quality:
+    specification_based: true # Tests must verify specified behavior
+    meaningful_assertions: true # Assertions must have clear purpose
+    avoid_implementation_coupling: true # Tests should not couple to implementation details
+    mutation_testing_enabled: false # Optional: mutation testing for effectiveness validation
+
+  # LSP quality gates (Ralph-style autonomous workflow)
+  lsp_quality_gates:
+    enabled: true # Enable LSP-based quality gates
+
+    # Phase-specific LSP thresholds
+    plan:
+      require_baseline: true # Capture LSP baseline at plan phase start
+
+    run:
+      max_errors: 0 # Zero LSP errors required for run phase completion
+      max_type_errors: 0 # Zero type errors required
+      max_lint_errors: 0 # Zero lint errors required
+      allow_regression: false # Regression from baseline not allowed
+
+    sync:
+      max_errors: 0 # Zero errors required before sync/PR
+      max_warnings: 10 # Allow some warnings for documentation
+      require_clean_lsp: true # LSP must be clean for sync
+
+    # LSP diagnostic caching and timeout
+    cache_ttl_seconds: 5 # Cache LSP diagnostics for 5 seconds
+    timeout_seconds: 3 # Timeout for LSP diagnostic fetch
+
+  # Simplicity principles (separate from TRUST 5)
+  principles:
+    simplicity:
+      max_parallel_tasks: 10 # Maximum parallel operations for focus (NOT concurrent projects)
+
+  # LSP integration with TRUST 5
+  lsp_integration:
+    # LSP as quality indicator for each TRUST 5 pillar
+    truct5_integration:
+      tested:
+        - unit_tests_pass
+        - lsp_type_errors == 0 # Type safety verified
+        - lsp_errors == 0 # No diagnostic errors
+
+      readable:
+        - naming_conventions_followed
+        - lsp_lint_errors == 0 # Linting clean
+
+      understandable:
+        - documentation_complete
+        - code_complexity_acceptable
+        - lsp_warnings < threshold # Warning threshold met
+
+      secured:
+        - security_scan_pass
+        - lsp_security_warnings == 0 # Security linting clean
+
+      trackable:
+        - logs_structured
+        - lsp_diagnostic_history_tracked # LSP state changes logged
+
+    # LSP diagnostic sources to monitor
+    diagnostic_sources:
+      - typecheck # Type checkers (pyright, mypy, tsc)
+      - lint # Linters (ruff, eslint, golangci-lint)
+      - security # Security scanners (bandit, semgrep)
+
+    # Regression detection thresholds
+    regression_detection:
+      error_increase_threshold: 0 # Any error increase is regression
+      warning_increase_threshold: 10 # Allow 10% warning increase
+      type_error_increase_threshold: 0 # Type error regressions not allowed
+
+report_generation:
+  enabled: true # Enable report generation
+  auto_create: false # Auto-create full reports (false = minimal)
+  warn_user: true # Ask before generating reports
+  user_choice: Minimal # Default: Minimal, Full, None
+
+# LSP Diagnostic State Tracking
+lsp_state_tracking:
+  # Track LSP state changes throughout workflow
+  enabled: true
+
+  # State capture points
+  capture_points:
+    - phase_start # Capture at start of each workflow phase
+    - post_transformation # Capture after each code transformation
+    - pre_sync # Capture before sync phase
+
+  # State comparison
+  comparison:
+    baseline: phase_start # Use phase start as baseline
+    regression_threshold: 0 # Any increase in errors is regression
+
+  # Logging and observability
+  logging:
+    log_lsp_state_changes: true
+    log_regression_detection: true
+    log_completion_markers: true
+    include_lsp_in_reports: true
+ (lsp_quality_gates, lsp_state_tracking)
+
+**구현:** .claude/hooks/moai/quality_gate_with_lsp.py (289줄, Ralph 스타일 자율 워크플로우)
+
 ---
 
 ## 7. 사용자 상호작용 아키텍처
