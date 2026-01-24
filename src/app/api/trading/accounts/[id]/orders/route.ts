@@ -13,7 +13,7 @@ import {
   generateDailyOrders,
   processOrderExecution,
   deleteDailyOrders,
-  processPreviousDayExecution,
+  processHistoricalOrders,
 } from "@/database/trading";
 
 interface RouteParams {
@@ -53,9 +53,17 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  // [REQ-001] 이전 거래일 미체결 주문 체결 처리
-  // 오늘 주문 조회 전에 이전 거래일의 미체결 주문을 먼저 체결 처리
-  const executedPreviousOrders = processPreviousDayExecution(id, date, account.ticker);
+  // [REQ-001] 사이클 시작일부터 어제까지의 모든 주문 처리
+  // - 각 거래일에 대해 주문 생성 및 체결 조건 확인
+  // - 체결 결과에 따라 holdings 업데이트
+  const executedPreviousOrders = processHistoricalOrders(
+    id,
+    account.cycleStartDate,
+    date,
+    account.ticker,
+    account.strategy,
+    account.seedCapital
+  );
 
   // 이전 거래일 체결이 발생했으면 오늘 주문 재생성 필요 (holdings가 변경됨)
   // regenerate 옵션이 있어도 마찬가지로 삭제

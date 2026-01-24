@@ -771,3 +771,87 @@ export function processPreviousDayExecution(
   // 4. 체결 처리 (기존 함수 재사용, CON-002 준수: 이미 체결된 주문은 스킵됨)
   return processOrderExecution(accountId, prevDate, ticker);
 }
+
+/**
+ * 사이클 시작일부터 어제까지의 모든 주문을 순차적으로 처리
+ * - 각 거래일에 대해 주문이 없으면 생성하고, 체결 조건을 확인하여 처리
+ * - 체결 결과에 따라 holdings가 업데이트되므로 순차 처리 필수
+ *
+ * @param accountId - 계좌 ID
+ * @param cycleStartDate - 사이클 시작일 (YYYY-MM-DD)
+ * @param currentDate - 현재 날짜 (YYYY-MM-DD)
+ * @param ticker - 종목
+ * @param strategy - 전략
+ * @param seedCapital - 시드 캐피털
+ * @returns 전체 체결 결과 목록
+ */
+export function processHistoricalOrders(
+  accountId: string,
+  cycleStartDate: string,
+  currentDate: string,
+  ticker: Ticker,
+  strategy: Strategy,
+  seedCapital: number
+): ExecutionResult[] {
+  const allResults: ExecutionResult[] = [];
+
+  // 사이클 시작일부터 어제까지의 모든 거래일 순회
+  let processingDate = cycleStartDate;
+  const yesterday = getPreviousTradingDate(currentDate);
+
+  // 종료 조건: processingDate > yesterday
+  while (processingDate <= yesterday) {
+    // 1. 해당 날짜의 종가 확인
+    const closePrice = getClosingPrice(ticker, processingDate);
+
+    if (closePrice) {
+      // 2. 해당 날짜의 주문 조회
+      let orders = getDailyOrders(accountId, processingDate);
+
+      // 3. 주문이 없으면 생성 (현재 holdings 상태 기준)
+      if (orders.length === 0) {
+        const holdings = getTierHoldings(accountId);
+        orders = generateDailyOrders(
+          accountId,
+          processingDate,
+          ticker,
+          strategy,
+          seedCapital,
+          holdings
+        );
+      }
+
+      // 4. 미체결 주문이 있으면 체결 처리
+      const hasUnexecutedOrders = orders.some((o) => !o.executed);
+      if (hasUnexecutedOrders) {
+        const results = processOrderExecution(accountId, processingDate, ticker);
+        allResults.push(...results);
+      }
+    }
+
+    // 5. 다음 거래일로 이동
+    processingDate = getNextTradingDate(processingDate);
+  }
+
+  return allResults;
+}
+
+/**
+ * 다음 거래일 계산 (주말 제외)
+ */
+function getNextTradingDate(date: string): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setDate(d.getDate() + 1);
+
+  // 주말이면 월요일로 이동
+  const dayOfWeek = d.getUTCDay();
+  if (dayOfWeek === 0) {
+    // Sunday -> Monday
+    d.setDate(d.getDate() + 1);
+  } else if (dayOfWeek === 6) {
+    // Saturday -> Monday
+    d.setDate(d.getDate() + 2);
+  }
+
+  return d.toISOString().split("T")[0];
+}
