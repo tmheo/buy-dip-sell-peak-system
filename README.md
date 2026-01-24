@@ -136,6 +136,7 @@ npx tsx scripts/precompute-recommendations.ts
 | GET/POST | `/api/trading/accounts` | 계좌 CRUD | 필요 |
 | GET | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 | 필요 |
 | GET/POST | `/api/trading/accounts/[id]/orders` | 당일 주문 | 필요 |
+| GET | `/api/trading/accounts/[id]/profits` | 수익 현황 | 필요 |
 
 ---
 
@@ -470,6 +471,7 @@ npx tsx scripts/precompute-recommendations.ts
 - **주문 체결 처리**: 종가 기준 체결 여부 판정 및 티어 업데이트
 - **손절 처리**: 보유일 >= 손절일 시 MOC 주문으로 전량 청산
 - **사이클 보호**: 사이클 진행 중 계좌 설정 변경 방지
+- **수익 현황**: 매도 체결 시 자동 수익 기록 생성 및 월별 조회
 
 #### 주문 유형
 
