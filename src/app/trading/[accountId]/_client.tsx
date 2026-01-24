@@ -13,6 +13,7 @@ import type { UpdateAccountData } from "@/components/trading/AccountSettingsCard
 import AssetSummary from "@/components/trading/AssetSummary";
 import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
+import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
 import type { TradingAccountWithHoldings, DailyOrder } from "@/types/trading";
 
 interface TradingDetailClientProps {
@@ -237,6 +238,9 @@ export default function TradingDetailClient({
         </div>
       )}
       <DailyOrdersTable orders={orders} ticker={account.ticker} date={orderDate} />
+
+      {/* Profit Status Section (SPEC-TRADING-002) */}
+      <ProfitStatusTable accountId={accountId} />
     </div>
   );
 }
