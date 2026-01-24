@@ -1037,9 +1037,9 @@ export function groupProfitsByMonth(accountId: string): ProfitStatusResponse {
     monthlyMap.get(yearMonth)!.push(record);
   }
 
-  // 월별 요약 생성 (최신 월 우선)
+  // 월별 요약 생성 (과거 월 우선)
   const months: MonthlyProfitSummary[] = [];
-  const sortedMonths = Array.from(monthlyMap.keys()).sort().reverse();
+  const sortedMonths = Array.from(monthlyMap.keys()).sort();
 
   for (const yearMonth of sortedMonths) {
     const monthRecords = monthlyMap.get(yearMonth)!;
