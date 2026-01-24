@@ -123,18 +123,19 @@ export default function TradingDetailClient({
     profitRate: number;
   } {
     const totalShares = acc.totalShares;
-    // For now, we use estimated values since we don't have real-time price
-    // In production, this would come from a price API
-    const estimatedPrice = 30; // Placeholder price
-    const stockValue = totalShares * estimatedPrice;
 
-    // Calculate invested amount
+    // Calculate invested amount (sum of shares × buyPrice for each holding)
     let investedAmount = 0;
     for (const holding of acc.holdings) {
       if (holding.shares > 0 && holding.buyPrice) {
         investedAmount += holding.shares * holding.buyPrice;
       }
     }
+
+    // Use invested amount as stock value (buyPrice as proxy for current price)
+    // This shows 0% profit rate until we have real-time price data
+    // When real-time prices are available, replace with: shares × currentPrice
+    const stockValue = investedAmount;
 
     const cashBalance = acc.seedCapital - investedAmount;
     const totalAssets = cashBalance + stockValue;

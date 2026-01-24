@@ -57,8 +57,9 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // 오늘 주문 조회 전에 이전 거래일의 미체결 주문을 먼저 체결 처리
   const executedPreviousOrders = processPreviousDayExecution(id, date, account.ticker);
 
-  // regenerate 옵션이면 기존 주문 삭제
-  if (regenerate) {
+  // 이전 거래일 체결이 발생했으면 오늘 주문 재생성 필요 (holdings가 변경됨)
+  // regenerate 옵션이 있어도 마찬가지로 삭제
+  if (executedPreviousOrders.length > 0 || regenerate) {
     deleteDailyOrders(id, date);
   }
 
