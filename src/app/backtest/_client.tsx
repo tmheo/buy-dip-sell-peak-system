@@ -7,17 +7,12 @@
 import { useState, FormEvent } from "react";
 import dynamic from "next/dynamic";
 import type { BacktestResult, StrategyName } from "@/backtest/types";
+import { getTodayDate, getYearStartDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화 - Recharts는 클라이언트에서만 동작)
 const PriceChart = dynamic(() => import("@/components/backtest/PriceChart"), { ssr: false });
 const MetricsCharts = dynamic(() => import("@/components/backtest/MetricsCharts"), { ssr: false });
 const ProResultCard = dynamic(() => import("@/components/backtest/ProResultCard"), { ssr: false });
-
-// 오늘 날짜를 YYYY-MM-DD 형식으로 반환
-function getTodayDate(): string {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-}
 
 interface BacktestForm {
   startDate: string;
@@ -34,7 +29,7 @@ interface BacktestResults {
 
 export default function BacktestPageClient() {
   const [form, setForm] = useState<BacktestForm>({
-    startDate: "2025-01-01",
+    startDate: getYearStartDate(),
     endDate: getTodayDate(),
     symbol: "SOXL",
     initialCapital: 10000,

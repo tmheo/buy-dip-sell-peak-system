@@ -4,14 +4,15 @@
  * 백테스트 (추천 전략) 페이지 (클라이언트 컴포넌트)
  * 원본 UI와 동일한 레이아웃으로 구현
  */
-import type { FormEvent, ChangeEvent } from "react";
 import { useState } from "react";
 import dynamic from "next/dynamic";
 
+import type { ChangeEvent, FormEvent } from "react";
 import type { RecommendBacktestResult } from "@/backtest-recommend";
 import type { StrategyName } from "@/backtest/types";
+
 import { STRATEGY_COLORS } from "@/backtest";
-import { getTodayDate } from "@/lib/date";
+import { getTodayDate, getYearStartDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화)
 const AssetMddChart = dynamic(
@@ -28,7 +29,7 @@ interface BacktestForm {
 
 export default function BacktestRecommendPageClient() {
   const [form, setForm] = useState<BacktestForm>({
-    startDate: "2025-01-01",
+    startDate: getYearStartDate(),
     endDate: getTodayDate(),
     symbol: "SOXL",
     initialCapital: 10000,
