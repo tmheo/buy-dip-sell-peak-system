@@ -51,28 +51,21 @@ interface AssetValues {
  * - 현재가 데이터가 없으므로 매수가를 기준으로 평가 (수익률 0%)
  */
 function calculateAssetValues(account: TradingAccountWithHoldings): AssetValues {
-  const totalShares = account.totalShares;
-
-  // 투자 금액 계산 (각 티어의 보유수량 × 매수가 합계)
-  let investedAmount = 0;
-  for (const holding of account.holdings) {
+  const investedAmount = account.holdings.reduce((sum, holding) => {
     if (holding.shares > 0 && holding.buyPrice) {
-      investedAmount += holding.shares * holding.buyPrice;
+      return sum + holding.shares * holding.buyPrice;
     }
-  }
+    return sum;
+  }, 0);
 
-  // 매수가 기준 평가 (실시간 시세 연동 전까지 수익률 0%)
-  const stockValue = investedAmount;
   const cashBalance = account.seedCapital - investedAmount;
-  const totalAssets = cashBalance + stockValue;
-  const profitRate = investedAmount > 0 ? ((stockValue - investedAmount) / investedAmount) * 100 : 0;
 
   return {
-    totalAssets,
-    totalShares,
-    stockValue,
+    totalAssets: cashBalance + investedAmount,
+    totalShares: account.totalShares,
+    stockValue: investedAmount,
     cashBalance,
-    profitRate,
+    profitRate: 0, // 실시간 시세 연동 전까지 수익률 0%
   };
 }
 

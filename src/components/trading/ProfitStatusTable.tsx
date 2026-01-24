@@ -13,13 +13,15 @@ interface ProfitStatusTableProps {
   accountId: string;
 }
 
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return currencyFormatter.format(value);
 }
 
 function formatPercent(value: number): string {
@@ -35,9 +37,9 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function getProfitColorClass(profit: number): string {
-  if (profit > 0) return "text-success";
-  if (profit < 0) return "text-danger";
+function getProfitColorClass(value: number): string {
+  if (value > 0) return "text-success";
+  if (value < 0) return "text-danger";
   return "";
 }
 
@@ -121,6 +123,45 @@ function MonthSection({ summary, isExpanded, onToggle }: MonthSectionProps): Rea
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+interface GrandTotalCardProps {
+  grandTotal: ProfitStatusResponse["grandTotal"];
+}
+
+function GrandTotalCard({ grandTotal }: GrandTotalCardProps): React.ReactElement {
+  return (
+    <div className="card bg-secondary bg-opacity-25 border-secondary mt-4">
+      <div className="card-body py-3">
+        <div className="row text-center">
+          <div className="col">
+            <div className="text-secondary small">총 거래</div>
+            <div className="fw-bold text-light">{grandTotal.totalTrades}건</div>
+          </div>
+          <div className="col">
+            <div className="text-secondary small">총 매수금액</div>
+            <div className="fw-bold text-light">{formatCurrency(grandTotal.totalBuyAmount)}</div>
+          </div>
+          <div className="col">
+            <div className="text-secondary small">총 매도금액</div>
+            <div className="fw-bold text-light">{formatCurrency(grandTotal.totalSellAmount)}</div>
+          </div>
+          <div className="col">
+            <div className="text-secondary small">총 수익</div>
+            <div className={`fw-bold ${getProfitColorClass(grandTotal.totalProfit)}`}>
+              {formatCurrency(grandTotal.totalProfit)}
+            </div>
+          </div>
+          <div className="col">
+            <div className="text-secondary small">평균 수익률</div>
+            <div className={`fw-bold ${getProfitColorClass(grandTotal.averageProfitRate)}`}>
+              {formatPercent(grandTotal.averageProfitRate)}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -237,63 +278,24 @@ export default function ProfitStatusTable({
           </div>
         )}
 
-        {!isLoading && !error && profitStatus && (
-          <>
-            {profitStatus.months.length === 0 ? (
-              <div className="text-center text-secondary py-4">
-                아직 수익 기록이 없습니다.
-              </div>
-            ) : (
-              <>
-                {/* Monthly Sections */}
-                {profitStatus.months.map((summary) => (
-                  <MonthSection
-                    key={summary.yearMonth}
-                    summary={summary}
-                    isExpanded={expandedMonths.has(summary.yearMonth)}
-                    onToggle={() => toggleMonth(summary.yearMonth)}
-                  />
-                ))}
+        {!isLoading && !error && profitStatus && profitStatus.months.length === 0 && (
+          <div className="text-center text-secondary py-4">
+            아직 수익 기록이 없습니다.
+          </div>
+        )}
 
-                {/* Grand Total */}
-                <div className="card bg-secondary bg-opacity-25 border-secondary mt-4">
-                  <div className="card-body py-3">
-                    <div className="row text-center">
-                      <div className="col">
-                        <div className="text-secondary small">총 거래</div>
-                        <div className="fw-bold text-light">
-                          {profitStatus.grandTotal.totalTrades}건
-                        </div>
-                      </div>
-                      <div className="col">
-                        <div className="text-secondary small">총 매수금액</div>
-                        <div className="fw-bold text-light">
-                          {formatCurrency(profitStatus.grandTotal.totalBuyAmount)}
-                        </div>
-                      </div>
-                      <div className="col">
-                        <div className="text-secondary small">총 매도금액</div>
-                        <div className="fw-bold text-light">
-                          {formatCurrency(profitStatus.grandTotal.totalSellAmount)}
-                        </div>
-                      </div>
-                      <div className="col">
-                        <div className="text-secondary small">총 수익</div>
-                        <div className={`fw-bold ${getProfitColorClass(profitStatus.grandTotal.totalProfit)}`}>
-                          {formatCurrency(profitStatus.grandTotal.totalProfit)}
-                        </div>
-                      </div>
-                      <div className="col">
-                        <div className="text-secondary small">평균 수익률</div>
-                        <div className={`fw-bold ${getProfitColorClass(profitStatus.grandTotal.averageProfitRate)}`}>
-                          {formatPercent(profitStatus.grandTotal.averageProfitRate)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+        {!isLoading && !error && profitStatus && profitStatus.months.length > 0 && (
+          <>
+            {profitStatus.months.map((summary) => (
+              <MonthSection
+                key={summary.yearMonth}
+                summary={summary}
+                isExpanded={expandedMonths.has(summary.yearMonth)}
+                onToggle={() => toggleMonth(summary.yearMonth)}
+              />
+            ))}
+
+            <GrandTotalCard grandTotal={profitStatus.grandTotal} />
           </>
         )}
       </div>

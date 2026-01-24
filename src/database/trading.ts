@@ -1019,6 +1019,41 @@ export function getProfitRecords(accountId: string): ProfitRecord[] {
   return rows.map(mapProfitRecordRow);
 }
 
+interface ProfitAggregate {
+  totalTrades: number;
+  totalBuyAmount: number;
+  totalSellAmount: number;
+  totalProfit: number;
+  averageProfitRate: number;
+}
+
+/**
+ * 수익 기록들의 합계 계산 (Decimal.js 정밀도)
+ */
+function aggregateProfits(records: ProfitRecord[]): ProfitAggregate {
+  let buyAmount = new Decimal(0);
+  let sellAmount = new Decimal(0);
+  let profit = new Decimal(0);
+
+  for (const record of records) {
+    buyAmount = buyAmount.plus(record.buyAmount);
+    sellAmount = sellAmount.plus(record.sellAmount);
+    profit = profit.plus(record.profit);
+  }
+
+  const averageProfitRate = buyAmount.isZero()
+    ? 0
+    : profit.div(buyAmount).mul(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+
+  return {
+    totalTrades: records.length,
+    totalBuyAmount: buyAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+    totalSellAmount: sellAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+    totalProfit: profit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+    averageProfitRate,
+  };
+}
+
 /**
  * 수익 기록을 월별로 그룹화하여 요약 생성
  */
@@ -1027,84 +1062,31 @@ export function groupProfitsByMonth(accountId: string): ProfitStatusResponse {
 
   // 월별로 그룹화
   const monthlyMap = new Map<string, ProfitRecord[]>();
-
   for (const record of records) {
-    // YYYY-MM-DD에서 YYYY-MM 추출
     const yearMonth = record.sellDate.substring(0, 7);
-    if (!monthlyMap.has(yearMonth)) {
-      monthlyMap.set(yearMonth, []);
-    }
-    monthlyMap.get(yearMonth)!.push(record);
+    const monthRecords = monthlyMap.get(yearMonth) ?? [];
+    monthRecords.push(record);
+    monthlyMap.set(yearMonth, monthRecords);
   }
 
   // 월별 요약 생성 (과거 월 우선)
-  const months: MonthlyProfitSummary[] = [];
   const sortedMonths = Array.from(monthlyMap.keys()).sort();
-
-  for (const yearMonth of sortedMonths) {
+  const months: MonthlyProfitSummary[] = sortedMonths.map((yearMonth) => {
     const monthRecords = monthlyMap.get(yearMonth)!;
-
-    // Decimal.js로 집계
-    let totalBuyAmount = new Decimal(0);
-    let totalSellAmount = new Decimal(0);
-    let totalProfit = new Decimal(0);
-
-    for (const record of monthRecords) {
-      totalBuyAmount = totalBuyAmount.plus(record.buyAmount);
-      totalSellAmount = totalSellAmount.plus(record.sellAmount);
-      totalProfit = totalProfit.plus(record.profit);
-    }
-
-    // 평균 수익률: 총수익 / 총매수금액 * 100
-    const averageProfitRate = totalBuyAmount.isZero()
-      ? 0
-      : totalProfit
-          .div(totalBuyAmount)
-          .mul(100)
-          .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-          .toNumber();
-
-    months.push({
+    const aggregate = aggregateProfits(monthRecords);
+    return {
       yearMonth,
       records: monthRecords,
-      totalTrades: monthRecords.length,
-      totalBuyAmount: totalBuyAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      totalSellAmount: totalSellAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      totalProfit: totalProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      averageProfitRate,
-    });
-  }
+      ...aggregate,
+    };
+  });
 
   // 전체 총계 계산
-  let grandTotalBuyAmount = new Decimal(0);
-  let grandTotalSellAmount = new Decimal(0);
-  let grandTotalProfit = new Decimal(0);
-  let grandTotalTrades = 0;
-
-  for (const month of months) {
-    grandTotalBuyAmount = grandTotalBuyAmount.plus(month.totalBuyAmount);
-    grandTotalSellAmount = grandTotalSellAmount.plus(month.totalSellAmount);
-    grandTotalProfit = grandTotalProfit.plus(month.totalProfit);
-    grandTotalTrades += month.totalTrades;
-  }
-
-  const grandAverageProfitRate = grandTotalBuyAmount.isZero()
-    ? 0
-    : grandTotalProfit
-        .div(grandTotalBuyAmount)
-        .mul(100)
-        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-        .toNumber();
+  const grandTotal = aggregateProfits(records);
 
   return {
     accountId,
     months,
-    grandTotal: {
-      totalTrades: grandTotalTrades,
-      totalBuyAmount: grandTotalBuyAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      totalSellAmount: grandTotalSellAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      totalProfit: grandTotalProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      averageProfitRate: grandAverageProfitRate,
-    },
+    grandTotal,
   };
 }
