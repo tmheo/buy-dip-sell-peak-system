@@ -321,5 +321,5 @@ export const SELECT_PROFIT_RECORDS_BY_ACCOUNT = `
 SELECT id, account_id, tier, ticker, strategy, buy_date, buy_price, buy_quantity, sell_date, sell_price, buy_amount, sell_amount, profit, profit_rate, created_at
 FROM profit_records
 WHERE account_id = ?
-ORDER BY sell_date DESC, tier ASC
+ORDER BY sell_date ASC, tier ASC
 `;

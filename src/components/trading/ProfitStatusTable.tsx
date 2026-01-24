@@ -172,9 +172,9 @@ export default function ProfitStatusTable({
       const data: ProfitStatusResponse = await response.json();
       setProfitStatus(data);
 
-      // Auto-expand the most recent month if any
+      // Auto-expand the most recent month (last in array since sorted ascending)
       if (data.months.length > 0) {
-        setExpandedMonths(new Set([data.months[0].yearMonth]));
+        setExpandedMonths(new Set([data.months[data.months.length - 1].yearMonth]));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
