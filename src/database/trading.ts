@@ -734,3 +734,40 @@ function getAccountStrategy(accountId: string): Strategy {
   }
   return result.strategy as Strategy;
 }
+
+/**
+ * 이전 거래일 미체결 주문 체결 처리
+ * REQ-001: 오늘 주문 조회 시 이전 거래일 미체결 주문 자동 체결
+ * CON-001: 종가 데이터가 없으면 체결하지 않음
+ * CON-002: 이미 체결된 주문은 다시 체결하지 않음 (processOrderExecution에서 처리)
+ *
+ * @param accountId - 계좌 ID
+ * @param currentDate - 현재 날짜 (YYYY-MM-DD)
+ * @param ticker - 종목
+ * @returns 체결 결과 목록
+ */
+export function processPreviousDayExecution(
+  accountId: string,
+  currentDate: string,
+  ticker: Ticker
+): ExecutionResult[] {
+  // 1. 이전 거래일 계산 (주말 제외)
+  const prevDate = getPreviousTradingDate(currentDate);
+
+  // 2. 이전 거래일 종가 확인 (CON-001 준수: 종가 없으면 체결 불가)
+  const closePrice = getClosingPrice(ticker, prevDate);
+  if (!closePrice) {
+    return [];
+  }
+
+  // 3. 이전 거래일 미체결 주문 조회
+  const orders = getDailyOrders(accountId, prevDate);
+  const hasUnexecutedOrders = orders.some((o) => !o.executed);
+
+  if (!hasUnexecutedOrders) {
+    return [];
+  }
+
+  // 4. 체결 처리 (기존 함수 재사용, CON-002 준수: 이미 체결된 주문은 스킵됨)
+  return processOrderExecution(accountId, prevDate, ticker);
+}
