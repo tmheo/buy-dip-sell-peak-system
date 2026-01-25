@@ -37,6 +37,14 @@ const DEFAULT_OPTIONS: Required<DivergenceOptions> = {
   rsiMinDrop: 3,
 };
 
+/** 다이버전스 없음 기본 결과 */
+const NO_DIVERGENCE_RESULT: DivergenceResult = Object.freeze({
+  hasBearishDivergence: false,
+  priceHighIndices: [],
+  priceHighs: [],
+  rsiHighs: [],
+});
+
 /**
  * 로컬 고점 탐지
  * 양쪽 이웃보다 높은 값을 고점으로 판정
@@ -92,26 +100,11 @@ export function detectBearishDivergence(
   options?: DivergenceOptions
 ): DivergenceResult {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-
-  // 기본 결과 (다이버전스 없음)
-  const noResult: DivergenceResult = {
-    hasBearishDivergence: false,
-    priceHighIndices: [],
-    priceHighs: [],
-    rsiHighs: [],
-  };
-
-  // 윈도우 범위 계산
   const windowStart = currentIndex - opts.windowSize + 1;
 
-  // 데이터 부족 확인 (RSI 계산을 위해 최소 15일 필요)
-  if (windowStart < 14) {
-    return noResult;
-  }
-
-  // 현재 인덱스가 배열 범위를 벗어나면 반환
-  if (currentIndex >= prices.length) {
-    return noResult;
+  // 데이터 부족 또는 범위 초과 시 기본 결과 반환
+  if (windowStart < 14 || currentIndex >= prices.length) {
+    return NO_DIVERGENCE_RESULT;
   }
 
   // 윈도우 내 로컬 고점 탐지
@@ -119,15 +112,11 @@ export function detectBearishDivergence(
 
   // 고점이 2개 미만이면 다이버전스 판정 불가
   if (highIndices.length < 2) {
-    return noResult;
+    return NO_DIVERGENCE_RESULT;
   }
 
   // 각 고점에서 RSI 계산
-  const rsiValues: (number | null)[] = [];
-  for (const idx of highIndices) {
-    const rsi = calculateRSI(prices, idx);
-    rsiValues.push(rsi);
-  }
+  const rsiValues = highIndices.map((idx) => calculateRSI(prices, idx));
 
   // 가장 최근 2개의 고점 비교
   // 인덱스가 큰 쪽이 최근
@@ -145,7 +134,7 @@ export function detectBearishDivergence(
 
   // RSI 값이 계산 불가능한 경우
   if (recentRsi === null || prevRsi === null) {
-    return noResult;
+    return NO_DIVERGENCE_RESULT;
   }
 
   // 베어리시 다이버전스 판정
