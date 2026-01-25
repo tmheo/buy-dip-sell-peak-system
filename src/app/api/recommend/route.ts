@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
-import { BacktestEngine } from "@/backtest";
+import { BacktestEngine, detectBearishDivergence } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
 import { getPricesByDateRange, getLatestDate, getMetricsByDateRange } from "@/database";
@@ -500,24 +500,42 @@ export async function POST(request: Request): Promise<Response> {
     // 추천 전략 결정
     let recommendedStrategyName = getRecommendedStrategy(strategyScores);
 
-    // SOXL 전용: RSI >= 60 AND 역배열이면 전략 한 단계 하향
+    // SOXL 전용 하향 규칙 (2가지 조건, 중복 시 1회만 하향)
     let downgradeInfo: DowngradeInfo = { applied: false, reasons: [] };
-    if (ticker === "SOXL" && referenceMetrics.rsi14 >= 60 && !isGoldenCross) {
-      const originalStrategy = recommendedStrategyName;
-      if (recommendedStrategyName === "Pro3") {
-        recommendedStrategyName = "Pro2";
-      } else if (recommendedStrategyName === "Pro2") {
-        recommendedStrategyName = "Pro1";
-      }
-      // Pro1은 그대로 유지
+    if (ticker === "SOXL") {
+      const downgradeReasons: string[] = [];
 
-      if (originalStrategy !== recommendedStrategyName) {
-        downgradeInfo = {
-          applied: true,
-          originalStrategy,
-          downgradedStrategy: recommendedStrategyName,
-          reasons: ["RSI≥60 & 역배열"],
-        };
+      // 조건 1: RSI >= 60 AND 역배열
+      if (referenceMetrics.rsi14 >= 60 && !isGoldenCross) {
+        downgradeReasons.push("RSI≥60 & 역배열");
+      }
+
+      // 조건 2: RSI 다이버전스 AND 이격도120+ (disparity >= 20%)
+      if (referenceMetrics.disparity >= 20) {
+        const divergence = detectBearishDivergence(adjClosePrices, referenceDateIndex);
+        if (divergence.hasBearishDivergence) {
+          downgradeReasons.push("RSI 다이버전스 & 이격도120+");
+        }
+      }
+
+      // 하향 적용 (1회만)
+      if (downgradeReasons.length > 0) {
+        const originalStrategy = recommendedStrategyName;
+        if (recommendedStrategyName === "Pro3") {
+          recommendedStrategyName = "Pro2";
+        } else if (recommendedStrategyName === "Pro2") {
+          recommendedStrategyName = "Pro1";
+        }
+        // Pro1은 그대로 유지
+
+        if (originalStrategy !== recommendedStrategyName) {
+          downgradeInfo = {
+            applied: true,
+            originalStrategy,
+            downgradedStrategy: recommendedStrategyName,
+            reasons: downgradeReasons,
+          };
+        }
       }
     }
 

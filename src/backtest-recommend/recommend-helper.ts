@@ -18,7 +18,7 @@ import {
 } from "@/recommend/similarity";
 import { calculateAllStrategyScores, getRecommendedStrategy } from "@/recommend/score";
 import type { HistoricalMetrics, SimilarPeriod, PeriodBacktestResult } from "@/recommend/types";
-import { BacktestEngine } from "@/backtest";
+import { BacktestEngine, detectBearishDivergence } from "@/backtest";
 
 import type { QuickRecommendResult } from "./types";
 
@@ -261,17 +261,35 @@ export function getQuickRecommendation(
   const strategyScore = strategyScores.find((s) => s.strategy === recommendedStrategy);
   let reason = strategyScore ? `평균 점수 ${strategyScore.averageScore.toFixed(2)}점` : "추천 전략";
 
-  // 9. SOXL 전용: RSI >= 60 AND 역배열이면 전략 한 단계 하향
-  if (ticker === "SOXL" && referenceMetrics.rsi14 >= 60 && !referenceMetrics.isGoldenCross) {
-    const downgradeMap: Record<StrategyName, StrategyName> = {
-      Pro3: "Pro2",
-      Pro2: "Pro1",
-      Pro1: "Pro1", // Pro1은 그대로 유지
-    };
-    const originalStrategy = recommendedStrategy;
-    recommendedStrategy = downgradeMap[recommendedStrategy];
-    if (originalStrategy !== recommendedStrategy) {
-      reason = `${reason} (RSI≥60 & 역배열로 ${originalStrategy}→${recommendedStrategy} 하향)`;
+  // 9. SOXL 전용 하향 규칙 (2가지 조건, 중복 시 1회만 하향)
+  if (ticker === "SOXL") {
+    const downgradeReasons: string[] = [];
+
+    // 조건 1: RSI >= 60 AND 역배열
+    if (referenceMetrics.rsi14 >= 60 && !referenceMetrics.isGoldenCross) {
+      downgradeReasons.push("RSI≥60 & 역배열");
+    }
+
+    // 조건 2: RSI 다이버전스 AND 이격도120+ (disparity >= 20%)
+    if (referenceMetrics.disparity >= 20) {
+      const divergence = detectBearishDivergence(adjClosePrices, referenceDateIndex);
+      if (divergence.hasBearishDivergence) {
+        downgradeReasons.push("RSI 다이버전스 & 이격도120+");
+      }
+    }
+
+    // 하향 적용 (1회만)
+    if (downgradeReasons.length > 0) {
+      const downgradeMap: Record<StrategyName, StrategyName> = {
+        Pro3: "Pro2",
+        Pro2: "Pro1",
+        Pro1: "Pro1", // Pro1은 그대로 유지
+      };
+      const originalStrategy = recommendedStrategy;
+      recommendedStrategy = downgradeMap[recommendedStrategy];
+      if (originalStrategy !== recommendedStrategy) {
+        reason = `${reason} (${downgradeReasons.join(", ")}로 ${originalStrategy}→${recommendedStrategy} 하향)`;
+      }
     }
   }
 

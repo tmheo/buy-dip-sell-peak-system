@@ -56,3 +56,7 @@ export type { BuyOrderResult, SellOrderResult } from "./trading-utils";
 
 // 성과 지표 함수 내보내기
 export { calculateReturn, calculateMDD, calculateWinRate } from "./metrics";
+
+// 다이버전스 탐지 함수 내보내기
+export { findLocalHighs, detectBearishDivergence } from "./divergence";
+export type { DivergenceResult, DivergenceOptions } from "./divergence";
