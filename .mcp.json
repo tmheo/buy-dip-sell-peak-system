@@ -1,25 +1,28 @@
 {
   "mcpServers": {
     "context7": {
-      "$comment": "Cross-platform MCP configuration - see .mcp.windows.json for Windows",
-      "command": "npx",
+      "$comment": "Using shell wrapper to load PATH (fixes npx bash function issue). Use .mcp.windows.json for Windows.",
+      "command": "${SHELL:-/bin/bash}",
       "args": [
-        "-y",
-        "@upstash/context7-mcp@latest"
+        "-l",
+        "-c",
+        "exec npx -y @upstash/context7-mcp@latest"
       ]
     },
     "sequential-thinking": {
-      "command": "npx",
+      "command": "${SHELL:-/bin/bash}",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
+        "-l",
+        "-c",
+        "exec npx -y @modelcontextprotocol/server-sequential-thinking"
       ]
     },
     "stitch": {
-      "command": "npx",
+      "command": "${SHELL:-/bin/bash}",
       "args": [
-        "-y",
-        "stitch-mcp"
+        "-l",
+        "-c",
+        "exec npx -y stitch-mcp"
       ],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "YOUR_PROJECT_ID"
