@@ -10,6 +10,8 @@ export interface RecommendationCardProps {
   recommendation: RecommendationDetail;
   referenceDate: string;
   isGoldenCross?: boolean;
+  /** 다이버전스 조건 발동으로 정배열 Pro1 제외 규칙이 무시되었는지 여부 */
+  skipPro1Exclusion?: boolean;
 }
 
 const STRATEGY_COLORS: Record<string, string> = {
@@ -24,7 +26,7 @@ const STRATEGY_CONDITIONS: Record<string, { buy: string; sell: string; stopLossD
   Pro3: { buy: "전일 종가 대비 -0.10%", sell: "매수가 대비 +2.00%", stopLossDays: 12 },
 };
 
-export default function RecommendationCard({ recommendation, referenceDate, isGoldenCross }: RecommendationCardProps): React.ReactElement {
+export default function RecommendationCard({ recommendation, referenceDate, isGoldenCross, skipPro1Exclusion }: RecommendationCardProps): React.ReactElement {
   const strategyColor = STRATEGY_COLORS[recommendation.strategy] ?? STRATEGY_COLORS.Pro2;
   const tierRatioString = recommendation.tierRatios.map((r) => `${(r * 100).toFixed(1)}%`).join(" | ");
   const conditions = STRATEGY_CONDITIONS[recommendation.strategy] ?? STRATEGY_CONDITIONS.Pro2;
@@ -52,8 +54,8 @@ export default function RecommendationCard({ recommendation, referenceDate, isGo
       </div>
 
       <div className="card-body text-center py-4">
-        {/* 정배열 경고 */}
-        {isGoldenCross && (
+        {/* 정배열 경고 (다이버전스 조건 발동 시 표시하지 않음) */}
+        {isGoldenCross && !skipPro1Exclusion && (
           <div
             className="alert py-2 mb-3"
             style={{
