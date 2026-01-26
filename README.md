@@ -184,6 +184,8 @@ src/
 │   ├── cycle.ts                     # 사이클 상태 관리
 │   ├── order.ts                     # LOC/MOC 주문 계산
 │   ├── metrics.ts                   # 성과 지표 계산
+│   ├── divergence.ts                # RSI 다이버전스 탐지 (베어리시 다이버전스)
+│   ├── downgrade.ts                 # SOXL 전략 하향 규칙 (Pro3→Pro2→Pro1)
 │   ├── types.ts                     # 백테스트 전용 타입 + STRATEGY_COLORS 상수
 │   └── index.ts                     # 모듈 엔트리포인트
 ├── recommend/

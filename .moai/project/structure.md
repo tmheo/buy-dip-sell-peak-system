@@ -340,7 +340,9 @@ src/
 │   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
 │   ├── cycle.ts                  # 사이클 관리자
 │   ├── order.ts                  # 주문 계산 로직
-│   └── metrics.ts                # 기술적 지표 계산 (SMA, RSI, ROC 등)
+│   ├── metrics.ts                # 기술적 지표 계산 (SMA, RSI, ROC 등)
+│   ├── divergence.ts             # RSI 다이버전스 탐지 (베어리시 다이버전스)
+│   └── downgrade.ts              # SOXL 전략 하향 규칙 (Pro3→Pro2→Pro1)
 ├── components/                   # React 공통 컴포넌트
 │   ├── TopControlBar.tsx         # 상단 컨트롤 바
 │   ├── MainNavigation.tsx        # 메인 네비게이션
