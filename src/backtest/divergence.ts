@@ -19,22 +19,25 @@ export interface DivergenceResult {
 
 /** 다이버전스 탐지 옵션 */
 export interface DivergenceOptions {
-  /** 분석 윈도우 크기 (기본값: 15 거래일) */
+  /** 분석 윈도우 크기 (기본값: 25 거래일) */
   windowSize?: number;
   /** 고점 간 최소 거리 (기본값: 3 거래일) */
   minPeakDistance?: number;
   /** 가격 허용 오차 (기본값: -0.01 = -1%) */
   priceTolerance?: number;
-  /** RSI 최소 하락폭 (기본값: 3 포인트) */
+  /** RSI 최소 하락폭 (기본값: 0 = 조금이라도 하락) */
   rsiMinDrop?: number;
+  /** RSI 최소값 필터 (기본값: 60, 이 값 이상인 고점만 비교) */
+  minRsi?: number;
 }
 
 /** 기본 옵션 */
 const DEFAULT_OPTIONS: Required<DivergenceOptions> = {
-  windowSize: 15,
+  windowSize: 25,
   minPeakDistance: 3,
   priceTolerance: -0.01,
-  rsiMinDrop: 3,
+  rsiMinDrop: 0,
+  minRsi: 60,
 };
 
 /** 다이버전스 없음 기본 결과 */
@@ -86,8 +89,9 @@ export function findLocalHighs(
  * RSI 베어리시 다이버전스 탐지
  *
  * 베어리시 다이버전스:
+ * - RSI >= minRsi (기본 60) 인 고점만 비교
  * - 가격이 상승/횡보하는데 (최근 고점 >= 이전 고점의 99%)
- * - RSI는 하락 (최근 RSI < 이전 RSI - 3)
+ * - RSI는 하락 (최근 RSI < 이전 RSI)
  *
  * @param prices - 전체 가격 배열 (adjClose 값들)
  * @param currentIndex - 현재 날짜 인덱스 (기준일)
@@ -110,49 +114,38 @@ export function detectBearishDivergence(
   // 윈도우 내 로컬 고점 탐지
   const highIndices = findLocalHighs(prices, windowStart, currentIndex, opts.minPeakDistance);
 
-  // 고점이 2개 미만이면 다이버전스 판정 불가
-  if (highIndices.length < 2) {
-    return NO_DIVERGENCE_RESULT;
+  // 각 고점에서 RSI 계산 및 minRsi 필터링
+  const filteredHighs: { idx: number; price: number; rsi: number }[] = [];
+  for (const idx of highIndices) {
+    const rsi = calculateRSI(prices, idx);
+    if (rsi !== null && rsi >= opts.minRsi) {
+      filteredHighs.push({ idx, price: prices[idx], rsi });
+    }
   }
 
-  // 각 고점에서 RSI 계산
-  const rsiValues = highIndices.map((idx) => calculateRSI(prices, idx));
+  // RSI >= minRsi인 고점이 2개 미만이면 다이버전스 판정 불가
+  if (filteredHighs.length < 2) {
+    return NO_DIVERGENCE_RESULT;
+  }
 
   // 가장 최근 2개의 고점 비교
-  // 인덱스가 큰 쪽이 최근
-  const recentIdx = highIndices.length - 1;
-  const prevIdx = highIndices.length - 2;
-
-  const recentHighIndex = highIndices[recentIdx];
-  const prevHighIndex = highIndices[prevIdx];
-
-  const recentPrice = prices[recentHighIndex];
-  const prevPrice = prices[prevHighIndex];
-
-  const recentRsi = rsiValues[recentIdx];
-  const prevRsi = rsiValues[prevIdx];
-
-  // RSI 값이 계산 불가능한 경우
-  if (recentRsi === null || prevRsi === null) {
-    return NO_DIVERGENCE_RESULT;
-  }
+  const prev = filteredHighs[filteredHighs.length - 2];
+  const recent = filteredHighs[filteredHighs.length - 1];
 
   // 베어리시 다이버전스 판정
   // 1. 가격 조건: 최근 고점 >= 이전 고점 * (1 + tolerance)
-  //    tolerance = -0.01 이므로, 최근 고점 >= 이전 고점 * 0.99
-  const priceThreshold = new Decimal(prevPrice).mul(new Decimal(1).add(opts.priceTolerance));
-  const priceCondition = new Decimal(recentPrice).gte(priceThreshold);
+  const priceThreshold = new Decimal(prev.price).mul(new Decimal(1).add(opts.priceTolerance));
+  const priceCondition = new Decimal(recent.price).gte(priceThreshold);
 
   // 2. RSI 조건: 최근 RSI < 이전 RSI - minDrop
-  const rsiThreshold = new Decimal(prevRsi).sub(opts.rsiMinDrop);
-  const rsiCondition = new Decimal(recentRsi).lt(rsiThreshold);
+  const rsiCondition = recent.rsi < prev.rsi - opts.rsiMinDrop;
 
   const hasBearishDivergence = priceCondition && rsiCondition;
 
   return {
     hasBearishDivergence,
-    priceHighIndices: [prevHighIndex, recentHighIndex],
-    priceHighs: [prevPrice, recentPrice],
-    rsiHighs: [prevRsi, recentRsi],
+    priceHighIndices: [prev.idx, recent.idx],
+    priceHighs: [prev.price, recent.price],
+    rsiHighs: [prev.rsi, recent.rsi],
   };
 }
