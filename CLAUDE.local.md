@@ -202,7 +202,7 @@ const sellPrice = new Decimal(buyPrice)
 1. **정배열 시 Pro1 제외**: MA20 > MA60일 때 Pro1은 후보에서 제외
 2. **SOXL 전용 하향 규칙** (2가지 조건, 중복 시 1회만 하향):
    - 조건 1: RSI >= 60 AND 역배열
-   - 조건 2: RSI 다이버전스 AND 이격도120+
+   - 조건 2: RSI 다이버전스 AND 이격도<120
    - 적용: Pro3 → Pro2, Pro2 → Pro1, Pro1은 유지
 
 ### RSI 다이버전스 정의
@@ -213,8 +213,8 @@ const sellPrice = new Decimal(buyPrice)
 - 가격 조건: 최근 고점 >= 이전 고점 (허용 오차 -1%, 상승/횡보)
 - RSI 조건: 최근 RSI < 이전 RSI (조금이라도 하락)
 
-**이격도120+**:
-- 조건: disparity >= 20% (종가가 MA20보다 20% 이상 높음)
+**이격도<120**:
+- 조건: disparity < 20% (이격도 지수 120 미만)
 
 ### 참고 파일
 
