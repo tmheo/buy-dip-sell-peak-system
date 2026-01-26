@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
-import { BacktestEngine } from "@/backtest";
+import { BacktestEngine, applySOXLDowngrade, checkDivergenceCondition } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
 import { getPricesByDateRange, getLatestDate, getMetricsByDateRange } from "@/database";
@@ -493,32 +493,41 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    // SOXL: 다이버전스 조건 발동 시 정배열 Pro1 제외 규칙 무시
+    const isDivergenceCondition =
+      ticker === "SOXL" &&
+      checkDivergenceCondition(referenceMetrics, adjClosePrices, referenceDateIndex);
+
     // 전략 점수 계산
     const isGoldenCross = referenceMetrics.isGoldenCross;
-    const strategyScores = calculateAllStrategyScores(similarPeriods, isGoldenCross);
+    const strategyScores = calculateAllStrategyScores(similarPeriods, isGoldenCross, {
+      skipPro1Exclusion: isDivergenceCondition,
+    });
 
     // 추천 전략 결정
     let recommendedStrategyName = getRecommendedStrategy(strategyScores);
 
-    // SOXL 전용: RSI >= 60 AND 역배열이면 전략 한 단계 하향
-    let downgradeInfo: DowngradeInfo = { applied: false, reasons: [] };
-    if (ticker === "SOXL" && referenceMetrics.rsi14 >= 60 && !isGoldenCross) {
-      const originalStrategy = recommendedStrategyName;
-      if (recommendedStrategyName === "Pro3") {
-        recommendedStrategyName = "Pro2";
-      } else if (recommendedStrategyName === "Pro2") {
-        recommendedStrategyName = "Pro1";
-      }
-      // Pro1은 그대로 유지
-
-      if (originalStrategy !== recommendedStrategyName) {
-        downgradeInfo = {
-          applied: true,
-          originalStrategy,
-          downgradedStrategy: recommendedStrategyName,
-          reasons: ["RSI≥60 & 역배열"],
-        };
-      }
+    // SOXL 전용 하향 규칙 적용
+    let downgradeInfo: DowngradeInfo = {
+      applied: false,
+      reasons: [],
+      skipPro1Exclusion: isDivergenceCondition,
+    };
+    if (ticker === "SOXL") {
+      const result = applySOXLDowngrade(
+        recommendedStrategyName,
+        referenceMetrics,
+        adjClosePrices,
+        referenceDateIndex
+      );
+      recommendedStrategyName = result.strategy;
+      downgradeInfo = {
+        applied: result.applied,
+        originalStrategy: result.originalStrategy,
+        downgradedStrategy: result.strategy,
+        reasons: result.reasons,
+        skipPro1Exclusion: isDivergenceCondition,
+      };
     }
 
     const tierRatios = getStrategyTierRatios(recommendedStrategyName);

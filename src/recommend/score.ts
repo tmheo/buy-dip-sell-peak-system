@@ -91,16 +91,18 @@ export function calculateAverageScore(
 /** 모든 전략의 점수 계산 (정배열 시 Pro1 제외) */
 export function calculateAllStrategyScores(
   periods: SimilarPeriod[],
-  isGoldenCross: boolean
+  isGoldenCross: boolean,
+  options?: { skipPro1Exclusion?: boolean }
 ): StrategyScore[] {
   const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
   const strategyScores: StrategyScore[] = [];
+  const skipExclusion = options?.skipPro1Exclusion ?? false;
 
   for (const strategy of strategies) {
     const scoreData = calculateAverageScore(periods, strategy);
 
-    // REQ-SCORE-003: 정배열 시 Pro1 제외
-    const excluded = strategy === "Pro1" && isGoldenCross;
+    // REQ-SCORE-003: 정배열 시 Pro1 제외 (다이버전스 조건 발동 시 무시)
+    const excluded = strategy === "Pro1" && isGoldenCross && !skipExclusion;
     const excludeReason = excluded ? "정배열 시 제외" : undefined;
 
     strategyScores.push({

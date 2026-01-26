@@ -243,6 +243,7 @@ export default function RecommendPageClient() {
             recommendation={result.recommendedStrategy}
             referenceDate={result.referenceDate}
             isGoldenCross={result.metrics.isGoldenCross}
+            skipPro1Exclusion={result.downgradeInfo?.skipPro1Exclusion}
           />
         </>
       )}

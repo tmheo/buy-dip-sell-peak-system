@@ -200,15 +200,30 @@ const sellPrice = new Decimal(buyPrice)
 ### 전략 선택 규칙
 
 1. **정배열 시 Pro1 제외**: MA20 > MA60일 때 Pro1은 후보에서 제외
-2. **SOXL 전용 하향 규칙**: RSI ≥ 60 AND 역배열 시 전략 한 단계 하향
-   - Pro3 → Pro2, Pro2 → Pro1, Pro1은 유지
-3. **기본 전략**: 데이터 부족 시 Pro2 사용
+   - 단, SOXL에서 다이버전스 조건(조건 2) 발동 시 이 규칙 무시
+2. **SOXL 전용 하향 규칙** (2가지 조건, 중복 시 1회만 하향):
+   - 조건 1: RSI >= 60 AND 역배열
+   - 조건 2: RSI 다이버전스 AND 이격도<120 AND 기준일RSI>=60
+   - 적용: Pro3 → Pro2, Pro2 → Pro1, Pro1은 유지
+
+### RSI 다이버전스 정의
+
+**베어리시 다이버전스** (하락 신호):
+- 전제 조건: 기준일 RSI >= 60
+- 분석 윈도우: 25 거래일
+- RSI 필터: RSI >= 60인 고점만 비교 대상
+- 가격 조건: 최근 고점 >= 이전 고점 (허용 오차 -1%, 상승/횡보)
+- RSI 조건: 최근 RSI < 이전 RSI (조금이라도 하락)
+
+**이격도<120**:
+- 조건: disparity < 20% (이격도 지수 120 미만)
 
 ### 참고 파일
 
 - `src/recommend/similarity.ts`: 유사도 계산 (지수 감쇠)
 - `src/recommend/score.ts`: 전략 점수 계산
 - `src/recommend/types.ts`: 타입 정의
+- `src/backtest/divergence.ts`: RSI 다이버전스 탐지
 
 ---
 
