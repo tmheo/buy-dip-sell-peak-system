@@ -50,11 +50,11 @@ export function applySOXLDowngrade(
     downgradeReasons.push("RSI≥60 & 역배열");
   }
 
-  // 조건 2: RSI 다이버전스 AND 이격도120+ (disparity >= 20%)
-  if (metrics.disparity >= 20) {
+  // 조건 2: RSI 다이버전스 AND 이격도 < 120 (disparity < 20%)
+  if (metrics.disparity < 20) {
     const divergence = detectBearishDivergence(prices, referenceDateIndex);
     if (divergence.hasBearishDivergence) {
-      downgradeReasons.push("RSI 다이버전스 & 이격도120+");
+      downgradeReasons.push("RSI 다이버전스 & 이격도<120");
     }
   }
 
