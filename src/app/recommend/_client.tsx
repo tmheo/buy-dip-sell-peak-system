@@ -243,7 +243,7 @@ export default function RecommendPageClient() {
             recommendation={result.recommendedStrategy}
             referenceDate={result.referenceDate}
             isGoldenCross={result.metrics.isGoldenCross}
-            skipPro1Exclusion={result.downgradeInfo?.reasons.some((r) => r.includes("다이버전스"))}
+            skipPro1Exclusion={result.downgradeInfo?.skipPro1Exclusion}
           />
         </>
       )}

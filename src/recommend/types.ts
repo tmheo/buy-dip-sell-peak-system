@@ -89,6 +89,8 @@ export interface DowngradeInfo {
   downgradedStrategy?: StrategyName;
   /** 하향 사유 목록 */
   reasons: string[];
+  /** 다이버전스 조건 발동으로 정배열 Pro1 제외 규칙 무시 여부 */
+  skipPro1Exclusion?: boolean;
 }
 
 /** 추천 결과 인터페이스 */

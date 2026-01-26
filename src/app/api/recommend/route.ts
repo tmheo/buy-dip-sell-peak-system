@@ -508,7 +508,11 @@ export async function POST(request: Request): Promise<Response> {
     let recommendedStrategyName = getRecommendedStrategy(strategyScores);
 
     // SOXL 전용 하향 규칙 적용
-    let downgradeInfo: DowngradeInfo = { applied: false, reasons: [] };
+    let downgradeInfo: DowngradeInfo = {
+      applied: false,
+      reasons: [],
+      skipPro1Exclusion: isDivergenceCondition,
+    };
     if (ticker === "SOXL") {
       const result = applySOXLDowngrade(
         recommendedStrategyName,
@@ -517,14 +521,13 @@ export async function POST(request: Request): Promise<Response> {
         referenceDateIndex
       );
       recommendedStrategyName = result.strategy;
-      if (result.applied) {
-        downgradeInfo = {
-          applied: true,
-          originalStrategy: result.originalStrategy,
-          downgradedStrategy: result.strategy,
-          reasons: result.reasons,
-        };
-      }
+      downgradeInfo = {
+        applied: result.applied,
+        originalStrategy: result.originalStrategy,
+        downgradedStrategy: result.strategy,
+        reasons: result.reasons,
+        skipPro1Exclusion: isDivergenceCondition,
+      };
     }
 
     const tierRatios = getStrategyTierRatios(recommendedStrategyName);
