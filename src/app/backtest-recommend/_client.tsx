@@ -546,6 +546,42 @@ export default function BacktestRecommendPageClient() {
           <div className="alert alert-secondary">
             <p className="mb-0">백테스트를 실행하면 여기에 결과가 표시됩니다.</p>
           </div>
+
+          {/* 추천 전략 백테스트 안내 */}
+          <div className="card bg-dark mt-4">
+            <div className="card-body">
+              <h5 className="card-title">추천 전략 백테스트란?</h5>
+              <p className="card-text">
+                추천 전략 백테스트는 매 사이클마다 시장 상황에 맞는 최적의 전략을 동적으로 선택하여
+                시뮬레이션합니다. 과거 유사 구간의 성과를 분석하여 Pro1, Pro2, Pro3 중 가장 적합한 전략을
+                자동으로 추천받아 진행합니다.
+              </p>
+              <h5 className="card-title mt-4">추천 시스템 특징</h5>
+              <ul className="mb-0">
+                <li>
+                  <strong>동적 전략 전환</strong>: 사이클 시작 시점의 기술적 지표를 분석하여 최적 전략 선택
+                </li>
+                <li>
+                  <strong>유사 구간 분석</strong>: RSI, 이격도, MA 기울기, ROC, 변동성을 기반으로 과거
+                  유사 구간 탐색
+                </li>
+                <li>
+                  <strong>SOXL 전용 하향 규칙</strong>: 다음 조건 충족 시 보수적 전략으로 자동 하향
+                  (Pro3→Pro2→Pro1)
+                  <ul className="mt-1 mb-0">
+                    <li>조건 1: RSI ≥ 60 AND 역배열</li>
+                    <li>조건 2: RSI 다이버전스 AND 이격도 &lt; 120 AND 기준일 RSI ≥ 60</li>
+                  </ul>
+                </li>
+              </ul>
+              <h5 className="card-title mt-4">주의사항</h5>
+              <ul className="mb-0">
+                <li>과거 성과가 미래 수익을 보장하지 않습니다.</li>
+                <li>백테스트 결과는 거래 수수료, 세금 등을 반영하지 않을 수 있습니다.</li>
+                <li>실제 거래에서는 슬리피지(체결가 차이)가 발생할 수 있습니다.</li>
+              </ul>
+            </div>
+          </div>
         </section>
       )}
     </div>
