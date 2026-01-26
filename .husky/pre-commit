@@ -1,5 +1,1 @@
-#!/bin/sh
-# Load fnm environment for Node.js
-eval "$(fnm env --shell bash)"
-
 npx lint-staged
