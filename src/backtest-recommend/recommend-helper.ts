@@ -18,7 +18,12 @@ import {
 } from "@/recommend/similarity";
 import { calculateAllStrategyScores, getRecommendedStrategy } from "@/recommend/score";
 import type { HistoricalMetrics, SimilarPeriod, PeriodBacktestResult } from "@/recommend/types";
-import { BacktestEngine, applySOXLDowngrade, formatDowngradeReason } from "@/backtest";
+import {
+  BacktestEngine,
+  applySOXLDowngrade,
+  formatDowngradeReason,
+  checkDivergenceCondition,
+} from "@/backtest";
 
 import type { QuickRecommendResult } from "./types";
 
@@ -255,13 +260,24 @@ export function getQuickRecommendation(
     };
   }
 
-  // 8. 전략 점수 계산 및 추천
-  const strategyScores = calculateAllStrategyScores(similarPeriods, referenceMetrics.isGoldenCross);
+  // 8. SOXL: 다이버전스 조건 발동 시 정배열 Pro1 제외 규칙 무시
+  const isDivergenceCondition =
+    ticker === "SOXL" &&
+    checkDivergenceCondition(referenceMetrics, adjClosePrices, referenceDateIndex);
+
+  // 9. 전략 점수 계산 및 추천
+  const strategyScores = calculateAllStrategyScores(
+    similarPeriods,
+    referenceMetrics.isGoldenCross,
+    {
+      skipPro1Exclusion: isDivergenceCondition,
+    }
+  );
   let recommendedStrategy = getRecommendedStrategy(strategyScores);
   const strategyScore = strategyScores.find((s) => s.strategy === recommendedStrategy);
   let reason = strategyScore ? `평균 점수 ${strategyScore.averageScore.toFixed(2)}점` : "추천 전략";
 
-  // 9. SOXL 전용 하향 규칙 적용
+  // 10. SOXL 전용 하향 규칙 적용
   if (ticker === "SOXL") {
     const downgradeResult = applySOXLDowngrade(
       recommendedStrategy,

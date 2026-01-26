@@ -62,5 +62,5 @@ export { findLocalHighs, detectBearishDivergence } from "./divergence";
 export type { DivergenceResult, DivergenceOptions } from "./divergence";
 
 // SOXL 하향 규칙 내보내기
-export { applySOXLDowngrade, formatDowngradeReason } from "./downgrade";
+export { applySOXLDowngrade, formatDowngradeReason, checkDivergenceCondition } from "./downgrade";
 export type { DowngradeResult } from "./downgrade";

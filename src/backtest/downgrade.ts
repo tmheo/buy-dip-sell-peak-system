@@ -80,6 +80,28 @@ export function applySOXLDowngrade(
 }
 
 /**
+ * RSI 다이버전스 조건 발동 여부 체크
+ * 정배열 시 Pro1 제외 규칙을 무시할지 결정하는 데 사용
+ *
+ * @param metrics - 기준일 기술적 지표
+ * @param prices - 전체 가격 배열
+ * @param referenceDateIndex - 기준일 인덱스
+ * @returns 다이버전스 조건 발동 여부
+ */
+export function checkDivergenceCondition(
+  metrics: TechnicalMetrics,
+  prices: number[],
+  referenceDateIndex: number
+): boolean {
+  // 조건 2: RSI 다이버전스 AND 이격도 < 120 AND 기준일 RSI >= 60
+  if (metrics.disparity < 20 && metrics.rsi14 >= 60) {
+    const divergence = detectBearishDivergence(prices, referenceDateIndex);
+    return divergence.hasBearishDivergence;
+  }
+  return false;
+}
+
+/**
  * 하향 사유를 reason 문자열에 추가
  *
  * @param baseReason - 기존 reason 문자열

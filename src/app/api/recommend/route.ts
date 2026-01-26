@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
-import { BacktestEngine, applySOXLDowngrade } from "@/backtest";
+import { BacktestEngine, applySOXLDowngrade, checkDivergenceCondition } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
 import { getPricesByDateRange, getLatestDate, getMetricsByDateRange } from "@/database";
@@ -493,9 +493,16 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    // SOXL: 다이버전스 조건 발동 시 정배열 Pro1 제외 규칙 무시
+    const isDivergenceCondition =
+      ticker === "SOXL" &&
+      checkDivergenceCondition(referenceMetrics, adjClosePrices, referenceDateIndex);
+
     // 전략 점수 계산
     const isGoldenCross = referenceMetrics.isGoldenCross;
-    const strategyScores = calculateAllStrategyScores(similarPeriods, isGoldenCross);
+    const strategyScores = calculateAllStrategyScores(similarPeriods, isGoldenCross, {
+      skipPro1Exclusion: isDivergenceCondition,
+    });
 
     // 추천 전략 결정
     let recommendedStrategyName = getRecommendedStrategy(strategyScores);
