@@ -269,6 +269,8 @@ Yahoo Finance API → dataFetcher (재시도/파싱) → database (트랜잭션)
 
 떨사오팔 Pro 전략의 과거 성과를 시뮬레이션하는 백테스트 엔진입니다.
 
+![백테스트 엔진 워크플로우](./docs/architecture/backtest-engine.png)
+
 #### 핵심 기능
 
 - **LOC 주문**: 전일 종가 기준 매수/매도 지정가 계산
@@ -350,6 +352,8 @@ result.dailyHistory.forEach(day => {
 
 과거 유사 구간을 분석하여 최적의 트레이딩 전략을 추천하는 시스템입니다. (SPEC-RECOMMEND-001)
 
+![전략 추천 시스템 워크플로우](./docs/architecture/recommend-system.png)
+
 #### 핵심 기능
 
 - **기술적 지표 벡터**: 6개 지표(정배열, 기울기, 이격도, RSI, ROC, 변동성)로 시장 상태 표현
@@ -417,6 +421,8 @@ result.dailyHistory.forEach(day => {
 <summary>상세 보기</summary>
 
 사이클 경계에서 전략을 동적으로 전환하는 백테스트 시스템입니다. (SPEC-BACKTEST-RECOMMEND)
+
+![추천 전략 백테스트 워크플로우](./docs/architecture/backtest-recommend.png)
 
 #### 핵심 기능
 
