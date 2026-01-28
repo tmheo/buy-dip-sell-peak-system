@@ -33,7 +33,7 @@ export interface DivergenceOptions {
 
 /** 기본 옵션 */
 const DEFAULT_OPTIONS: Required<DivergenceOptions> = {
-  windowSize: 25,
+  windowSize: 20,
   minPeakDistance: 3,
   priceTolerance: -0.01,
   rsiMinDrop: 0,
