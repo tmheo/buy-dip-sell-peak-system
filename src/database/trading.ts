@@ -705,9 +705,11 @@ export function processOrderExecution(
   // 당일 주문 조회
   const orders = getDailyOrders(accountId, date);
   const results: ExecutionResult[] = [];
+  // 이번에 새로 체결된 매도 여부 추적 (이미 체결된 주문은 제외)
+  let hasNewSellExecution = false;
 
   for (const order of orders) {
-    // 이미 체결된 주문은 스킵
+    // 이미 체결된 주문은 스킵 (결과에만 포함, 사이클 완료 체크에서 제외)
     if (order.executed) {
       results.push({
         orderId: order.id,
@@ -775,6 +777,9 @@ export function processOrderExecution(
           buyDate: null,
           sellTargetPrice: null,
         });
+
+        // 이번에 새로 체결된 매도 표시
+        hasNewSellExecution = true;
       }
     }
 
@@ -787,6 +792,16 @@ export function processOrderExecution(
       closePrice,
       shares: order.shares,
     });
+  }
+
+  // 이번에 새로 체결된 매도가 있으면 사이클 완료 여부 확인
+  // (이미 체결된 주문은 제외하여 중복 사이클 증가 방지)
+  if (hasNewSellExecution) {
+    const remainingShares = getTotalShares(accountId);
+    if (remainingShares === 0) {
+      // 모든 티어가 비었으면 사이클 완료
+      completeCycleAndIncrement(accountId);
+    }
   }
 
   return results;
@@ -803,6 +818,34 @@ function getAccountStrategy(accountId: string): Strategy {
     throw new Error(`Account not found: ${accountId}`);
   }
   return result.strategy as Strategy;
+}
+
+/**
+ * 사이클 완료 시 cycleNumber 증가
+ * 모든 티어가 비었을 때 호출되어 다음 사이클을 준비
+ *
+ * @param accountId - 계좌 ID
+ * @returns 업데이트된 cycleNumber, 계좌가 없으면 null
+ */
+export function completeCycleAndIncrement(accountId: string): number | null {
+  const database = getConnection();
+
+  // 1. 현재 cycle_number 조회
+  const selectStmt = database.prepare("SELECT cycle_number FROM trading_accounts WHERE id = ?");
+  const current = selectStmt.get(accountId) as { cycle_number: number } | undefined;
+
+  if (!current) {
+    return null;
+  }
+
+  // 2. cycle_number 증가
+  const newCycleNumber = current.cycle_number + 1;
+  const updateStmt = database.prepare(
+    "UPDATE trading_accounts SET cycle_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+  );
+  updateStmt.run(newCycleNumber, accountId);
+
+  return newCycleNumber;
 }
 
 /**

@@ -1074,4 +1074,55 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(results).toHaveLength(0);
     });
   });
+
+  describe("completeCycleAndIncrement()", () => {
+    it("cycleNumber를 1 증가시켜야 한다", () => {
+      const request: CreateTradingAccountRequest = {
+        name: "사이클 증가 테스트",
+        ticker: "SOXL",
+        seedCapital: 10000,
+        strategy: "Pro2",
+        cycleStartDate: "2025-01-02",
+      };
+      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+
+      // 초기 cycleNumber는 1
+      expect(created.cycleNumber).toBe(1);
+
+      // 사이클 완료 처리
+      const newCycleNumber = tradingModule.completeCycleAndIncrement(created.id);
+
+      expect(newCycleNumber).toBe(2);
+
+      // DB에서 조회하여 확인
+      const account = tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
+      expect(account?.cycleNumber).toBe(2);
+    });
+
+    it("여러 번 호출 시 cycleNumber가 계속 증가해야 한다", () => {
+      const request: CreateTradingAccountRequest = {
+        name: "다중 사이클 테스트",
+        ticker: "SOXL",
+        seedCapital: 10000,
+        strategy: "Pro1",
+        cycleStartDate: "2025-01-02",
+      };
+      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+
+      // 3번 호출
+      tradingModule.completeCycleAndIncrement(created.id);
+      tradingModule.completeCycleAndIncrement(created.id);
+      const result = tradingModule.completeCycleAndIncrement(created.id);
+
+      expect(result).toBe(4); // 1 + 3 = 4
+
+      const account = tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
+      expect(account?.cycleNumber).toBe(4);
+    });
+
+    it("존재하지 않는 계좌는 null을 반환해야 한다", () => {
+      const result = tradingModule.completeCycleAndIncrement(randomUUID());
+      expect(result).toBeNull();
+    });
+  });
 });
