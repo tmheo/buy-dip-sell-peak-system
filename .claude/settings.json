@@ -6,7 +6,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${SHELL:-/bin/bash} -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/session_start__show_project_info.py\"'"
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/session_start__show_project_info.py\"'"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/pre_compact__save_context.py\"'",
+            "timeout": 5000
           }
         ]
       }
@@ -17,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${SHELL:-/bin/bash} -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/session_end__auto_cleanup.py\" &'"
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/session_end__auto_cleanup.py\" &'"
           }
         ]
       }
@@ -28,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${SHELL:-/bin/bash} -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/pre_tool__security_guard.py\"'",
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/pre_tool__security_guard.py\"'",
             "timeout": 5000
           }
         ]
@@ -40,17 +52,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${SHELL:-/bin/bash} -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__code_formatter.py\"'",
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__code_formatter.py\"'",
             "timeout": 30000
           },
           {
             "type": "command",
-            "command": "${SHELL:-/bin/bash} -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__linter.py\"'",
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__linter.py\"'",
             "timeout": 60000
           },
           {
             "type": "command",
-            "command": "${SHELL:-/bin/bash} -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__ast_grep_scan.py\"'",
+            "command": "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__ast_grep_scan.py\"'",
             "timeout": 30000
           }
         ]
@@ -67,7 +79,7 @@
   "cleanupPeriodDays": 30,
   "env": {
     "MOAI_CONFIG_SOURCE": "sections",
-    "ENABLE_TOOL_SEARCH": "auto:5",
+    "ENABLE_TOOL_SEARCH": "1",
     "MAX_THINKING_TOKENS": "31999",
     "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS": "64000",
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
@@ -80,6 +92,7 @@
       "Bash(awk:*)",
       "Bash(basename:*)",
       "Bash(black:*)",
+      "Bash(bun*)",
       "Bash(cat:*)",
       "Bash(comm:*)",
       "Bash(coverage:*)",
@@ -128,11 +141,17 @@
       "Bash(moai:*)",
       "Bash(mv:*)",
       "Bash(mypy:*)",
+      "Bash(node*)",
       "Bash(node:*)",
+      "Bash(npm*)",
       "Bash(npm:*)",
+      "Bash(npx*)",
       "Bash(npx:*)",
+      "Bash(pip*)",
+      "Bash(pip3*)",
       "Bash(pip3:*)",
       "Bash(pip:*)",
+      "Bash(pnpm*)",
       "Bash(prettier:*)",
       "Bash(printf:*)",
       "Bash(pwd:*)",
@@ -157,10 +176,12 @@
       "Bash(true:*)",
       "Bash(type:*)",
       "Bash(uniq:*)",
+      "Bash(uv*)",
       "Bash(uv:*)",
       "Bash(wc:*)",
       "Bash(which:*)",
       "Bash(xargs:*)",
+      "Bash(yarn*)",
       "Bash(yq:*)",
       "BashOutput",
       "Edit",

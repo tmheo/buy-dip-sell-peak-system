@@ -77,13 +77,15 @@ from lib.path_utils import find_project_root  # noqa: E402
 # Import unified timeout manager and Git operations manager
 try:
     from lib.git_operations_manager import GitOperationType, get_git_manager
-    from lib.timeout import TimeoutError as PlatformTimeoutError
     from lib.unified_timeout_manager import (
         HookTimeoutConfig,
         HookTimeoutError,
         TimeoutPolicy,
         get_timeout_manager,
         hook_timeout_context,
+    )
+    from lib.unified_timeout_manager import (
+        TimeoutError as PlatformTimeoutError,
     )
 except ImportError:
     # Fallback implementations if new modules not available
@@ -873,15 +875,13 @@ def load_user_personalization() -> dict:
         has_valid_name = user_name and not user_name.startswith("{{") and not user_name.endswith("}}")
 
         # Get language name
+        # System provides 4 languages: ko, en, ja, zh
+        # Language names are defined in .moai/config/sections/language.yaml
         lang_name_map = {
             "ko": "Korean",
             "en": "English",
             "ja": "Japanese",
             "zh": "Chinese",
-            "es": "Spanish",
-            "fr": "French",
-            "de": "German",
-            "ru": "Russian",
         }
         lang_name = lang_name_map.get(conversation_lang, "Unknown")
 
@@ -1036,12 +1036,6 @@ def main() -> None:
 
     def execute_session_start():
         """Execute session start logic with proper error handling"""
-        # Read JSON payload from stdin (for compatibility)
-        # Handle Docker/non-interactive environments by checking TTY
-        # Note: SessionStart hook receives session info but we don't need it currently
-        input_data = sys.stdin.read() if not sys.stdin.isatty() else "{}"
-        _ = json.loads(input_data) if input_data.strip() else {}  # Explicitly ignore
-
         # Check if setup messages should be shown
         show_messages = should_show_setup_messages()
 
@@ -1102,73 +1096,6 @@ def main() -> None:
             }
             print(json.dumps(error_response, ensure_ascii=False))
             print(f"SessionStart error: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    else:
-        # Fallback to legacy timeout handling
-        try:
-            from lib.timeout import CrossPlatformTimeout
-            from lib.timeout import TimeoutError as PlatformTimeoutError
-
-            # Set 5-second timeout
-            timeout = CrossPlatformTimeout(5)
-            timeout.start()
-
-            try:
-                result = execute_session_start()
-                print(json.dumps(result))
-                sys.exit(0)
-
-            except PlatformTimeoutError:
-                # Timeout - return minimal valid response
-                timeout_response_legacy: dict[str, Any] = {
-                    "continue": True,
-                    "systemMessage": "⚠️ Session start timeout - continuing without project info",
-                }
-                print(json.dumps(timeout_response_legacy))
-                print("SessionStart hook timeout after 5 seconds", file=sys.stderr)
-                sys.exit(1)
-
-            finally:
-                # Always cancel timeout
-                timeout.cancel()
-
-        except ImportError:
-            # No timeout handling available
-            try:
-                result = execute_session_start()
-                print(json.dumps(result))
-                sys.exit(0)
-            except Exception as e:
-                print(
-                    json.dumps(
-                        {
-                            "continue": True,
-                            "systemMessage": "⚠️ Session start completed with errors",
-                            "error": str(e),
-                        }
-                    )
-                )
-                sys.exit(0)
-
-        except json.JSONDecodeError as e:
-            # JSON parse error
-            json_error_response: dict[str, Any] = {
-                "continue": True,
-                "hookSpecificOutput": {"error": f"JSON parse error: {e}"},
-            }
-            print(json.dumps(json_error_response))
-            print(f"SessionStart JSON parse error: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        except Exception as e:
-            # Unexpected error
-            general_error_response: dict[str, Any] = {
-                "continue": True,
-                "hookSpecificOutput": {"error": f"SessionStart error: {e}"},
-            }
-            print(json.dumps(general_error_response))
-            print(f"SessionStart unexpected error: {e}", file=sys.stderr)
             sys.exit(1)
 
 
