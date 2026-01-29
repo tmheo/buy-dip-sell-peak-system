@@ -310,30 +310,32 @@ export function createRemainingTiers(
   const activeTiers = cycleManager.getActiveTiers();
   const price = new Decimal(currentPrice);
 
-  return activeTiers.map((tier) => {
-    const shares = new Decimal(tier.shares);
-    const buyPrice = new Decimal(tier.buyPrice);
-    const currentValue = shares.mul(price).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
-    const cost = shares.mul(buyPrice).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
-    const profitLoss = new Decimal(currentValue)
-      .sub(cost)
-      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-      .toNumber();
-    const returnRate = price
-      .sub(buyPrice)
-      .div(buyPrice)
-      .toDecimalPlaces(4, Decimal.ROUND_DOWN)
-      .toNumber();
+  return activeTiers
+    .map((tier) => {
+      const shares = new Decimal(tier.shares);
+      const buyPrice = new Decimal(tier.buyPrice);
+      const currentValue = shares.mul(price).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+      const cost = shares.mul(buyPrice).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+      const profitLoss = new Decimal(currentValue)
+        .sub(cost)
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .toNumber();
+      const returnRate = price
+        .sub(buyPrice)
+        .div(buyPrice)
+        .toDecimalPlaces(4, Decimal.ROUND_DOWN)
+        .toNumber();
 
-    return {
-      tier: tier.tier,
-      shares: tier.shares,
-      buyPrice: tier.buyPrice,
-      buyDate: tier.buyDate,
-      currentPrice,
-      currentValue,
-      profitLoss,
-      returnRate,
-    };
-  });
+      return {
+        tier: tier.tier,
+        shares: tier.shares,
+        buyPrice: tier.buyPrice,
+        buyDate: tier.buyDate,
+        currentPrice,
+        currentValue,
+        profitLoss,
+        returnRate,
+      };
+    })
+    .sort((a, b) => a.tier - b.tier);
 }
