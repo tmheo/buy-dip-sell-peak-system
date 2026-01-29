@@ -5,7 +5,7 @@
  */
 import Decimal from "decimal.js";
 import type { DailySnapshot, TechnicalMetrics } from "./types";
-import { floorToDecimal } from "./order";
+import { floorToDecimal, roundToDecimal } from "./order";
 
 /**
  * 수익률 계산
@@ -16,7 +16,7 @@ import { floorToDecimal } from "./order";
  */
 export function calculateReturn(initial: number, final: number): number {
   if (initial === 0) return 0;
-  return floorToDecimal((final - initial) / initial, 4);
+  return roundToDecimal((final - initial) / initial, 4);
 }
 
 /**
@@ -254,7 +254,7 @@ export function calculateCAGR(
 
   const cagr = ratio.pow(new Decimal(1).div(years)).sub(1);
 
-  return cagr.toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber();
+  return cagr.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
 }
 
 /**

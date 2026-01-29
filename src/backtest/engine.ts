@@ -238,7 +238,7 @@ export class BacktestEngine {
       endDate: request.endDate,
       initialCapital: request.initialCapital,
       finalAsset,
-      returnRate: new Decimal(returnRate).toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber(),
+      returnRate: new Decimal(returnRate).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber(),
       cagr,
       mdd,
       totalCycles,
