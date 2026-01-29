@@ -6,14 +6,13 @@ description: >
 license: Apache-2.0
 compatibility: Designed for Claude Code
 allowed-tools: Read Write Edit Bash Grep Glob mcp__context7__resolve-library-id mcp__context7__get-library-docs
-
+user-invocable: false
 metadata:
   version: "1.2.0"
   category: "workflow"
   status: "active"
   updated: "2026-01-08"
   modularized: "true"
-  user-invocable: "false"
   tags: "workflow, spec, ears, requirements, moai-adk, planning"
   author: "MoAI-ADK Team"
   context: "fork"
@@ -279,11 +278,19 @@ For advanced patterns including SPEC templates, validation automation, and workf
 
 ### SPEC File Organization
 
-Directory Structure:
+Directory Structure (Standard 3-File Format):
 
-- .moai/specs/: SPEC document files (SPEC-001-feature-name.md)
+- .moai/specs/SPEC-{ID}/: SPEC document directory containing 3 required files
+  - spec.md: EARS format specification (Environment, Assumptions, Requirements, Specifications)
+  - plan.md: Implementation plan, milestones, technical approach
+  - acceptance.md: Detailed acceptance criteria, test scenarios (Given-When-Then format)
 - .moai/memory/: Session state files (last-session-state.json)
 - .moai/docs/: Generated documentation (api-documentation.md)
+
+[HARD] Required File Set:
+Every SPEC directory MUST contain all 3 files (spec.md, plan.md, acceptance.md)
+WHY: Complete SPEC structure ensures traceability, implementation guidance, and quality validation
+IMPACT: Missing files create incomplete requirements and prevent proper workflow execution
 
 ### SPEC Metadata Schema
 
