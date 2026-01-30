@@ -31,6 +31,8 @@ import type { QuickRecommendResult } from "./types";
 export interface QuickRecommendationOptions {
   /** DB에 캐시 저장 여부 (기본값: true) */
   persistToDb?: boolean;
+  /** DB 캐시 조회 건너뛰기 (기본값: false) - 커스텀 파라미터 백테스트 시 사용 */
+  skipDbCache?: boolean;
 }
 
 /** 백테스트용 lookback 일수 */
@@ -79,33 +81,37 @@ export function getQuickRecommendation(
   dateToIndexMap: Map<string, number>,
   options: QuickRecommendationOptions = {}
 ): QuickRecommendResult | null {
-  const { persistToDb = true } = options;
-  // 0. 메모이제이션 캐시 확인
+  const { persistToDb = true, skipDbCache = false } = options;
+  // 0. 메모이제이션 캐시 확인 (skipDbCache가 true면 건너뜀)
   const cacheKey = `${ticker}:${referenceDate}`;
-  const memoryCached = recommendationCache.get(cacheKey);
-  if (memoryCached) {
-    return memoryCached;
+  if (!skipDbCache) {
+    const memoryCached = recommendationCache.get(cacheKey);
+    if (memoryCached) {
+      return memoryCached;
+    }
   }
 
-  // 0-1. DB 캐시 확인
-  const dbCached = getRecommendationFromCache(ticker, referenceDate);
-  if (dbCached) {
-    const result: QuickRecommendResult = {
-      strategy: dbCached.strategy as StrategyName,
-      reason: dbCached.reason ?? "캐시된 추천",
-      metrics: {
-        goldenCross: dbCached.goldenCross ?? 0,
-        isGoldenCross: dbCached.isGoldenCross,
-        maSlope: dbCached.maSlope ?? 0,
-        disparity: dbCached.disparity ?? 0,
-        rsi14: dbCached.rsi14 ?? 50,
-        roc12: dbCached.roc12 ?? 0,
-        volatility20: dbCached.volatility20 ?? 0,
-      },
-    };
-    // 인메모리 캐시에도 저장
-    recommendationCache.set(cacheKey, result);
-    return result;
+  // 0-1. DB 캐시 확인 (skipDbCache가 true면 건너뜀)
+  if (!skipDbCache) {
+    const dbCached = getRecommendationFromCache(ticker, referenceDate);
+    if (dbCached) {
+      const result: QuickRecommendResult = {
+        strategy: dbCached.strategy as StrategyName,
+        reason: dbCached.reason ?? "캐시된 추천",
+        metrics: {
+          goldenCross: dbCached.goldenCross ?? 0,
+          isGoldenCross: dbCached.isGoldenCross,
+          maSlope: dbCached.maSlope ?? 0,
+          disparity: dbCached.disparity ?? 0,
+          rsi14: dbCached.rsi14 ?? 50,
+          roc12: dbCached.roc12 ?? 0,
+          volatility20: dbCached.volatility20 ?? 0,
+        },
+      };
+      // 인메모리 캐시에도 저장
+      recommendationCache.set(cacheKey, result);
+      return result;
+    }
   }
 
   // 1. 기준일 인덱스 찾기

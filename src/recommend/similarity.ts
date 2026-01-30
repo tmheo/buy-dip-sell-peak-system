@@ -5,6 +5,7 @@
 import Decimal from "decimal.js";
 
 import type { TechnicalMetrics } from "@/backtest/types";
+import type { SimilarityOptions, MetricWeights, MetricTolerances } from "@/optimize/types";
 
 import type { MetricsVector, HistoricalMetrics, SimilarPeriod } from "./types";
 
@@ -17,18 +18,91 @@ export const PERFORMANCE_PERIOD_DAYS = 20;
 /** 최소 과거 간격 (기준일로부터 최소 40일 이전) */
 export const MIN_PAST_GAP_DAYS = 40;
 
-/** 지표별 가중치: [기울기, 이격도, RSI, ROC, 변동성] */
-const METRIC_WEIGHTS: [number, number, number, number, number] = [0.35, 0.4, 0.05, 0.07, 0.13];
+/**
+ * 지표별 가중치: [기울기, 이격도, RSI, ROC, 변동성]
+ * SPEC-PERF-001 최적화 결과 (2025.01.02-2025.12.31, SOXL)
+ * - 기존: [0.35, 0.4, 0.05, 0.07, 0.13]
+ * - 최적화 후: +17.87% 전략점수 개선, 수익률 72.7% → 85.69%
+ */
+export const METRIC_WEIGHTS: MetricWeights = [0.214, 0.3175, 0.156, 0.266, 0.0465];
 
-/** 지표별 허용 오차 (지수 감쇠 민감도): [기울기, 이격도, RSI, ROC, 변동성] */
-const METRIC_TOLERANCES: [number, number, number, number, number] = [36, 90, 4.5, 40, 28];
+/**
+ * 지표별 허용 오차 (지수 감쇠 민감도): [기울기, 이격도, RSI, ROC, 변동성]
+ * SPEC-PERF-001 최적화 결과 (2025.01.02-2025.12.31, SOXL)
+ * - 기존: [36, 90, 4.5, 40, 28]
+ */
+export const METRIC_TOLERANCES: MetricTolerances = [14.38, 87.57, 7.03, 78.67, 70.27];
+
+// ============================================================
+// 글로벌 유사도 파라미터 관리
+// ============================================================
+
+/** 현재 활성 가중치 (글로벌 상태) */
+let currentWeights: MetricWeights = METRIC_WEIGHTS;
+
+/** 현재 활성 허용오차 (글로벌 상태) */
+let currentTolerances: MetricTolerances = METRIC_TOLERANCES;
+
+/**
+ * 글로벌 유사도 파라미터 설정
+ * 최적화 실행 시 커스텀 파라미터를 글로벌로 설정
+ *
+ * @param weights - 메트릭 가중치 (5개)
+ * @param tolerances - 메트릭 허용오차 (5개)
+ */
+export function setGlobalSimilarityParams(
+  weights: MetricWeights,
+  tolerances: MetricTolerances
+): void {
+  currentWeights = weights;
+  currentTolerances = tolerances;
+}
+
+/**
+ * 글로벌 유사도 파라미터 초기화
+ * 기본값(METRIC_WEIGHTS, METRIC_TOLERANCES)으로 복원
+ */
+export function resetGlobalSimilarityParams(): void {
+  currentWeights = METRIC_WEIGHTS;
+  currentTolerances = METRIC_TOLERANCES;
+}
+
+/**
+ * 현재 유사도 파라미터 조회
+ * 글로벌 상태로 설정된 현재 파라미터 반환
+ *
+ * @returns 현재 가중치와 허용오차
+ */
+export function getCurrentSimilarityParams(): {
+  weights: MetricWeights;
+  tolerances: MetricTolerances;
+} {
+  return {
+    weights: currentWeights,
+    tolerances: currentTolerances,
+  };
+}
 
 /**
  * 지수 감쇠 기반 유사도 계산
  * 공식: 유사도 = sum(weight_i * 100 * exp(-diff_i / tolerance_i))
+ *
+ * @param vectorA - 첫 번째 메트릭 벡터 (5개 지표)
+ * @param vectorB - 두 번째 메트릭 벡터 (5개 지표)
+ * @param options - 선택적 파라미터 (weights, tolerances)
+ *                  지정하지 않으면 글로벌 파라미터 사용
+ * @returns 유사도 점수 (0-100 범위)
  */
-export function calculateExponentialSimilarity(vectorA: number[], vectorB: number[]): number {
-  const expectedLen = METRIC_WEIGHTS.length;
+export function calculateExponentialSimilarity(
+  vectorA: number[],
+  vectorB: number[],
+  options?: SimilarityOptions
+): number {
+  // 파라미터 결정: options > 글로벌 상태
+  const weights = options?.weights ?? currentWeights;
+  const tolerances = options?.tolerances ?? currentTolerances;
+
+  const expectedLen = weights.length;
   if (vectorA.length !== expectedLen || vectorB.length !== expectedLen) {
     throw new Error(`벡터 길이는 ${expectedLen}이어야 합니다`);
   }
@@ -37,8 +111,8 @@ export function calculateExponentialSimilarity(vectorA: number[], vectorB: numbe
 
   for (let i = 0; i < vectorA.length; i++) {
     const diff = Math.abs(vectorA[i] - vectorB[i]);
-    const tolerance = METRIC_TOLERANCES[i];
-    const weight = METRIC_WEIGHTS[i];
+    const tolerance = tolerances[i];
+    const weight = weights[i];
 
     // sim_i = 100 * exp(-diff / tolerance)
     const simI = new Decimal(100).mul(new Decimal(-diff / tolerance).exp());
