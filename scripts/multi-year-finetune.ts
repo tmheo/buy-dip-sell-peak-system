@@ -307,7 +307,10 @@ async function main(): Promise<void> {
   console.log(`  평균 MDD: ${formatPercent(best.avgMdd)}`);
   console.log(`  최소 수익률: ${formatPercent(best.minReturnRate)}`);
 
-  const improvement = ((best.combinedScore - previousBest.combinedScore) / Math.abs(previousBest.combinedScore)) * 100;
+  const previousBestAbs = Math.abs(previousBest.combinedScore);
+  const improvement = previousBestAbs > 0
+    ? ((best.combinedScore - previousBest.combinedScore) / previousBestAbs) * 100
+    : 0;
   console.log(`  개선율: ${improvement >= 0 ? "+" : ""}${new Decimal(improvement).toDecimalPlaces(2).toNumber()}%`);
 
   console.log("\n  연도별 결과:");
@@ -337,7 +340,10 @@ async function main(): Promise<void> {
     const candidateVariations = sortedAll.filter((r) => r.parentIndex === i);
     const bestVariation = candidateVariations[0];
     const originalScore = topResults[i].combinedScore;
-    const variationImprovement = ((bestVariation.combinedScore - originalScore) / Math.abs(originalScore)) * 100;
+    const originalScoreAbs = Math.abs(originalScore);
+    const variationImprovement = originalScoreAbs > 0
+      ? ((bestVariation.combinedScore - originalScore) / originalScoreAbs) * 100
+      : 0;
     console.log(`  Top #${i + 1}: 원본=${formatScore(originalScore)} → 최고변형=${formatScore(bestVariation.combinedScore)} (${variationImprovement >= 0 ? "+" : ""}${new Decimal(variationImprovement).toDecimalPlaces(2).toNumber()}%)`);
   }
 
