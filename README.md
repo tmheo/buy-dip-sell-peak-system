@@ -104,6 +104,9 @@ npm run dev query -- --ticker SOXL --start 2025-01-01 --end 2025-12-31
 
 # 추천 전략 사전 계산
 npx tsx scripts/precompute-recommendations.ts
+
+# 유사도 파라미터 최적화 (SPEC-PERF-001)
+npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ```
 
 #### 명령어 옵션
@@ -197,6 +200,13 @@ src/
 │   ├── engine.ts                    # 추천 전략 백테스트 엔진
 │   ├── recommend-helper.ts          # 빠른 전략 추천 헬퍼
 │   ├── types.ts                     # 추천 백테스트 전용 타입
+│   └── index.ts                     # 모듈 엔트리포인트
+├── optimize/                        # 유사도 파라미터 최적화 (SPEC-PERF-001)
+│   ├── types.ts                     # 최적화 타입 정의
+│   ├── param-generator.ts           # 랜덤/변형 파라미터 생성
+│   ├── backtest-runner.ts           # 커스텀 파라미터 백테스트 실행
+│   ├── analyzer.ts                  # 결과 분석 및 순위 결정
+│   ├── cli.ts                       # CLI 진입점
 │   └── index.ts                     # 모듈 엔트리포인트
 ├── utils/
 │   └── trading-core.ts              # 공통 트레이딩 유틸리티 (가격 계산, 체결 판정)
