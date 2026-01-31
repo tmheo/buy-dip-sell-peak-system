@@ -119,8 +119,14 @@ function clamp(value: number, min: number, max: number): number {
  */
 function generateFineTuneVariations(base: SimilarityParams, count: number): SimilarityParams[] {
   const variations: SimilarityParams[] = [];
+  const maxRetries = count * 10; // 최대 재시도 횟수
+  let totalAttempts = 0;
 
   for (let i = 0; i < count; i++) {
+    if (totalAttempts++ >= maxRetries) {
+      console.warn(`경고: 최대 재시도 횟수(${maxRetries})에 도달. ${variations.length}개 변형만 생성됨.`);
+      break;
+    }
     // 가중치 변형: ±5% 범위 내 조정
     const variedWeights: number[] = [];
     for (let j = 0; j < METRIC_COUNT; j++) {
@@ -318,7 +324,7 @@ async function main(): Promise<void> {
   console.log("\n[Fine-tuning Top 5]");
   for (let i = 0; i < Math.min(5, sortedAll.length); i++) {
     const cand = sortedAll[i];
-    const isOriginal = i < TOP_CANDIDATES.length && cand === topResults[i];
+    const isOriginal = topResults.includes(cand);
     const label = isOriginal ? "(원본)" : `(Top #${cand.parentIndex + 1} 파생)`;
     console.log(`  #${i + 1}: 통합점수=${formatScore(cand.combinedScore)}, 평균수익률=${formatPercent(cand.avgReturnRate)} ${label}`);
     console.log(`      가중치: [${cand.params.weights.map((w) => new Decimal(w).toDecimalPlaces(4).toNumber()).join(", ")}]`);

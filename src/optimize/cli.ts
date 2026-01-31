@@ -72,6 +72,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
   if (!dateRegex.test(endDate)) {
     throw new Error(`유효하지 않은 종료일 형식: ${endDate}. YYYY-MM-DD 형식이어야 합니다.`);
   }
+  if (startDate > endDate) {
+    throw new Error(`시작일은 종료일보다 앞서야 합니다: ${startDate} ~ ${endDate}`);
+  }
 
   const config: OptimizationConfig = {
     ticker: tickerArg as "SOXL" | "TQQQ",

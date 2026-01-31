@@ -45,7 +45,9 @@ export function normalizeWeights(weights: number[]): MetricWeights {
       totalDeficit = totalDeficit.add(minWeight.sub(w));
     } else {
       adjustedWeights.push(w);
-      countAboveMin++;
+      if (w.greaterThan(minWeight)) {
+        countAboveMin++;
+      }
     }
   }
 

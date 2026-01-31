@@ -252,7 +252,10 @@ async function main(): Promise<void> {
   console.log(`  평균 MDD: ${formatPercent(best.avgMdd)}`);
   console.log(`  최소 수익률: ${formatPercent(best.minReturnRate)}`);
 
-  const improvement = ((best.combinedScore - baseline.combinedScore) / Math.abs(baseline.combinedScore)) * 100;
+  const baselineAbs = Math.abs(baseline.combinedScore);
+  const improvement = baselineAbs > 0
+    ? ((best.combinedScore - baseline.combinedScore) / baselineAbs) * 100
+    : 0;
   console.log(`  개선율: ${improvement >= 0 ? "+" : ""}${new Decimal(improvement).toDecimalPlaces(2).toNumber()}%`);
 
   console.log("\n  연도별 결과:");
