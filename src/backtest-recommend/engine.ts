@@ -34,7 +34,13 @@ import type {
   CycleStrategyInfo,
   DailySnapshotWithStrategy,
 } from "./types";
-import { getQuickRecommendation } from "./recommend-helper";
+import { getQuickRecommendation, type QuickRecommendationOptions } from "./recommend-helper";
+
+/** RecommendBacktestEngine 옵션 */
+export interface RecommendBacktestEngineOptions {
+  /** DB 캐시 조회 건너뛰기 (기본값: false) - 커스텀 유사도 파라미터 사용 시 true */
+  skipDbCache?: boolean;
+}
 
 /**
  * 추천 전략 백테스트 엔진
@@ -46,11 +52,13 @@ export class RecommendBacktestEngine {
   private ticker: "SOXL" | "TQQQ";
   private allPrices: DailyPrice[];
   private dateToIndexMap: Map<string, number>;
+  private recommendOptions: QuickRecommendationOptions;
 
   constructor(
     ticker: "SOXL" | "TQQQ",
     allPrices: DailyPrice[],
-    dateToIndexMap: Map<string, number>
+    dateToIndexMap: Map<string, number>,
+    options: RecommendBacktestEngineOptions = {}
   ) {
     this.ticker = ticker;
     this.allPrices = allPrices;
@@ -58,6 +66,11 @@ export class RecommendBacktestEngine {
     // 초기 전략은 run()에서 설정
     this.currentStrategyName = "Pro2";
     this.currentStrategy = getStrategy("Pro2");
+    // 추천 옵션 설정 (커스텀 파라미터 사용 시 DB 캐시 건너뛰기)
+    this.recommendOptions = {
+      persistToDb: !options.skipDbCache, // skipDbCache면 저장도 안 함
+      skipDbCache: options.skipDbCache ?? false,
+    };
   }
 
   /**
@@ -82,7 +95,8 @@ export class RecommendBacktestEngine {
             this.ticker,
             prices[initialRecommendDateIndex].date,
             this.allPrices,
-            this.dateToIndexMap
+            this.dateToIndexMap,
+            this.recommendOptions
           )
         : null;
     this.currentStrategyName = initialRecommend?.strategy ?? "Pro2";
@@ -169,7 +183,8 @@ export class RecommendBacktestEngine {
           this.ticker,
           prevPrice.date,
           this.allPrices,
-          this.dateToIndexMap
+          this.dateToIndexMap,
+          this.recommendOptions
         );
         const newStrategy = newRecommend?.strategy ?? "Pro2";
         const newReason = newRecommend?.reason ?? "기본 전략";
@@ -215,7 +230,8 @@ export class RecommendBacktestEngine {
           this.ticker,
           prevPrice.date,
           this.allPrices,
-          this.dateToIndexMap
+          this.dateToIndexMap,
+          this.recommendOptions
         );
         const todayStrategy = todayRecommend?.strategy ?? "Pro2";
         const todayReason = todayRecommend?.reason ?? "기본 전략";
