@@ -1,12 +1,6 @@
 /**
  * 유사도 파라미터 최적화 CLI
  * SPEC-PERF-001: CLI 진입점
- *
- * 최적화 파이프라인 전체를 오케스트레이션합니다.
- * - 명령줄 인자 파싱
- * - 베이스라인 및 랜덤 파라미터 백테스트 실행
- * - 상위 후보 변형 탐색
- * - 결과 분석 및 출력
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -25,32 +19,14 @@ import { generateRandomParams, generateVariations } from "./param-generator";
 import { loadPriceData, runBacktestWithParams } from "./backtest-runner";
 import { analyzeResults } from "./analyzer";
 
-// ============================================================
-// CLI 인자 파싱
-// ============================================================
-
-/**
- * CLI 인자 파싱
- * 명령줄 인자를 OptimizationConfig로 변환
- *
- * @param argv - process.argv 배열 (node, script path, ...args)
- * @returns 최적화 설정 객체
- *
- * 지원하는 인자:
- * --ticker SOXL|TQQQ (기본: SOXL)
- * --start YYYY-MM-DD (기본: 2025-01-01)
- * --end YYYY-MM-DD (기본: 2025-12-31)
- * --capital N (기본: 10000)
- * --random N (기본: 50)
- * --variations N (기본: 10)
- * --top N (기본: 3)
- * --output path (선택적, 결과 JSON 저장 경로)
- */
-export function parseArgs(argv: string[]): {
+/** CLI 인자 파싱 결과 */
+interface ParsedArgs {
   config: OptimizationConfig;
   outputPath: string | null;
-} {
-  // 인자 맵 생성 (--key value 형식)
+}
+
+/** 명령줄 인자 맵 생성 (--key value 형식) */
+function buildArgMap(argv: string[]): Map<string, string> {
   const args = new Map<string, string>();
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
@@ -59,24 +35,37 @@ export function parseArgs(argv: string[]): {
       const value = argv[i + 1];
       if (value && !value.startsWith("--")) {
         args.set(key, value);
-        i++; // 값 건너뛰기
+        i++;
       }
     }
   }
+  return args;
+}
 
-  // 티커 파싱 (SOXL 또는 TQQQ만 허용)
+/** 양의 정수 파싱 및 검증 */
+function parsePositiveInt(value: string | undefined, defaultValue: number, name: string): number {
+  const parsed = parseInt(value ?? String(defaultValue), 10);
+  if (isNaN(parsed) || parsed <= 0) {
+    throw new Error(`유효하지 않은 ${name}: ${value}. 양의 정수여야 합니다.`);
+  }
+  return parsed;
+}
+
+/** CLI 인자 파싱 */
+export function parseArgs(argv: string[]): ParsedArgs {
+  const args = buildArgMap(argv);
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+  // 티커 파싱
   const tickerArg = args.get("ticker")?.toUpperCase() ?? "SOXL";
   if (tickerArg !== "SOXL" && tickerArg !== "TQQQ") {
     throw new Error(`유효하지 않은 티커: ${tickerArg}. SOXL 또는 TQQQ만 지원합니다.`);
   }
-  const ticker: "SOXL" | "TQQQ" = tickerArg;
 
-  // 날짜 파싱 (YYYY-MM-DD 형식 검증)
+  // 날짜 파싱
   const startDate = args.get("start") ?? "2025-01-01";
   const endDate = args.get("end") ?? "2025-12-31";
 
-  // 날짜 형식 검증
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(startDate)) {
     throw new Error(`유효하지 않은 시작일 형식: ${startDate}. YYYY-MM-DD 형식이어야 합니다.`);
   }
@@ -84,162 +73,109 @@ export function parseArgs(argv: string[]): {
     throw new Error(`유효하지 않은 종료일 형식: ${endDate}. YYYY-MM-DD 형식이어야 합니다.`);
   }
 
-  // 숫자 파싱
-  const initialCapital = parseInt(args.get("capital") ?? "10000", 10);
-  const randomCombinations = parseInt(
-    args.get("random") ?? String(DEFAULT_OPTIMIZATION_CONFIG.randomCombinations),
-    10
-  );
-  const variationsPerTop = parseInt(
-    args.get("variations") ?? String(DEFAULT_OPTIMIZATION_CONFIG.variationsPerTop),
-    10
-  );
-  const topCandidates = parseInt(
-    args.get("top") ?? String(DEFAULT_OPTIMIZATION_CONFIG.topCandidates),
-    10
-  );
-
-  // 숫자 유효성 검증
-  if (isNaN(initialCapital) || initialCapital <= 0) {
-    throw new Error(`유효하지 않은 초기 자본: ${args.get("capital")}. 양의 정수여야 합니다.`);
-  }
-  if (isNaN(randomCombinations) || randomCombinations <= 0) {
-    throw new Error(`유효하지 않은 랜덤 조합 수: ${args.get("random")}. 양의 정수여야 합니다.`);
-  }
-  if (isNaN(variationsPerTop) || variationsPerTop <= 0) {
-    throw new Error(`유효하지 않은 변형 수: ${args.get("variations")}. 양의 정수여야 합니다.`);
-  }
-  if (isNaN(topCandidates) || topCandidates <= 0) {
-    throw new Error(`유효하지 않은 상위 후보 수: ${args.get("top")}. 양의 정수여야 합니다.`);
-  }
-
-  // 출력 경로 (선택적)
-  const outputPath = args.get("output") ?? null;
-
   const config: OptimizationConfig = {
-    ticker,
+    ticker: tickerArg as "SOXL" | "TQQQ",
     startDate,
     endDate,
-    initialCapital,
-    randomCombinations,
-    variationsPerTop,
-    topCandidates,
+    initialCapital: parsePositiveInt(args.get("capital"), 10000, "초기 자본"),
+    randomCombinations: parsePositiveInt(
+      args.get("random"),
+      DEFAULT_OPTIMIZATION_CONFIG.randomCombinations,
+      "랜덤 조합 수"
+    ),
+    variationsPerTop: parsePositiveInt(
+      args.get("variations"),
+      DEFAULT_OPTIMIZATION_CONFIG.variationsPerTop,
+      "변형 수"
+    ),
+    topCandidates: parsePositiveInt(
+      args.get("top"),
+      DEFAULT_OPTIMIZATION_CONFIG.topCandidates,
+      "상위 후보 수"
+    ),
   };
 
-  return { config, outputPath };
+  return { config, outputPath: args.get("output") ?? null };
 }
 
-// ============================================================
-// 출력 포맷팅
-// ============================================================
+/** 소수점을 지정된 자릿수로 반올림 */
+function roundDecimal(value: number, places: number): number {
+  return new Decimal(value).toDecimalPlaces(places, Decimal.ROUND_HALF_UP).toNumber();
+}
 
-/**
- * 숫자를 퍼센트 문자열로 포맷팅
- * @param value - 소수점 값 (예: 0.45)
- * @param decimalPlaces - 소수점 자릿수 (기본: 2)
- * @returns 퍼센트 문자열 (예: "45.00%")
- */
+/** 숫자를 퍼센트 문자열로 포맷팅 (예: 0.45 -> "45%") */
 function formatPercent(value: number, decimalPlaces: number = 2): string {
-  const percent = new Decimal(value).mul(100).toDecimalPlaces(decimalPlaces, Decimal.ROUND_HALF_UP);
-  return `${percent.toNumber()}%`;
+  return `${roundDecimal(value * 100, decimalPlaces)}%`;
 }
 
-/**
- * 개선율을 부호 포함 퍼센트 문자열로 포맷팅
- * @param value - 개선율 값 (소수점)
- * @returns 부호 포함 퍼센트 문자열 (예: "+8.9%")
- */
+/** 개선율을 부호 포함 퍼센트 문자열로 포맷팅 (예: 8.9 -> "+8.9%") */
 function formatImprovement(value: number): string {
-  const percent = new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
-  const sign = percent >= 0 ? "+" : "";
-  return `${sign}${percent}%`;
+  const percent = roundDecimal(value, 2);
+  return `${percent >= 0 ? "+" : ""}${percent}%`;
 }
 
-/**
- * 가중치 배열을 문자열로 포맷팅
- * @param weights - 가중치 배열
- * @returns 포맷팅된 문자열 (예: "[0.35, 0.4, 0.05, 0.07, 0.13]")
- */
+/** 배열을 문자열로 포맷팅 */
+function formatArray(arr: readonly number[], decimalPlaces: number): string {
+  return `[${arr.map((v) => roundDecimal(v, decimalPlaces)).join(", ")}]`;
+}
+
+/** 가중치 배열 포맷팅 (소수점 4자리) */
 function formatWeights(weights: readonly number[]): string {
-  const formatted = weights.map((w) =>
-    new Decimal(w).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber()
-  );
-  return `[${formatted.join(", ")}]`;
+  return formatArray(weights, 4);
 }
 
-/**
- * 허용오차 배열을 문자열로 포맷팅
- * @param tolerances - 허용오차 배열
- * @returns 포맷팅된 문자열 (예: "[36, 90, 4.5, 40, 28]")
- */
+/** 허용오차 배열 포맷팅 (소수점 2자리) */
 function formatTolerances(tolerances: readonly number[]): string {
-  const formatted = tolerances.map((t) =>
-    new Decimal(t).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber()
-  );
-  return `[${formatted.join(", ")}]`;
+  return formatArray(tolerances, 2);
 }
 
-/**
- * 전략 점수를 문자열로 포맷팅
- * @param score - 전략 점수
- * @returns 포맷팅된 문자열 (예: "38.72")
- */
+/** 전략 점수 포맷팅 */
 function formatScore(score: number): string {
   return new Decimal(score).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toString();
 }
 
-/**
- * 실행 시간을 초 단위로 포맷팅
- * @param ms - 밀리초
- * @returns 초 단위 문자열 (예: "245초")
- */
+/** 실행 시간을 초 단위로 포맷팅 */
 function formatDuration(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  return `${seconds}초`;
+  return `${Math.round(ms / 1000)}초`;
 }
 
-/**
- * 최적화 결과를 콘솔 출력 형식으로 포맷팅
- * SPEC-PERF-001 4.3 출력 형식 준수
- *
- * @param result - 최적화 결과
- * @returns 포맷팅된 출력 문자열
- */
+/** 후보별 개선율 계산 */
+function calculateCandidateImprovement(candidateScore: number, baselineScore: number): number {
+  if (baselineScore === 0) return 0;
+  return new Decimal(candidateScore)
+    .sub(baselineScore)
+    .div(baselineScore)
+    .mul(100)
+    .toDecimalPlaces(1, Decimal.ROUND_HALF_UP)
+    .toNumber();
+}
+
+/** 최적화 결과를 콘솔 출력 형식으로 포맷팅 */
 export function formatOutput(result: OptimizationResult): string {
-  const lines: string[] = [];
+  const lines: string[] = [
+    "=== 유사도 파라미터 최적화 결과 ===",
+    "",
+    "[베이스라인]",
+    `  가중치: ${formatWeights(METRIC_WEIGHTS)}`,
+    `  허용오차: ${formatTolerances(METRIC_TOLERANCES)}`,
+    `  수익률: ${formatPercent(result.baseline.returnRate)}`,
+    `  MDD: ${formatPercent(result.baseline.mdd)}`,
+    `  전략 점수: ${formatScore(result.baseline.strategyScore)}`,
+    "",
+    "[Top 3 후보]",
+  ];
 
-  // 헤더
-  lines.push("=== 유사도 파라미터 최적화 결과 ===");
-  lines.push("");
-
-  // 베이스라인 섹션
-  lines.push("[베이스라인]");
-  lines.push(`  가중치: ${formatWeights(METRIC_WEIGHTS)}`);
-  lines.push(`  허용오차: ${formatTolerances(METRIC_TOLERANCES)}`);
-  lines.push(`  수익률: ${formatPercent(result.baseline.returnRate)}`);
-  lines.push(`  MDD: ${formatPercent(result.baseline.mdd)}`);
-  lines.push(`  전략 점수: ${formatScore(result.baseline.strategyScore)}`);
-  lines.push("");
-
-  // Top 3 후보 섹션
-  lines.push("[Top 3 후보]");
-  const topCandidates = result.candidates.slice(0, 3);
-  for (const candidate of topCandidates) {
-    const improvementPercent = formatImprovement(result.summary.improvementPercent);
-    const scoreImprovement =
+  for (const candidate of result.candidates.slice(0, 3)) {
+    const improvement =
       candidate.rank === 1
-        ? ` (${improvementPercent})`
-        : ` (${formatImprovement(
-            new Decimal(candidate.metrics.strategyScore)
-              .sub(result.baseline.strategyScore)
-              .div(result.baseline.strategyScore)
-              .mul(100)
-              .toDecimalPlaces(1, Decimal.ROUND_HALF_UP)
-              .toNumber()
-          )})`;
+        ? result.summary.improvementPercent
+        : calculateCandidateImprovement(
+            candidate.metrics.strategyScore,
+            result.baseline.strategyScore
+          );
 
     lines.push(
-      `  #${candidate.rank}: 전략 점수 ${formatScore(candidate.metrics.strategyScore)}${scoreImprovement}`
+      `  #${candidate.rank}: 전략 점수 ${formatScore(candidate.metrics.strategyScore)} (${formatImprovement(improvement)})`
     );
     lines.push(`      가중치: ${formatWeights(candidate.params.weights)}`);
     lines.push(`      허용오차: ${formatTolerances(candidate.params.tolerances)}`);
@@ -249,47 +185,75 @@ export function formatOutput(result: OptimizationResult): string {
     lines.push("");
   }
 
-  // 요약 섹션
-  lines.push("[요약]");
-  lines.push(`  총 탐색 조합: ${result.summary.totalCombinations}개`);
-  lines.push(`  실행 시간: ${formatDuration(result.summary.executionTimeMs)}`);
-  lines.push(`  최고 개선율: ${formatImprovement(result.summary.improvementPercent)}`);
+  lines.push(
+    "[요약]",
+    `  총 탐색 조합: ${result.summary.totalCombinations}개`,
+    `  실행 시간: ${formatDuration(result.summary.executionTimeMs)}`,
+    `  최고 개선율: ${formatImprovement(result.summary.improvementPercent)}`
+  );
 
   return lines.join("\n");
 }
 
-// ============================================================
-// 메인 실행
-// ============================================================
-
-/**
- * 진행 상황 로그 출력
- * @param message - 출력할 메시지
- */
+/** 타임스탬프 포함 진행 상황 로그 출력 */
 function logProgress(message: string): void {
   const timestamp = new Date().toISOString().slice(11, 19);
   console.log(`[${timestamp}] ${message}`);
 }
 
-/**
- * CLI 메인 함수
- * 최적화 파이프라인 전체 실행
- *
- * 실행 흐름:
- * 1. 명령줄 인자 파싱
- * 2. 가격 데이터 로드
- * 3. 베이스라인 백테스트 실행 (기본 파라미터)
- * 4. 랜덤 파라미터 조합 생성 및 백테스트
- * 5. 상위 후보 선택 및 변형 생성
- * 6. 변형 백테스트 실행
- * 7. 전체 결과 분석
- * 8. 콘솔 출력 및 선택적 파일 저장
- */
+/** 백테스트 결과 타입 */
+type BacktestResult = { params: SimilarityParams; metrics: BacktestMetrics };
+
+/** 파라미터 배열에 대해 백테스트 실행 (진행 상황 출력 포함) */
+function runBatchBacktest(
+  config: OptimizationConfig,
+  params: SimilarityParams[],
+  priceData: ReturnType<typeof loadPriceData>,
+  label: string,
+  logInterval: number = 10
+): BacktestResult[] {
+  logProgress(`${label} 백테스트 실행 중 (0/${params.length})...`);
+
+  const results: BacktestResult[] = [];
+  for (let i = 0; i < params.length; i++) {
+    const metrics = runBacktestWithParams(config, params[i], priceData);
+    results.push({ params: params[i], metrics });
+
+    if ((i + 1) % logInterval === 0) {
+      logProgress(`${label} 백테스트 실행 중 (${i + 1}/${params.length})...`);
+    }
+  }
+
+  return results;
+}
+
+/** 결과를 JSON 파일로 저장 */
+function saveResults(
+  outputPath: string,
+  config: OptimizationConfig,
+  baseline: BacktestMetrics,
+  result: OptimizationResult
+): void {
+  const outputDir = path.dirname(outputPath);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const outputData = {
+    config,
+    baseline: { weights: METRIC_WEIGHTS, tolerances: METRIC_TOLERANCES, metrics: baseline },
+    result,
+    timestamp: new Date().toISOString(),
+  };
+  fs.writeFileSync(outputPath, JSON.stringify(outputData, null, 2), "utf-8");
+}
+
+/** CLI 메인 함수 */
 export async function main(): Promise<void> {
   const startTime = Date.now();
 
   try {
-    // 1. 인자 파싱
+    // 1. 인자 파싱 및 설정
     logProgress("인자 파싱 중...");
     const { config, outputPath } = parseArgs(process.argv);
     logProgress(
@@ -302,7 +266,7 @@ export async function main(): Promise<void> {
     const priceData = loadPriceData(config.ticker);
     logProgress(`가격 데이터 로드 완료: ${priceData.prices.length}개 일자`);
 
-    // 3. 베이스라인 백테스트 (기본 파라미터)
+    // 3. 베이스라인 백테스트
     logProgress("베이스라인 백테스트 실행 중...");
     const baseline = runBacktestWithParams(config, null, priceData);
     logProgress(
@@ -310,97 +274,54 @@ export async function main(): Promise<void> {
         `MDD=${formatPercent(baseline.mdd)}, 전략점수=${formatScore(baseline.strategyScore)}`
     );
 
-    // 4. 랜덤 파라미터 생성 및 백테스트
+    // 4. 랜덤 파라미터 백테스트
     logProgress(`랜덤 파라미터 ${config.randomCombinations}개 생성 중...`);
     const randomParams = generateRandomParams(config.randomCombinations);
-    logProgress(`랜덤 파라미터 생성 완료`);
-
-    logProgress(`랜덤 파라미터 백테스트 실행 중 (0/${randomParams.length})...`);
-    const randomResults: Array<{ params: SimilarityParams; metrics: BacktestMetrics }> = [];
-    for (let i = 0; i < randomParams.length; i++) {
-      const params = randomParams[i];
-      const metrics = runBacktestWithParams(config, params, priceData);
-      randomResults.push({ params, metrics });
-
-      // 10개마다 진행 상황 출력
-      if ((i + 1) % 10 === 0) {
-        logProgress(`랜덤 파라미터 백테스트 실행 중 (${i + 1}/${randomParams.length})...`);
-      }
-    }
-    logProgress(`랜덤 파라미터 백테스트 완료`);
+    const randomResults = runBatchBacktest(config, randomParams, priceData, "랜덤 파라미터");
+    logProgress("랜덤 파라미터 백테스트 완료");
 
     // 5. 상위 후보 선택
     logProgress(`상위 ${config.topCandidates}개 후보 선택 중...`);
-    // 전략 점수 기준 내림차순 정렬
-    const sortedRandomResults = [...randomResults].sort(
-      (a, b) => b.metrics.strategyScore - a.metrics.strategyScore
-    );
-    const topRandomResults = sortedRandomResults.slice(0, config.topCandidates);
+    const topRandomResults = [...randomResults]
+      .sort((a, b) => b.metrics.strategyScore - a.metrics.strategyScore)
+      .slice(0, config.topCandidates);
     logProgress(
       `상위 후보 선택 완료: ${topRandomResults.map((r) => formatScore(r.metrics.strategyScore)).join(", ")}`
     );
 
-    // 6. 상위 후보 변형 생성 및 백테스트
-    const variationResults: Array<{ params: SimilarityParams; metrics: BacktestMetrics }> = [];
-    for (let candidateIdx = 0; candidateIdx < topRandomResults.length; candidateIdx++) {
-      const topResult = topRandomResults[candidateIdx];
-      logProgress(`후보 #${candidateIdx + 1} 변형 ${config.variationsPerTop}개 생성 중...`);
-      const variations = generateVariations(topResult.params, config.variationsPerTop);
-
-      logProgress(`후보 #${candidateIdx + 1} 변형 백테스트 실행 중 (0/${variations.length})...`);
-      for (let i = 0; i < variations.length; i++) {
-        const params = variations[i];
-        const metrics = runBacktestWithParams(config, params, priceData);
-        variationResults.push({ params, metrics });
-
-        // 5개마다 진행 상황 출력
-        if ((i + 1) % 5 === 0) {
-          logProgress(
-            `후보 #${candidateIdx + 1} 변형 백테스트 실행 중 (${i + 1}/${variations.length})...`
-          );
-        }
-      }
+    // 6. 상위 후보 변형 백테스트
+    const variationResults: BacktestResult[] = [];
+    for (let i = 0; i < topRandomResults.length; i++) {
+      logProgress(`후보 #${i + 1} 변형 ${config.variationsPerTop}개 생성 중...`);
+      const variations = generateVariations(topRandomResults[i].params, config.variationsPerTop);
+      const results = runBatchBacktest(config, variations, priceData, `후보 #${i + 1} 변형`, 5);
+      variationResults.push(...results);
     }
     logProgress(`변형 백테스트 완료: ${variationResults.length}개`);
 
-    // 7. 전체 결과 분석
+    // 7. 결과 분석
     logProgress("결과 분석 중...");
-    const allResults = [...randomResults, ...variationResults];
     const executionTimeMs = Date.now() - startTime;
-    const result = analyzeResults(baseline, allResults, executionTimeMs);
+    const result = analyzeResults(
+      baseline,
+      [...randomResults, ...variationResults],
+      executionTimeMs
+    );
     logProgress("결과 분석 완료");
 
-    // 8. 콘솔 출력
+    // 8. 출력
     console.log("");
     console.log(formatOutput(result));
 
-    // 9. 선택적 파일 저장
+    // 9. 파일 저장 (선택적)
     if (outputPath) {
       logProgress(`결과 저장 중: ${outputPath}`);
-      // 디렉토리 생성 (없으면)
-      const outputDir = path.dirname(outputPath);
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      // JSON 파일로 저장
-      const outputData = {
-        config,
-        baseline: {
-          weights: METRIC_WEIGHTS,
-          tolerances: METRIC_TOLERANCES,
-          metrics: baseline,
-        },
-        result,
-        timestamp: new Date().toISOString(),
-      };
-      fs.writeFileSync(outputPath, JSON.stringify(outputData, null, 2), "utf-8");
+      saveResults(outputPath, config, baseline, result);
       logProgress(`결과 저장 완료: ${outputPath}`);
     }
 
     logProgress(`최적화 완료. 총 소요 시간: ${formatDuration(executionTimeMs)}`);
   } catch (error) {
-    // 에러 처리
     if (error instanceof Error) {
       console.error(`\n[오류] ${error.message}`);
       if (process.env.DEBUG) {

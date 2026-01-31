@@ -20,18 +20,18 @@ export const MIN_PAST_GAP_DAYS = 40;
 
 /**
  * 지표별 가중치: [기울기, 이격도, RSI, ROC, 변동성]
- * SPEC-PERF-001 최적화 결과 (2025.01.02-2025.12.31, SOXL)
- * - 기존: [0.35, 0.4, 0.05, 0.07, 0.13]
- * - 최적화 후: +17.87% 전략점수 개선, 수익률 72.7% → 85.69%
+ * SPEC-PERF-001 5개년 Fine-tuning 결과 (2021-2025, SOXL)
+ * - 이전: [0.214, 0.3175, 0.156, 0.266, 0.0465]
+ * - Fine-tuning 후: +5.09% 통합점수 개선, 평균수익률 68.99% → 70.89%
  */
-export const METRIC_WEIGHTS: MetricWeights = [0.214, 0.3175, 0.156, 0.266, 0.0465];
+export const METRIC_WEIGHTS: MetricWeights = [0.3997, 0.0189, 0.3317, 0.0317, 0.218];
 
 /**
  * 지표별 허용 오차 (지수 감쇠 민감도): [기울기, 이격도, RSI, ROC, 변동성]
- * SPEC-PERF-001 최적화 결과 (2025.01.02-2025.12.31, SOXL)
- * - 기존: [36, 90, 4.5, 40, 28]
+ * SPEC-PERF-001 5개년 Fine-tuning 결과 (2021-2025, SOXL)
+ * - 이전: [14.38, 87.57, 7.03, 78.67, 70.27]
  */
-export const METRIC_TOLERANCES: MetricTolerances = [14.38, 87.57, 7.03, 78.67, 70.27];
+export const METRIC_TOLERANCES: MetricTolerances = [17.65, 75.8, 11.81, 20.17, 48.11];
 
 // ============================================================
 // 글로벌 유사도 파라미터 관리
