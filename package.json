@@ -22,7 +22,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "precompute": "tsx scripts/precompute-recommendations.ts"
+    "precompute": "tsx scripts/precompute-recommendations.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop"
   },
   "keywords": [
     "soxl",
@@ -36,8 +42,10 @@
   "dependencies": {
     "better-sqlite3": "^11.7.0",
     "decimal.js": "^10.6.0",
+    "drizzle-orm": "^0.45.1",
     "next": "^15.1.0",
     "next-auth": "^5.0.0-beta.30",
+    "postgres": "^3.4.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.6.0",
@@ -52,6 +60,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitest/coverage-v8": "^4.0.17",
+    "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",

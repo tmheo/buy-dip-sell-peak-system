@@ -107,12 +107,12 @@ secret-*.*
 .claude/skills/*/*/*key*
 *-api-key.*
 # FIXED: Issue #237 - Replaced overly broad *key* and *secret* patterns
-!.env.example
 # ============================================
 *_key.*
 *.sqlite3
 *.egg
 .env.*
+!.env.example
 .claude/settings.local.*.json
 .pytest_cache/
 *-backup/
