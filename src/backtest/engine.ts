@@ -214,8 +214,8 @@ export class BacktestEngine {
     const backtestDays = prices.length - effectiveStartIndex;
     const cagr = calculateCAGR(request.initialCapital, finalAsset, backtestDays);
 
-    // 잔여 티어 (미매도 보유 주식) 정보 생성
-    const remainingTiers = createRemainingTiers(cycleManager, lastPrice.adjClose);
+    // 잔여 티어 (미매도 보유 주식) 정보 생성 - 실제 종가 기준 평가
+    const remainingTiers = createRemainingTiers(cycleManager, lastPrice.close);
 
     // SPEC-METRICS-001: 종료 시점 기술적 지표 계산
     // 원본 사이트 방식: 백테스트 기간 내 거래일 수가 60일 미만이면 정배열(goldenCross) NaN

@@ -257,10 +257,10 @@ export function createSnapshot(
   const activeTiers = cycleManager.getActiveTiers();
   let holdingsValue = new Decimal(0);
   let totalShares = 0;
-  // 보유 자산 평가: adjClose(수정종가) 사용 - 배당/분할 반영된 실제 투자 성과
-  const adjClosePrice = new Decimal(price.adjClose);
+  // 보유 자산 평가: close(종가) 사용 - 실제 거래 가능 가격 기준
+  const closePrice = new Decimal(price.close);
   for (const tier of activeTiers) {
-    holdingsValue = holdingsValue.add(adjClosePrice.mul(tier.shares));
+    holdingsValue = holdingsValue.add(closePrice.mul(tier.shares));
     totalShares += tier.shares;
   }
 
