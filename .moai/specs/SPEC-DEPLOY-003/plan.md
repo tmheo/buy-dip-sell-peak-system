@@ -127,7 +127,7 @@ https://[your-project].vercel.app/api/auth/callback/google
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // 최대 60초 (Hobby는 10초)
+export const maxDuration = 60; // Hobby 레거시: 60초, Fluid Compute 활성화 시: 300초
 
 export async function GET(request: NextRequest) {
   // Vercel Cron 인증

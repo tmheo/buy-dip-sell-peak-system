@@ -36,7 +36,7 @@
 
 ### 1.3 아키텍처 다이어그램
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                        Production                            │
 ├─────────────────────────────────────────────────────────────┤
@@ -399,9 +399,15 @@ async function migrate() {
     console.log("  SQLite:", JSON.stringify(samplePrice));
     console.log("  PostgreSQL:", JSON.stringify(pgSamplePrice[0]));
 
-    // 불일치 검증
+    // 불일치 검증 (모든 테이블)
     if (pgPriceCount[0].count < sqlitePriceCount * 0.99) {
       throw new Error(`Price record count mismatch! SQLite: ${sqlitePriceCount}, PostgreSQL: ${pgPriceCount[0].count}`);
+    }
+    if (pgMetricCount[0].count < sqliteMetricCount * 0.99) {
+      throw new Error(`Metric record count mismatch! SQLite: ${sqliteMetricCount}, PostgreSQL: ${pgMetricCount[0].count}`);
+    }
+    if (pgCacheCount[0].count < sqliteCacheCount * 0.99) {
+      throw new Error(`Cache record count mismatch! SQLite: ${sqliteCacheCount}, PostgreSQL: ${pgCacheCount[0].count}`);
     }
 
     console.log("\n✅ Migration completed successfully!");
