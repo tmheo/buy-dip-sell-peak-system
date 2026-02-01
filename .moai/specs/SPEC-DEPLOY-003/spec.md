@@ -118,7 +118,7 @@
 | 변수명 | 용도 |
 |--------|------|
 | `DATABASE_URL` | Supabase Connection Pooler URL |
-| `DIRECT_URL` | Supabase Direct URL (마이그레이션용) |
+| `SUPABASE_DIRECT_URL` | Supabase Direct URL (마이그레이션용) |
 | `AUTH_SECRET` | Auth.js 암호화 키 |
 | `AUTH_GOOGLE_ID` | Google OAuth Client ID |
 | `AUTH_GOOGLE_SECRET` | Google OAuth Secret |
@@ -202,8 +202,33 @@
 
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
-import { updateAllTickers } from "@/services/yahoo-finance";
-import { calculateAllMetrics } from "@/services/calculations";
+import { fetchSince } from "@/services/dataFetcher";
+import { calculateMetricsBatch } from "@/services/metricsCalculator";
+
+// 재시도 로직 (REQ-003 요구사항)
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts: number = 3,
+  context: string = "operation"
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      console.error(`Attempt ${attempt}/${maxAttempts} failed for ${context}:`, error);
+      if (attempt === maxAttempts) throw error;
+      // 지수 백오프: 1초, 2초, 4초
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+    }
+  }
+  throw new Error(`All ${maxAttempts} attempts failed for ${context}`);
+}
+
+// 단일 티커 업데이트 함수
+async function updateTicker(ticker: string): Promise<number> {
+  const newPrices = await fetchSince(ticker);
+  return newPrices.length;
+}
 
 export async function GET(request: NextRequest) {
   // Vercel Cron 인증
@@ -213,24 +238,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 1. 가격 데이터 업데이트
+    // 1. 가격 데이터 업데이트 (각 티커별 3회 재시도)
     const tickers = ["SOXL", "TQQQ"];
+    const results = [];
     for (const ticker of tickers) {
-      await updateAllTickers(ticker);
+      const count = await withRetry(
+        () => updateTicker(ticker),
+        3,
+        `updateTicker(${ticker})`
+      );
+      results.push({ ticker, updatedCount: count });
     }
 
-    // 2. 기술지표 재계산
-    await calculateAllMetrics();
+    // 2. 기술지표 재계산 (3회 재시도)
+    await withRetry(
+      () => calculateMetricsBatch(tickers),
+      3,
+      "calculateMetricsBatch"
+    );
 
     return NextResponse.json({
       success: true,
       updatedAt: new Date().toISOString(),
-      tickers,
+      results,
     });
   } catch (error) {
-    console.error("Cron update failed:", error);
+    console.error("Cron update failed after all retries:", error);
     return NextResponse.json(
-      { error: "Update failed" },
+      { error: "Update failed", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
@@ -244,48 +279,140 @@ export async function GET(request: NextRequest) {
 ```typescript
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { count, desc } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "../src/database/schema";
 
+// 환경변수 검증 (REQ-005 요구사항)
+function validateEnv(): string {
+  const url = process.env.SUPABASE_DIRECT_URL || process.env.DIRECT_URL;
+  if (!url) {
+    throw new Error(
+      "SUPABASE_DIRECT_URL or DIRECT_URL environment variable is required.\n" +
+      "Usage: SUPABASE_DIRECT_URL=postgresql://... npx tsx scripts/migrate-to-supabase.ts"
+    );
+  }
+  return url;
+}
+
+// SQLite → PostgreSQL 데이터 타입 변환
+function transformPriceRow(row: any) {
+  return {
+    ...row,
+    date: new Date(row.date).toISOString().split('T')[0], // ISO 날짜 형식
+    open: Number(row.open),
+    high: Number(row.high),
+    low: Number(row.low),
+    close: Number(row.close),
+    adjClose: Number(row.adjClose),
+    volume: Number(row.volume),
+  };
+}
+
+function transformMetricRow(row: any) {
+  return {
+    ...row,
+    date: new Date(row.date).toISOString().split('T')[0],
+    ma20: row.ma20 != null ? Number(row.ma20) : null,
+    ma60: row.ma60 != null ? Number(row.ma60) : null,
+    rsi14: row.rsi14 != null ? Number(row.rsi14) : null,
+    // 기타 필드 변환...
+  };
+}
+
 async function migrate() {
+  // 환경변수 검증
+  const directUrl = validateEnv();
+
   // 로컬 SQLite 연결
-  const sqlite = new Database("./data/prices.db");
+  const sqlite = new Database("./data/prices.db", { readonly: true });
 
   // Supabase PostgreSQL 연결
-  const pg = postgres(process.env.SUPABASE_DIRECT_URL!);
+  const pg = postgres(directUrl);
   const db = drizzle(pg, { schema });
 
-  // 1. daily_prices 이관
-  console.log("Migrating daily_prices...");
-  const prices = sqlite.prepare("SELECT * FROM daily_prices").all();
-  for (const batch of chunks(prices, 1000)) {
-    await db.insert(schema.dailyPrices).values(batch).onConflictDoNothing();
+  try {
+    // 트랜잭션으로 전체 이관 (REQ-005 롤백 가능 요구사항)
+    await db.transaction(async (tx) => {
+      // 1. daily_prices 이관
+      console.log("Migrating daily_prices...");
+      const prices = sqlite.prepare("SELECT * FROM daily_prices").all();
+      const transformedPrices = prices.map(transformPriceRow);
+      let priceConflicts = 0;
+      for (const batch of chunks(transformedPrices, 1000)) {
+        const result = await tx.insert(schema.dailyPrices)
+          .values(batch)
+          .onConflictDoNothing()
+          .returning({ id: schema.dailyPrices.id });
+        priceConflicts += batch.length - result.length;
+      }
+      console.log(`Migrated ${prices.length} price records (${priceConflicts} conflicts skipped)`);
+
+      // 2. daily_metrics 이관
+      console.log("Migrating daily_metrics...");
+      const metrics = sqlite.prepare("SELECT * FROM daily_metrics").all();
+      const transformedMetrics = metrics.map(transformMetricRow);
+      let metricConflicts = 0;
+      for (const batch of chunks(transformedMetrics, 1000)) {
+        const result = await tx.insert(schema.dailyMetrics)
+          .values(batch)
+          .onConflictDoNothing()
+          .returning({ id: schema.dailyMetrics.id });
+        metricConflicts += batch.length - result.length;
+      }
+      console.log(`Migrated ${metrics.length} metric records (${metricConflicts} conflicts skipped)`);
+
+      // 3. recommendation_cache 이관
+      console.log("Migrating recommendation_cache...");
+      const cache = sqlite.prepare("SELECT * FROM recommendation_cache").all();
+      let cacheConflicts = 0;
+      for (const batch of chunks(cache, 1000)) {
+        const result = await tx.insert(schema.recommendationCache)
+          .values(batch)
+          .onConflictDoNothing()
+          .returning({ id: schema.recommendationCache.id });
+        cacheConflicts += batch.length - result.length;
+      }
+      console.log(`Migrated ${cache.length} cache records (${cacheConflicts} conflicts skipped)`);
+    });
+
+    // 검증 (REQ-005 데이터 검증 요구사항)
+    console.log("\n=== Verifying migration ===");
+
+    // Row count 검증
+    const sqlitePriceCount = (sqlite.prepare("SELECT COUNT(*) as count FROM daily_prices").get() as { count: number }).count;
+    const pgPriceCount = await db.select({ count: count() }).from(schema.dailyPrices);
+    console.log(`Price records: SQLite=${sqlitePriceCount}, PostgreSQL=${pgPriceCount[0].count}`);
+
+    const sqliteMetricCount = (sqlite.prepare("SELECT COUNT(*) as count FROM daily_metrics").get() as { count: number }).count;
+    const pgMetricCount = await db.select({ count: count() }).from(schema.dailyMetrics);
+    console.log(`Metric records: SQLite=${sqliteMetricCount}, PostgreSQL=${pgMetricCount[0].count}`);
+
+    const sqliteCacheCount = (sqlite.prepare("SELECT COUNT(*) as count FROM recommendation_cache").get() as { count: number }).count;
+    const pgCacheCount = await db.select({ count: count() }).from(schema.recommendationCache);
+    console.log(`Cache records: SQLite=${sqliteCacheCount}, PostgreSQL=${pgCacheCount[0].count}`);
+
+    // 샘플 데이터 검증
+    const samplePrice = sqlite.prepare("SELECT * FROM daily_prices ORDER BY date DESC LIMIT 1").get();
+    const pgSamplePrice = await db.select().from(schema.dailyPrices).orderBy(desc(schema.dailyPrices.date)).limit(1);
+    console.log("\nSample comparison (latest price):");
+    console.log("  SQLite:", JSON.stringify(samplePrice));
+    console.log("  PostgreSQL:", JSON.stringify(pgSamplePrice[0]));
+
+    // 불일치 검증
+    if (pgPriceCount[0].count < sqlitePriceCount * 0.99) {
+      throw new Error(`Price record count mismatch! SQLite: ${sqlitePriceCount}, PostgreSQL: ${pgPriceCount[0].count}`);
+    }
+
+    console.log("\n✅ Migration completed successfully!");
+
+  } catch (error) {
+    console.error("\n❌ Migration failed, transaction rolled back:", error);
+    throw error;
+  } finally {
+    sqlite.close();
+    await pg.end();
   }
-  console.log(`Migrated ${prices.length} price records`);
-
-  // 2. daily_metrics 이관
-  console.log("Migrating daily_metrics...");
-  const metrics = sqlite.prepare("SELECT * FROM daily_metrics").all();
-  for (const batch of chunks(metrics, 1000)) {
-    await db.insert(schema.dailyMetrics).values(batch).onConflictDoNothing();
-  }
-  console.log(`Migrated ${metrics.length} metric records`);
-
-  // 3. recommendation_cache 이관
-  console.log("Migrating recommendation_cache...");
-  const cache = sqlite.prepare("SELECT * FROM recommendation_cache").all();
-  for (const batch of chunks(cache, 1000)) {
-    await db.insert(schema.recommendationCache).values(batch).onConflictDoNothing();
-  }
-  console.log(`Migrated ${cache.length} cache records`);
-
-  // 검증
-  console.log("Verifying migration...");
-  // ... 검증 로직
-
-  sqlite.close();
-  await pg.end();
-  console.log("Migration complete!");
 }
 
 function chunks<T>(arr: T[], size: number): T[][] {
@@ -294,7 +421,10 @@ function chunks<T>(arr: T[], size: number): T[][] {
   );
 }
 
-migrate().catch(console.error);
+migrate().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 ```
 
 ### 4.4 환경변수 설정
@@ -303,13 +433,13 @@ migrate().catch(console.error);
 
 | 변수명 | 환경 | 값 |
 |--------|------|-----|
-| `DATABASE_URL` | Production | `postgresql://...?pgbouncer=true` |
-| `DIRECT_URL` | Production | `postgresql://...` (direct) |
-| `AUTH_SECRET` | Production | (생성된 값) |
+| `DATABASE_URL` | Production, Preview | `postgresql://...?pgbouncer=true` |
+| `SUPABASE_DIRECT_URL` | Production, Preview | `postgresql://...` (direct, 마이그레이션용) |
+| `AUTH_SECRET` | Production, Preview | (생성된 값) |
 | `AUTH_GOOGLE_ID` | All | (Google Console) |
-| `AUTH_GOOGLE_SECRET` | Production | (Google Console) |
+| `AUTH_GOOGLE_SECRET` | Production, Preview | (Google Console) |
 | `NEXTAUTH_URL` | Production | `https://your-app.vercel.app` |
-| `CRON_SECRET` | Production | (생성된 값) |
+| `CRON_SECRET` | All | (생성된 값, 로컬 테스트 시에도 필요) |
 
 ---
 

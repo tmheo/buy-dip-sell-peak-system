@@ -39,7 +39,7 @@ Install Command: npm install (자동 감지)
 ```
 DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true
 
-DIRECT_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.supabase.com:5432/postgres
+SUPABASE_DIRECT_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.supabase.com:5432/postgres
 
 AUTH_SECRET=[openssl rand -base64 32 결과]
 
@@ -57,9 +57,12 @@ CRON_SECRET=[openssl rand -hex 32 결과]
 | 변수 | Production | Preview | Development |
 |------|------------|---------|-------------|
 | DATABASE_URL | O | O | X |
+| SUPABASE_DIRECT_URL | O | O | X |
 | AUTH_SECRET | O | O | X |
 | AUTH_GOOGLE_* | O | O | X |
-| CRON_SECRET | O | X | X |
+| CRON_SECRET | O | O | X |
+
+> **Note**: `CRON_SECRET`은 로컬/Preview 환경에서 수동 테스트 시에도 필요하므로 모든 환경에 설정합니다.
 
 ---
 
