@@ -17,13 +17,13 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/\".claude/hooks/moai/pre_tool__security_guard.py'"
+          command: "/bin/zsh -l -c 'export PATH=$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH; uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/pre_tool__security_guard.py\"'"
           timeout: 30
   PostToolUse:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "/bin/zsh -l -c 'uv run \"$CLAUDE_PROJECT_DIR/\".claude/hooks/moai/post_tool__ast_grep_scan.py'"
+          command: "/bin/zsh -l -c 'export PATH=$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH; uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__ast_grep_scan.py\"'"
           timeout: 60
 ---
 
