@@ -26,7 +26,7 @@ export async function getCachedRecommendation(
     .where(and(eq(recommendationCache.ticker, ticker), eq(recommendationCache.date, date)))
     .limit(1);
 
-  return rows.length > 0 ? rows[0] : null;
+  return rows[0] ?? null;
 }
 
 /**
@@ -62,37 +62,11 @@ export async function cacheRecommendation(data: NewRecommendationCache): Promise
 export async function bulkSaveRecommendations(items: NewRecommendationCache[]): Promise<number> {
   if (items.length === 0) return 0;
 
-  // PostgreSQL은 단일 INSERT로 여러 값을 처리하고
-  // ON CONFLICT DO UPDATE로 UPSERT 처리
-  // 대량 데이터의 경우 청크 단위로 처리
-  const CHUNK_SIZE = 1000;
-  let savedCount = 0;
-
-  for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-    const chunk = items.slice(i, i + CHUNK_SIZE);
-
-    // 각 항목을 개별 UPSERT 처리 (PostgreSQL ON CONFLICT 제약)
-    for (const item of chunk) {
-      await db
-        .insert(recommendationCache)
-        .values(item)
-        .onConflictDoUpdate({
-          target: [recommendationCache.ticker, recommendationCache.date],
-          set: {
-            strategy: item.strategy,
-            reason: item.reason,
-            rsi14: item.rsi14,
-            isGoldenCross: item.isGoldenCross,
-            maSlope: item.maSlope,
-            disparity: item.disparity,
-            roc12: item.roc12,
-            volatility20: item.volatility20,
-            goldenCross: item.goldenCross,
-          },
-        });
-      savedCount++;
-    }
+  // 각 항목을 개별 UPSERT 처리
+  // PostgreSQL의 ON CONFLICT DO UPDATE는 단일 values에서만 동작하므로 순차 처리
+  for (const item of items) {
+    await cacheRecommendation(item);
   }
 
-  return savedCount;
+  return items.length;
 }

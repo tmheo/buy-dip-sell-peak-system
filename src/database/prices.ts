@@ -37,7 +37,7 @@ export async function getLatestDate(ticker: string = "SOXL"): Promise<string | n
     .orderBy(desc(dailyPrices.date))
     .limit(1);
 
-  return rows.length > 0 ? rows[0].date : null;
+  return rows[0]?.date ?? null;
 }
 
 /**
@@ -74,7 +74,7 @@ export async function getPriceByDate(ticker: string, date: string): Promise<Dail
     .where(and(eq(dailyPrices.ticker, ticker), eq(dailyPrices.date, date)))
     .limit(1);
 
-  return rows.length > 0 ? rows[0] : null;
+  return rows[0] ?? null;
 }
 
 /**

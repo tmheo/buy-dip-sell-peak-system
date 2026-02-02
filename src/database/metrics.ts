@@ -35,7 +35,7 @@ export async function getMetricsByDate(ticker: string, date: string): Promise<Da
     .where(and(eq(dailyMetrics.ticker, ticker), eq(dailyMetrics.date, date)))
     .limit(1);
 
-  return rows.length > 0 ? rows[0] : null;
+  return rows[0] ?? null;
 }
 
 /**
@@ -72,5 +72,5 @@ export async function getLatestMetricDate(ticker: string = "SOXL"): Promise<stri
     .orderBy(desc(dailyMetrics.date))
     .limit(1);
 
-  return rows.length > 0 ? rows[0].date : null;
+  return rows[0]?.date ?? null;
 }

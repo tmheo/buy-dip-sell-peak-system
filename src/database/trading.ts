@@ -859,11 +859,9 @@ function getNextTradingDate(date: string): string {
   // 주말이면 월요일로 이동
   const dayOfWeek = d.getUTCDay();
   if (dayOfWeek === 0) {
-    // Sunday -> Monday
-    d.setDate(d.getDate() + 1);
+    d.setDate(d.getDate() + 1); // 일요일 -> 월요일
   } else if (dayOfWeek === 6) {
-    // Saturday -> Monday
-    d.setDate(d.getDate() + 2);
+    d.setDate(d.getDate() + 2); // 토요일 -> 월요일
   }
 
   return d.toISOString().split("T")[0];
