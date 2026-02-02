@@ -4,27 +4,90 @@
 
 ```
 buy-dip-sell-peak-system/
-├── src/                          # 소스 코드 디렉토리
-│   ├── index.ts                  # CLI 진입점 및 명령어 라우터
-│   ├── types/
-│   │   └── index.ts              # TypeScript 인터페이스 정의
-│   ├── database/
-│   │   ├── index.ts              # SQLite 데이터베이스 연결 및 CRUD 작업
-│   │   └── schema.ts             # SQL 스키마 및 쿼리 정의
-│   └── services/
-│       └── dataFetcher.ts        # Yahoo Finance API 연동 서비스
-├── data/                         # 데이터 저장 디렉토리 (자동 생성)
-│   └── prices.db                 # SQLite 데이터베이스 파일
-├── dist/                         # 컴파일된 JavaScript 출력 (빌드 후 생성)
-├── node_modules/                 # npm 패키지 의존성
-├── .moai/                        # MoAI 프로젝트 설정
-│   ├── config/                   # 프로젝트 구성 파일
-│   └── project/                  # 프로젝트 문서
-├── package.json                  # npm 프로젝트 설정
-├── tsconfig.json                 # TypeScript 컴파일러 설정
-├── eslint.config.js              # ESLint 린터 설정
-├── .prettierrc                   # Prettier 포매터 설정
-└── README.md                     # 프로젝트 설명서
+├── src/                              # 소스 코드 디렉토리
+│   ├── index.ts                      # CLI 진입점 및 명령어 라우터
+│   ├── app/                          # Next.js App Router 페이지
+│   │   ├── layout.tsx                # 루트 레이아웃
+│   │   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
+│   │   ├── api/                      # API 라우트
+│   │   │   ├── auth/[...nextauth]/   # NextAuth.js 인증 핸들러
+│   │   │   ├── backtest/             # 백테스트 API
+│   │   │   ├── backtest-recommend/   # 추천 백테스트 API
+│   │   │   ├── recommend/            # 전략 추천 API
+│   │   │   ├── trading/              # 트레이딩 계좌 API
+│   │   │   └── user/                 # 사용자 관리 API
+│   │   ├── backtest/                 # 백테스트 페이지
+│   │   ├── backtest-recommend/       # 추천 백테스트 페이지
+│   │   ├── info/                     # 정보 페이지
+│   │   ├── mypage/                   # 마이페이지
+│   │   ├── recommend/                # 전략 추천 페이지
+│   │   └── trading/                  # 트레이딩 페이지
+│   ├── backtest/                     # 백테스트 엔진 모듈
+│   │   ├── types.ts                  # 백테스트 타입 정의
+│   │   ├── engine.ts                 # 백테스트 엔진
+│   │   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
+│   │   ├── cycle.ts                  # 사이클 관리자
+│   │   ├── order.ts                  # 주문 계산 로직
+│   │   ├── metrics.ts                # 기술적 지표 계산
+│   │   ├── divergence.ts             # RSI 다이버전스 탐지
+│   │   ├── downgrade.ts              # 전략 하향 규칙
+│   │   └── trading-utils.ts          # 거래 유틸리티
+│   ├── backtest-recommend/           # 추천 백테스트 엔진
+│   │   ├── engine.ts                 # 추천 백테스트 엔진
+│   │   ├── recommend-helper.ts       # 빠른 추천 조회 헬퍼
+│   │   └── types.ts                  # 추천 백테스트 타입
+│   ├── recommend/                    # 전략 추천 엔진
+│   │   ├── similarity.ts             # 유사도 계산 (지수 감쇠)
+│   │   ├── score.ts                  # 전략 점수 계산
+│   │   └── types.ts                  # 추천 타입 정의
+│   ├── optimize/                     # 최적화 엔진 (유전 알고리즘)
+│   ├── components/                   # React 공통 컴포넌트
+│   │   ├── auth/                     # 인증 컴포넌트
+│   │   ├── backtest/                 # 백테스트 컴포넌트
+│   │   ├── backtest-recommend/       # 추천 백테스트 컴포넌트
+│   │   ├── mypage/                   # 마이페이지 컴포넌트
+│   │   ├── recommend/                # 전략 추천 컴포넌트
+│   │   └── trading/                  # 트레이딩 컴포넌트
+│   ├── database/                     # 데이터베이스 모듈
+│   │   ├── schema/                   # Drizzle ORM 스키마
+│   │   │   ├── auth.ts               # 인증 테이블 (users, accounts, sessions)
+│   │   │   ├── cache.ts              # 추천 캐시 테이블
+│   │   │   ├── prices.ts             # 가격 데이터 테이블
+│   │   │   └── trading.ts            # 트레이딩 테이블
+│   │   ├── db-drizzle.ts             # Drizzle 클라이언트
+│   │   ├── index.ts                  # 가격 데이터 CRUD
+│   │   ├── metrics.ts                # 기술적 지표 CRUD
+│   │   ├── recommend-cache.ts        # 추천 캐시 CRUD
+│   │   └── trading.ts                # 트레이딩 CRUD
+│   ├── services/                     # 외부 서비스 연동
+│   │   ├── dataFetcher.ts            # Yahoo Finance API
+│   │   └── metricsCalculator.ts      # 기술적 지표 계산
+│   ├── lib/                          # 유틸리티 및 공통 모듈
+│   │   ├── auth/                     # 인증 관련 모듈
+│   │   ├── validations/              # Zod 스키마
+│   │   └── date.ts                   # 날짜 유틸리티
+│   ├── types/                        # TypeScript 타입 정의
+│   │   ├── index.ts                  # 기본 타입
+│   │   └── trading.ts                # 트레이딩 타입
+│   ├── utils/                        # 유틸리티 함수
+│   │   └── trading-core.ts           # 트레이딩 코어 로직
+│   └── styles/
+│       └── globals.css               # 글로벌 스타일
+├── data/                             # 로컬 데이터 저장 디렉토리
+│   └── prices.db                     # SQLite 데이터베이스 (로컬 개발용)
+├── dist/                             # 컴파일된 JavaScript 출력
+├── node_modules/                     # npm 패키지 의존성
+├── .moai/                            # MoAI 프로젝트 설정
+│   ├── config/                       # 프로젝트 구성 파일
+│   └── project/                      # 프로젝트 문서
+├── drizzle.config.ts                 # Drizzle Kit 설정
+├── auth.ts                           # Auth.js v5 설정
+├── package.json                      # npm 프로젝트 설정
+├── tsconfig.json                     # TypeScript 컴파일러 설정
+├── vitest.config.ts                  # Vitest 테스트 설정
+├── eslint.config.js                  # ESLint 린터 설정
+├── .prettierrc                       # Prettier 포매터 설정
+└── README.md                         # 프로젝트 설명서
 ```
 
 ---
@@ -35,9 +98,29 @@ buy-dip-sell-peak-system/
 
 애플리케이션의 모든 TypeScript 소스 코드가 위치하는 디렉토리입니다.
 
-### `data/` - 데이터 저장소
+### `src/app/` - Next.js App Router
 
-SQLite 데이터베이스 파일(`prices.db`)이 저장되는 디렉토리입니다. 애플리케이션 최초 실행 시 자동으로 생성됩니다.
+Next.js 15 App Router 기반의 페이지 및 API 라우트입니다.
+
+### `src/database/` - 데이터베이스 레이어
+
+Drizzle ORM을 사용한 데이터베이스 스키마 정의 및 CRUD 작업을 담당합니다.
+
+### `src/backtest/` - 백테스트 엔진
+
+Pro1/Pro2/Pro3 전략 기반의 백테스트 시뮬레이션 로직입니다.
+
+### `src/backtest-recommend/` - 추천 백테스트 엔진
+
+사이클별로 추천 전략을 동적으로 적용하는 백테스트 엔진입니다.
+
+### `src/recommend/` - 전략 추천 엔진
+
+기술적 지표 기반 유사 구간 분석 및 전략 점수 계산 모듈입니다.
+
+### `data/` - 로컬 데이터 저장소
+
+SQLite 데이터베이스 파일(`prices.db`)이 저장되는 디렉토리입니다. 로컬 개발 환경에서 사용됩니다.
 
 ### `dist/` - 빌드 출력
 
@@ -113,53 +196,89 @@ type Command = "init" | "init-all" | "update" | "update-all" | "query" | "help";
 
 ---
 
-### `src/database/index.ts` - 데이터베이스 모듈
+### `src/database/schema/` - Drizzle ORM 스키마
 
-SQLite 데이터베이스 연결 관리 및 CRUD 작업을 담당합니다.
+PostgreSQL 데이터베이스 테이블 스키마를 Drizzle ORM으로 정의합니다.
 
-**설계 패턴:** 싱글톤 패턴으로 데이터베이스 연결 관리
+**스키마 파일:**
+
+| 파일 | 설명 |
+|------|------|
+| `auth.ts` | 인증 테이블 (users, accounts, sessions, verification_tokens) |
+| `prices.ts` | 가격 데이터 테이블 (daily_prices, daily_metrics) |
+| `trading.ts` | 트레이딩 테이블 (trading_accounts, tier_holdings, daily_orders, profit_records) |
+| `cache.ts` | 추천 캐시 테이블 (recommendation_cache) |
+
+**주요 테이블:**
+
+| 테이블 | 설명 |
+|--------|------|
+| `daily_prices` | OHLCV 일봉 데이터 |
+| `daily_metrics` | 기술적 지표 (MA20, MA60, RSI14, ROC12, Volatility20) |
+| `users` | 사용자 정보 |
+| `accounts` | OAuth 계정 연동 정보 |
+| `sessions` | 세션 관리 |
+| `trading_accounts` | 트레이딩 계좌 |
+| `tier_holdings` | 티어별 보유 현황 |
+| `daily_orders` | 일일 주문 내역 |
+| `profit_records` | 수익 기록 |
+| `recommendation_cache` | 전략 추천 캐시 |
+
+---
+
+### `src/database/db-drizzle.ts` - Drizzle 클라이언트
+
+Supabase PostgreSQL 연결을 관리하는 Drizzle ORM 클라이언트입니다.
+
+**주요 기능:**
+- Supabase PostgreSQL 연결 관리
+- 트랜잭션 지원
+- 타입 안전한 쿼리 빌더
+
+---
+
+### `src/database/index.ts` - 가격 데이터 모듈
+
+가격 데이터 CRUD 작업을 담당합니다.
 
 **주요 함수:**
 
 | 함수 | 설명 |
 |------|------|
-| `getConnection()` | 데이터베이스 연결 획득 (내부용, WAL 모드 활성화) |
-| `close()` | 데이터베이스 연결 종료 |
-| `initTables()` | 테이블 및 인덱스 초기화 |
 | `insertPrice()` | 단일 가격 데이터 삽입 |
-| `insertPrices()` | 다중 가격 데이터 일괄 삽입 (트랜잭션) |
-| `getAllPrices()` | 전체 가격 데이터 조회 |
+| `insertPrices()` | 다중 가격 데이터 일괄 삽입 |
 | `getAllPricesByTicker()` | 특정 티커 전체 데이터 조회 |
 | `getPricesByDateRange()` | 날짜 범위 조회 |
 | `getLatestDate()` | 최신 저장 날짜 조회 |
 | `getCount()` | 특정 티커 데이터 수 조회 |
-| `getTotalCount()` | 전체 데이터 수 조회 |
-
-**데이터베이스 경로:** `data/prices.db`
 
 ---
 
-### `src/database/schema.ts` - SQL 스키마
+### `src/database/metrics.ts` - 기술적 지표 모듈
 
-데이터베이스 테이블 스키마 및 SQL 쿼리를 정의합니다.
+사전 계산된 기술적 지표 CRUD 작업을 담당합니다.
 
-**테이블 구조: `daily_prices`**
+**주요 함수:**
 
-| 컬럼 | 타입 | 제약 조건 | 설명 |
-|------|------|----------|------|
-| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 자동 증가 ID |
-| ticker | TEXT | NOT NULL DEFAULT 'SOXL' | 티커 심볼 |
-| date | TEXT | NOT NULL | 날짜 (YYYY-MM-DD) |
-| open | REAL | NOT NULL | 시가 |
-| high | REAL | NOT NULL | 고가 |
-| low | REAL | NOT NULL | 저가 |
-| close | REAL | NOT NULL | 종가 |
-| volume | INTEGER | NOT NULL | 거래량 |
-| created_at | TEXT | DEFAULT CURRENT_TIMESTAMP | 생성 시간 |
+| 함수 | 설명 |
+|------|------|
+| `getMetricsByDateRange()` | 날짜 범위 지표 조회 |
+| `upsertMetrics()` | 지표 삽입/업데이트 |
+| `calculateAndSaveMetrics()` | 지표 계산 및 저장 |
 
-**인덱스:** `idx_ticker_date ON daily_prices(ticker, date)` - 조회 성능 최적화
+---
 
-**유니크 제약:** `UNIQUE(ticker, date)` - 동일 티커/날짜 중복 방지
+### `src/database/recommend-cache.ts` - 추천 캐시 모듈
+
+전략 추천 결과 캐시 관리를 담당합니다.
+
+**주요 함수:**
+
+| 함수 | 설명 |
+|------|------|
+| `getRecommendationFromCache()` | 캐시에서 추천 조회 |
+| `saveRecommendationToCache()` | 추천 결과 캐시 저장 |
+| `clearExpiredCache()` | 만료된 캐시 삭제 |
 
 ---
 
@@ -194,28 +313,80 @@ const TICKER_CONFIG = {
 
 ---
 
+### `src/services/metricsCalculator.ts` - 기술적 지표 계산 서비스
+
+가격 데이터로부터 기술적 지표를 계산합니다.
+
+**계산하는 지표:**
+
+| 지표 | 설명 |
+|------|------|
+| MA20 | 20일 단순이동평균 |
+| MA60 | 60일 단순이동평균 |
+| RSI14 | 14일 RSI (Wilder's EMA) |
+| ROC12 | 12일 변화율 |
+| Volatility20 | 20일 변동성 |
+| MA Slope | MA20 기울기 |
+| Disparity | 이격도 |
+| Golden Cross | 정배열 여부 |
+
+---
+
 ## 모듈 구성 및 데이터 흐름
 
 ### 아키텍처 다이어그램
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        CLI Layer                                 │
+│                      Presentation Layer                          │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    src/index.ts                          │    │
-│  │  - 명령어 파싱 및 라우팅                                  │    │
-│  │  - 사용자 입/출력 처리                                    │    │
+│  │                    src/app/ (Pages)                      │    │
+│  │  - info/: 전략 설명 페이지                               │    │
+│  │  - recommend/: 전략 추천 페이지                          │    │
+│  │  - backtest/: 백테스트 페이지                            │    │
+│  │  - backtest-recommend/: 추천 백테스트 페이지             │    │
+│  │  - trading/: 트레이딩 계좌 페이지                        │    │
+│  │  - mypage/: 마이페이지                                   │    │
 │  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         API Layer                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                  src/app/api/ (Routes)                   │    │
+│  │  - /api/backtest: 백테스트 실행                          │    │
+│  │  - /api/recommend: 전략 추천                             │    │
+│  │  - /api/backtest-recommend: 추천 백테스트                │    │
+│  │  - /api/trading/accounts: 계좌 CRUD                      │    │
+│  │  - /api/auth/[...nextauth]: 인증                         │    │
+│  │  - /api/user/delete: 회원 탈퇴                           │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Business Logic Layer                        │
+│  ┌──────────────────┐  ┌──────────────────┐                     │
+│  │ src/backtest/    │  │ src/recommend/   │                     │
+│  │  - engine.ts     │  │  - similarity.ts │                     │
+│  │  - strategy.ts   │  │  - score.ts      │                     │
+│  │  - cycle.ts      │  │  - types.ts      │                     │
+│  └──────────────────┘  └──────────────────┘                     │
+│  ┌──────────────────────────────────────────┐                   │
+│  │ src/backtest-recommend/                   │                   │
+│  │  - engine.ts (추천 백테스트 엔진)         │                   │
+│  │  - recommend-helper.ts (빠른 추천 조회)   │                   │
+│  └──────────────────────────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Service Layer                               │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │               src/services/dataFetcher.ts                │    │
-│  │  - Yahoo Finance API 연동                                │    │
-│  │  - 재시도 로직 (지수 백오프)                             │    │
-│  │  - 데이터 변환 및 검증                                   │    │
+│  │               src/services/                              │    │
+│  │  - dataFetcher.ts: Yahoo Finance API 연동               │    │
+│  │  - metricsCalculator.ts: 기술적 지표 계산               │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -223,10 +394,12 @@ const TICKER_CONFIG = {
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Database Layer                               │
 │  ┌──────────────────────┐  ┌──────────────────────┐            │
-│  │ src/database/index.ts│  │ src/database/schema.ts│            │
-│  │  - 연결 관리 (싱글톤) │  │  - 테이블 스키마      │            │
-│  │  - CRUD 작업         │  │  - SQL 쿼리 정의      │            │
-│  │  - 트랜잭션 처리     │  │  - 인덱스 정의        │            │
+│  │ src/database/        │  │ src/database/schema/ │            │
+│  │  - db-drizzle.ts     │  │  - auth.ts           │            │
+│  │  - index.ts          │  │  - prices.ts         │            │
+│  │  - metrics.ts        │  │  - trading.ts        │            │
+│  │  - trading.ts        │  │  - cache.ts          │            │
+│  │  - recommend-cache.ts│  │                      │            │
 │  └──────────────────────┘  └──────────────────────┘            │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -234,9 +407,15 @@ const TICKER_CONFIG = {
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Storage Layer                                │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │                   data/prices.db                         │    │
-│  │  - SQLite 데이터베이스                                   │    │
-│  │  - WAL 모드 활성화                                       │    │
+│  │          Supabase PostgreSQL (Production)                │    │
+│  │  - daily_prices: OHLCV 일봉 데이터                       │    │
+│  │  - daily_metrics: 기술적 지표                            │    │
+│  │  - trading_accounts: 트레이딩 계좌                       │    │
+│  │  - recommendation_cache: 추천 캐시                       │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │            SQLite (Local Development)                    │    │
+│  │  - data/prices.db                                        │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -263,15 +442,22 @@ Yahoo Finance API
        │ DailyPrice[]
        ▼
 ┌──────────────────┐
-│   insertPrices   │ ◄── 트랜잭션 처리
-│  (better-sqlite3)│     (일괄 삽입)
+│ metricsCalculator│ ◄── 기술적 지표 계산
+│                  │     (MA, RSI, ROC, Volatility)
+└──────────────────┘
+       │
+       │ DailyMetrics[]
+       ▼
+┌──────────────────┐
+│   Drizzle ORM    │ ◄── 타입 안전한 삽입
+│   (PostgreSQL)   │     (트랜잭션 처리)
 └──────────────────┘
        │
        │ SQL INSERT
        ▼
 ┌──────────────────┐
-│    prices.db     │ ◄── UNIQUE 제약 (중복 방지)
-│    (SQLite)      │     INSERT OR REPLACE
+│    Supabase      │ ◄── UNIQUE 제약 (중복 방지)
+│   PostgreSQL     │     ON CONFLICT DO UPDATE
 └──────────────────┘
 ```
 
@@ -283,186 +469,106 @@ Yahoo Finance API
 
 | 패턴 | 적용 위치 | 설명 |
 |------|----------|------|
-| **싱글톤** | database/index.ts | 데이터베이스 연결 인스턴스 관리 |
-| **레이어드 아키텍처** | 전체 구조 | CLI, Service, Database 레이어 분리 |
+| **레이어드 아키텍처** | 전체 구조 | Presentation, API, Business, Service, Database, Storage 레이어 분리 |
 | **설정 기반 설계** | dataFetcher.ts | TICKER_CONFIG으로 티커 확장 용이 |
-| **트랜잭션 패턴** | database/index.ts | 대량 데이터 삽입 시 원자성 보장 |
+| **트랜잭션 패턴** | database/*.ts | Drizzle ORM 트랜잭션으로 원자성 보장 |
 | **재시도 패턴** | dataFetcher.ts | 지수 백오프를 통한 API 안정성 |
+| **캐시 패턴** | recommend-cache.ts | 추천 결과 캐싱으로 성능 최적화 |
+| **Repository 패턴** | database/*.ts | 데이터 접근 로직 추상화 |
 
 ### Clean Architecture 원칙
 
-1. **의존성 역전**: 상위 레이어(CLI)가 하위 레이어(Database)에 의존하지만, 인터페이스(types)를 통해 결합도 최소화
+1. **의존성 역전**: 상위 레이어가 하위 레이어에 의존하지만, 인터페이스(types)를 통해 결합도 최소화
 2. **단일 책임**: 각 모듈이 하나의 명확한 책임 담당
-3. **개방-폐쇄**: 새 티커 추가 시 TICKER_CONFIG만 수정
+3. **개방-폐쇄**: 새 티커/전략 추가 시 설정만 수정
 
 ---
 
----
+## Frontend 컴포넌트 구조
 
-## Frontend 디렉토리 구조
-
-### `src/` - 프론트엔드 소스 코드
-
-Next.js 15 App Router 기반의 프론트엔드 애플리케이션입니다.
+### 컴포넌트 디렉토리
 
 ```
-src/
-├── app/                          # Next.js App Router 페이지
-│   ├── layout.tsx                # 루트 레이아웃 (CDN, 메타데이터)
-│   ├── page.tsx                  # 홈페이지 (/ → /info 리다이렉트)
-│   ├── api/
-│   │   ├── backtest/
-│   │   │   └── route.ts          # 백테스트 API 엔드포인트
-│   │   ├── auth/
-│   │   │   └── [...nextauth]/
-│   │   │       └── route.ts      # NextAuth.js 인증 핸들러
-│   │   └── user/
-│   │       └── delete/
-│   │           └── route.ts      # 회원 탈퇴 API (DELETE)
-│   ├── info/
-│   │   └── page.tsx              # Info 페이지 (전략 설명)
-│   ├── backtest/
-│   │   └── page.tsx              # Backtest 페이지 (백테스트 결과 시각화)
-│   ├── backtest-recommend/
-│   │   └── page.tsx              # 백테스트 추천 페이지
-│   ├── trading/
-│   │   ├── page.tsx              # 트레이딩 계좌 목록 페이지
-│   │   ├── new/
-│   │   │   └── page.tsx          # 새 계좌 생성 페이지
-│   │   └── [accountId]/
-│   │       └── page.tsx          # 계좌 상세 페이지 (티어 보유현황, 당일 주문표)
-│   └── mypage/
-│       ├── page.tsx              # 마이페이지 서버 컴포넌트 (인증 체크)
-│       └── _client.tsx           # 마이페이지 클라이언트 컴포넌트
-├── backtest/                     # 백테스트 엔진 모듈
-│   ├── types.ts                  # 백테스트 타입 정의
-│   ├── engine.ts                 # 백테스트 엔진 (시뮬레이션 로직)
-│   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
-│   ├── cycle.ts                  # 사이클 관리자
-│   ├── order.ts                  # 주문 계산 로직
-│   ├── metrics.ts                # 기술적 지표 계산 (SMA, RSI, ROC 등)
-│   ├── divergence.ts             # RSI 다이버전스 탐지 (베어리시 다이버전스)
-│   └── downgrade.ts              # SOXL 전략 하향 규칙 (Pro3→Pro2→Pro1)
-├── components/                   # React 공통 컴포넌트
-│   ├── TopControlBar.tsx         # 상단 컨트롤 바
-│   ├── MainNavigation.tsx        # 메인 네비게이션
-│   ├── Sidebar.tsx               # 우측 사이드바 (최근 주가 SOXL/TQQQ)
-│   ├── StrategyCard.tsx          # 전략 카드 (Pro1/Pro2/Pro3)
-│   ├── FlowChart.tsx             # 사용법 플로우차트
-│   ├── PremiumModal.tsx          # 프리미엄 모달
-│   ├── backtest/                 # 백테스트 결과 시각화 컴포넌트
-│   │   ├── PriceChart.tsx        # 가격 차트 (종가 + MA20/MA60)
-│   │   ├── MetricsCharts.tsx     # 6개 기술적 지표 차트
-│   │   └── ProResultCard.tsx     # Pro 전략 결과 카드 (자산/MDD 차트)
-│   ├── trading/                  # 트레이딩 컴포넌트
-│   │   ├── AccountForm.tsx       # 계좌 생성/수정 폼
-│   │   ├── AccountListTable.tsx  # 계좌 목록 테이블
-│   │   ├── AccountSettingsCard.tsx # 계좌 설정 카드
-│   │   ├── AssetSummary.tsx      # 자산 요약 카드
-│   │   ├── DailyOrdersTable.tsx  # 당일 주문표 테이블
-│   │   ├── TierHoldingsTable.tsx # 티어별 보유현황 테이블
-│   │   ├── InvestmentRatioBar.tsx # 투자 비율 막대 그래프
-│   │   └── DeleteAccountModal.tsx # 계좌 삭제 확인 모달
-│   └── mypage/                   # 마이페이지 컴포넌트
-│       ├── UserProfile.tsx       # 사용자 프로필 카드 (이미지, 이름, 이메일, 가입일)
-│       └── DeleteAccountModal.tsx # 회원 탈퇴 확인 모달
-├── lib/                          # 유틸리티 및 공통 모듈
-│   ├── date.ts                   # 날짜 포맷팅 유틸리티
-│   ├── validations/              # 입력값 검증 스키마
-│   │   └── trading.ts            # 트레이딩 관련 Zod 스키마
-│   └── auth/                     # 인증 관련 모듈
-│       ├── adapter.ts            # NextAuth.js SQLite 어댑터
-│       ├── api-auth.ts           # API 인증 유틸리티
-│       └── queries.ts            # 사용자/계정 DB 쿼리 (deleteUser, getUserById)
-└── styles/
-    └── globals.css               # 글로벌 스타일 + 커스텀 CSS
+src/components/
+├── auth/                             # 인증 컴포넌트
+│   └── SignInButton.tsx              # 로그인 버튼
+├── backtest/                         # 백테스트 결과 시각화
+│   ├── PriceChart.tsx                # 가격 차트 (종가 + MA20/MA60)
+│   ├── MetricsCharts.tsx             # 6개 기술적 지표 차트
+│   └── ProResultCard.tsx             # Pro 전략 결과 카드
+├── backtest-recommend/               # 추천 백테스트 컴포넌트
+│   ├── RecommendResultCard.tsx       # 추천 백테스트 결과 카드
+│   └── StrategyUsageChart.tsx        # 전략 사용 통계 차트
+├── mypage/                           # 마이페이지 컴포넌트
+│   ├── UserProfile.tsx               # 사용자 프로필 카드
+│   └── DeleteAccountModal.tsx        # 회원 탈퇴 확인 모달
+├── recommend/                        # 전략 추천 컴포넌트
+│   ├── RecommendForm.tsx             # 추천 요청 폼
+│   ├── RecommendResult.tsx           # 추천 결과 표시
+│   └── SimilarityTable.tsx           # 유사 구간 테이블
+├── trading/                          # 트레이딩 컴포넌트
+│   ├── AccountForm.tsx               # 계좌 생성/수정 폼
+│   ├── AccountListTable.tsx          # 계좌 목록 테이블
+│   ├── AccountSettingsCard.tsx       # 계좌 설정 카드
+│   ├── AssetSummary.tsx              # 자산 요약 카드
+│   ├── DailyOrdersTable.tsx          # 당일 주문표 테이블
+│   ├── TierHoldingsTable.tsx         # 티어별 보유현황 테이블
+│   ├── InvestmentRatioBar.tsx        # 투자 비율 막대 그래프
+│   └── DeleteAccountModal.tsx        # 계좌 삭제 확인 모달
+├── TopControlBar.tsx                 # 상단 컨트롤 바
+├── MainNavigation.tsx                # 메인 네비게이션
+├── Sidebar.tsx                       # 우측 사이드바
+├── StrategyCard.tsx                  # 전략 카드
+├── FlowChart.tsx                     # 사용법 플로우차트
+└── PremiumModal.tsx                  # 프리미엄 모달
 ```
 
-### Frontend 컴포넌트 구조
+### 컴포넌트 설명
 
 | 컴포넌트 | 파일명 | 용도 |
 |----------|--------|------|
-| TopControlBar | `TopControlBar.tsx` | 상단 사용자 네비게이션 (제품군 드롭다운, 사용자명, 메뉴 버튼) |
-| MainNavigation | `MainNavigation.tsx` | 메인 메뉴 (로고 + 7개 메뉴 링크) |
-| Sidebar | `Sidebar.tsx` | 우측 최근 주가 패널 (SOXL/TQQQ 테이블, 고정 위치, 반응형 숨김) |
-| StrategyCard | `StrategyCard.tsx` | Pro1/Pro2/Pro3 전략 카드 (분할 비율, 설정값) |
-| FlowChart | `FlowChart.tsx` | 사용법 5단계 플로우차트 (가로 배치, 화살표) |
-| PremiumModal | `PremiumModal.tsx` | 프리미엄 기능 안내 모달 (Bootstrap Modal) |
-| UserProfile | `mypage/UserProfile.tsx` | 사용자 프로필 카드 (이미지, 이름, 이메일, 가입일) |
-| DeleteAccountModal | `mypage/DeleteAccountModal.tsx` | 회원 탈퇴 확인 모달 (확인 후 계정 삭제) |
-| AccountForm | `trading/AccountForm.tsx` | 계좌 생성/수정 폼 (전략, 시드캐피털, 손절일 설정) |
-| AccountListTable | `trading/AccountListTable.tsx` | 계좌 목록 테이블 (상태, 자산, 수익률 표시) |
-| AccountSettingsCard | `trading/AccountSettingsCard.tsx` | 계좌 설정 카드 (전략 정보, 티어 비율 표시) |
-| AssetSummary | `trading/AssetSummary.tsx` | 자산 요약 카드 (총 자산, 현금, 보유 주식 가치) |
-| DailyOrdersTable | `trading/DailyOrdersTable.tsx` | 당일 주문표 테이블 (LOC/MOC 주문 목록) |
-| TierHoldingsTable | `trading/TierHoldingsTable.tsx` | 티어별 보유현황 테이블 (수량, 매수가, 보유일수) |
-| InvestmentRatioBar | `trading/InvestmentRatioBar.tsx` | 투자 비율 막대 그래프 (티어별 투자 현황) |
-| DeleteAccountModal | `trading/DeleteAccountModal.tsx` | 계좌 삭제 확인 모달 |
-
-### Frontend 아키텍처 다이어그램
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Presentation Layer                          │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    src/app/ (Pages)                      │    │
-│  │  - layout.tsx: CDN, 메타데이터, 공통 레이아웃            │    │
-│  │  - page.tsx: 홈 리다이렉트                               │    │
-│  │  - info/page.tsx: 전략 설명 페이지                       │    │
-│  │  - backtest/page.tsx: 백테스트 폼 페이지                 │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Component Layer                             │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │               src/components/ (Shared)                   │    │
-│  │  ┌──────────────────┐  ┌──────────────────┐             │    │
-│  │  │ TopControlBar    │  │ MainNavigation   │             │    │
-│  │  │ (상단 컨트롤 바) │  │ (메인 네비게이션)│             │    │
-│  │  └──────────────────┘  └──────────────────┘             │    │
-│  │  ┌──────────────────┐  ┌──────────────────┐             │    │
-│  │  │ Sidebar          │  │ StrategyCard     │             │    │
-│  │  │ (우측 사이드바)  │  │ (전략 카드)      │             │    │
-│  │  └──────────────────┘  └──────────────────┘             │    │
-│  │  ┌──────────────────┐  ┌──────────────────┐             │    │
-│  │  │ FlowChart        │  │ PremiumModal     │             │    │
-│  │  │ (플로우차트)     │  │ (프리미엄 모달)  │             │    │
-│  │  └──────────────────┘  └──────────────────┘             │    │
-│  │  ┌──────────────────┐  ┌──────────────────┐             │    │
-│  │  │ Trading 컴포넌트 │  │ TierHoldings     │             │    │
-│  │  │ (계좌/주문 관리) │  │ (티어 보유현황)  │             │    │
-│  │  └──────────────────┘  └──────────────────┘             │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       Style Layer                                │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                  src/styles/globals.css                  │    │
-│  │  - Bootswatch Solar 테마 커스터마이징                    │    │
-│  │  - 반응형 브레이크포인트 (768px, 1700px)                 │    │
-│  │  - 가격 상승/하락 색상 (#ff5370, #26c6da)               │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-```
+| TopControlBar | `TopControlBar.tsx` | 상단 사용자 네비게이션 |
+| MainNavigation | `MainNavigation.tsx` | 메인 메뉴 (로고 + 메뉴 링크) |
+| Sidebar | `Sidebar.tsx` | 우측 최근 주가 패널 |
+| StrategyCard | `StrategyCard.tsx` | Pro1/Pro2/Pro3 전략 카드 |
+| FlowChart | `FlowChart.tsx` | 사용법 5단계 플로우차트 |
+| PremiumModal | `PremiumModal.tsx` | 프리미엄 기능 안내 모달 |
+| UserProfile | `mypage/UserProfile.tsx` | 사용자 프로필 카드 |
+| RecommendForm | `recommend/RecommendForm.tsx` | 전략 추천 요청 폼 |
+| RecommendResult | `recommend/RecommendResult.tsx` | 추천 결과 및 점수 표시 |
+| AccountForm | `trading/AccountForm.tsx` | 계좌 생성/수정 폼 |
+| TierHoldingsTable | `trading/TierHoldingsTable.tsx` | 티어별 보유현황 테이블 |
+| DailyOrdersTable | `trading/DailyOrdersTable.tsx` | 당일 주문표 테이블 |
 
 ---
 
-## 트레이딩 모듈 구조
+## API 엔드포인트
 
-### 핵심 모듈
+### 인증 API
 
-| 파일 | 설명 |
-|------|------|
-| `src/types/trading.ts` | 트레이딩 타입 정의 (TradingAccount, TierHolding, DailyOrder, 전략 상수) |
-| `src/database/trading.ts` | 트레이딩 CRUD 및 주문 생성/체결 로직 |
-| `src/utils/trading-core.ts` | 공통 트레이딩 유틸리티 (가격 계산, 체결 판정, 날짜 유틸리티) |
-| `src/lib/validations/trading.ts` | 입력값 검증 스키마 (Zod) |
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| - | `/api/auth/[...nextauth]` | NextAuth.js 인증 핸들러 (Google OAuth) |
 
-### API 엔드포인트
+### 백테스트 API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/backtest` | 백테스트 실행 |
+
+### 전략 추천 API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/recommend` | 기준일 기반 전략 추천 |
+
+### 추천 백테스트 API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/backtest-recommend` | 사이클별 추천 전략 적용 백테스트 |
+
+### 트레이딩 계좌 API
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -476,14 +582,47 @@ src/
 | GET | `/api/trading/accounts/[id]/orders` | 당일 주문 조회 |
 | POST | `/api/trading/accounts/[id]/orders` | 주문 생성 |
 
-### 데이터베이스 테이블
+### 사용자 API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| DELETE | `/api/user/delete` | 회원 탈퇴 (CASCADE 삭제) |
+
+---
+
+## 데이터베이스 스키마
+
+### 가격 데이터 테이블
+
+| 테이블 | 설명 |
+|--------|------|
+| `daily_prices` | OHLCV 일봉 데이터 (ticker, date, open, high, low, close, volume) |
+| `daily_metrics` | 기술적 지표 (ticker, date, ma20, ma60, rsi14, roc12, volatility20, maSlope, disparity, isGoldenCross) |
+
+### 인증 테이블
+
+| 테이블 | 설명 |
+|--------|------|
+| `users` | 사용자 정보 (id, name, email, image, emailVerified) |
+| `accounts` | OAuth 계정 연동 (userId, provider, providerAccountId, tokens) |
+| `sessions` | 세션 관리 (sessionToken, userId, expires) |
+| `verification_tokens` | 이메일 인증 토큰 |
+
+### 트레이딩 테이블
 
 | 테이블 | 설명 |
 |--------|------|
 | `trading_accounts` | 트레이딩 계좌 (userId, ticker, strategy, seedCapital, stopLossDays) |
 | `tier_holdings` | 티어별 보유현황 (accountId, tierNumber, quantity, buyPrice, buyDate) |
 | `daily_orders` | 당일 주문 (accountId, orderType, tierNumber, price, quantity, status) |
+| `profit_records` | 수익 기록 (accountId, tierNumber, sellDate, profit, profitRate) |
+
+### 캐시 테이블
+
+| 테이블 | 설명 |
+|--------|------|
+| `recommendation_cache` | 추천 결과 캐시 (ticker, date, strategy, score, expiresAt) |
 
 ---
 
-*마지막 업데이트: 2026년 1월*
+*마지막 업데이트: 2026년 2월*

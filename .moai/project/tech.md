@@ -3,28 +3,33 @@
 ## 기술 스택 개요
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Application Layer                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ TypeScript  │  │    Node.js  │  │     ESM     │         │
-│  │   5.7.3     │  │   (Runtime) │  │  (Modules)  │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│                      Data Layer                              │
-│  ┌─────────────────────┐  ┌─────────────────────┐          │
-│  │    better-sqlite3   │  │   yahoo-finance2    │          │
-│  │      v11.7.0        │  │      v3.11.2        │          │
-│  │  (Native SQLite)    │  │   (Data Source)     │          │
-│  └─────────────────────┘  └─────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│                    Development Layer                         │
-│  ┌───────┐  ┌──────────┐  ┌───────┐  ┌───────┐  ┌───────┐ │
-│  │ ESLint│  │ Prettier │  │  tsx  │  │ Husky │  │lint-  │ │
-│  │9.39.2 │  │  3.8.0   │  │4.19.2 │  │ 9.1.7 │  │staged │ │
-│  └───────┘  └──────────┘  └───────┘  └───────┘  └───────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     Application Layer                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ TypeScript  │  │   Node.js   │  │     ESM     │             │
+│  │    5.7.3    │  │  (Runtime)  │  │  (Modules)  │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Data Layer                                │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │    Drizzle ORM      │  │   yahoo-finance2    │              │
+│  │      v0.45.1        │  │      v3.11.2        │              │
+│  │  (Type-safe ORM)    │  │   (Data Source)     │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │     Supabase        │  │   better-sqlite3    │              │
+│  │   (PostgreSQL)      │  │      v11.7.0        │              │
+│  │   (Production)      │  │  (Local Dev)        │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Development Layer                             │
+│  ┌───────┐  ┌──────────┐  ┌───────┐  ┌───────┐  ┌───────────┐ │
+│  │Vitest │  │  ESLint  │  │Prettier│ │ Husky │  │lint-staged│ │
+│  │4.0.17 │  │  9.39.2  │  │ 3.8.0 │  │ 9.1.7 │  │  16.2.7   │ │
+│  └───────┘  └──────────┘  └───────┘  └───────┘  └───────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -44,6 +49,10 @@
 │  │   Bootstrap 5.3.3   │  │  Bootswatch Solar   │              │
 │  │  (CSS Framework)    │  │   (Dark Theme)      │              │
 │  └─────────────────────┘  └─────────────────────┘              │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │   Tailwind CSS      │  │   Recharts 3.6.0    │              │
+│  │  (Utility CSS)      │  │   (Charts)          │              │
+│  └─────────────────────┘  └─────────────────────┘              │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │              Google Fonts - Noto Sans KR                 │   │
 │  │                    (한글 폰트)                           │   │
@@ -57,6 +66,7 @@
 - React 19의 최신 기능 활용 (Server Components, Streaming)
 - 파일 기반 라우팅으로 직관적인 페이지 구조
 - 빌트인 최적화 (이미지, 폰트, 스크립트)
+- Turbopack 지원으로 빠른 개발 서버
 
 **주요 설정:**
 | 기능 | 설정 | 설명 |
@@ -64,6 +74,7 @@
 | App Router | `src/app/` | 파일 시스템 기반 라우팅 |
 | Server Components | 기본값 | 서버 사이드 렌더링 |
 | Client Components | `'use client'` | 인터랙티브 컴포넌트 |
+| Turbopack | `--turbopack` | 빠른 개발 서버 |
 
 ### React 19
 
@@ -88,6 +99,28 @@
 | `--price-up` | #ff5370 | 상승 가격 (빨강) |
 | `--price-down` | #26c6da | 하락 가격 (밝은 청록) |
 
+### Tailwind CSS
+
+**선택 이유:**
+- 유틸리티 기반 스타일링으로 빠른 개발
+- Bootstrap과 조합하여 유연한 커스터마이징
+- JIT 컴파일로 최적화된 CSS 번들
+
+### Recharts 3.6.0
+
+**선택 이유:**
+- React 친화적인 차트 라이브러리
+- 반응형 차트 지원
+- 커스터마이징 용이
+
+**주요 활용:**
+| 차트 타입 | 용도 |
+|----------|------|
+| LineChart | 가격 차트, MA 차트 |
+| AreaChart | 자산 변동 차트 |
+| ComposedChart | MDD 차트 |
+| BarChart | 전략 사용 통계 |
+
 ### Google Fonts - Noto Sans KR
 
 **선택 이유:**
@@ -106,15 +139,14 @@
 | 기능 | 설정 | 설명 |
 |------|------|------|
 | Google OAuth | `GoogleProvider` | 소셜 로그인 제공자 |
-| SQLite Adapter | Custom Adapter | better-sqlite3 기반 커스텀 어댑터 |
+| Drizzle Adapter | `DrizzleAdapter` | Drizzle ORM 기반 어댑터 |
 | Session | JWT | 세션 저장 전략 |
 
 **구성 파일:**
 - `auth.ts` - NextAuth.js 설정
-- `src/lib/auth/adapter.ts` - SQLite 커스텀 어댑터
-- `src/lib/auth/queries.ts` - 사용자/계정 DB 쿼리
+- `src/database/schema/auth.ts` - 인증 테이블 스키마
 
-### Zod (입력값 검증)
+### Zod 4.3.5 (입력값 검증)
 
 **선택 이유:**
 - TypeScript 친화적인 스키마 정의
@@ -131,7 +163,7 @@
 - 주문 생성 시 orderType, tierNumber, price, quantity 검증
 - 티어 보유현황 수정 시 수량, 매수가, 보유일수 검증
 
-### Decimal.js (정밀 연산)
+### Decimal.js 10.6.0 (정밀 연산)
 
 **선택 이유:**
 - JavaScript 부동소수점 오차 방지
@@ -190,12 +222,51 @@
 
 ## 데이터 레이어
 
-### better-sqlite3 v11.7.0
+### Drizzle ORM 0.45.1
+
+**선택 이유:**
+- **타입 안전성**: TypeScript 네이티브 ORM으로 완벽한 타입 추론
+- **경량**: 런타임 오버헤드 최소화
+- **SQL 친화적**: SQL에 가까운 직관적인 쿼리 빌더
+- **마이그레이션**: Drizzle Kit으로 스키마 관리
+
+**주요 기능 활용:**
+
+| 기능 | 구현 | 설명 |
+|------|------|------|
+| 스키마 정의 | `src/database/schema/` | TypeScript로 테이블 정의 |
+| 쿼리 빌더 | `db.select()`, `db.insert()` | 타입 안전한 쿼리 |
+| 트랜잭션 | `db.transaction()` | 원자성 보장 |
+| 마이그레이션 | `drizzle-kit` | 스키마 변경 관리 |
+
+**Drizzle Kit 설정 (drizzle.config.ts):**
+- `schema`: 스키마 파일 경로
+- `out`: 마이그레이션 출력 디렉토리
+- `dialect`: PostgreSQL
+- `dbCredentials`: Supabase 연결 정보
+
+### Supabase (PostgreSQL)
+
+**선택 이유:**
+- **클라우드 호스팅**: 서버 관리 없이 PostgreSQL 사용
+- **무료 티어**: 개인 프로젝트에 적합한 무료 플랜
+- **실시간 기능**: 필요시 실시간 구독 가능
+- **인증 통합**: Auth 서비스 제공 (NextAuth.js와 별도 사용)
+
+**주요 기능 활용:**
+
+| 기능 | 설명 |
+|------|------|
+| PostgreSQL | 프로덕션 데이터베이스 |
+| Connection Pooling | 연결 풀링으로 성능 최적화 |
+| Row Level Security | 데이터 보안 (선택적) |
+
+### better-sqlite3 v11.7.0 (로컬 개발용)
 
 **선택 이유:**
 - **성능**: 동기식 API로 Node.js에서 가장 빠른 SQLite 드라이버
-- **안정성**: 네이티브 바인딩으로 직접 SQLite 라이브러리 호출
-- **간결함**: 프로미스/콜백 없이 직관적인 동기 코드 작성
+- **개발 편의성**: 로컬 개발 환경에서 빠른 테스트
+- **네이티브 바인딩**: 직접 SQLite 라이브러리 호출
 
 **주요 기능 활용:**
 
@@ -203,25 +274,7 @@
 |------|------|------|
 | WAL 모드 | `db.pragma("journal_mode = WAL")` | 동시 읽기 성능 향상 |
 | 트랜잭션 | `db.transaction()` | 대량 삽입 시 원자성 보장 |
-| Prepared Statements | `db.prepare()` | SQL 인젝션 방지 및 성능 최적화 |
-
-**데이터베이스 스키마:**
-```sql
-CREATE TABLE IF NOT EXISTS daily_prices (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker TEXT NOT NULL DEFAULT 'SOXL',
-    date TEXT NOT NULL,
-    open REAL NOT NULL,
-    high REAL NOT NULL,
-    low REAL NOT NULL,
-    close REAL NOT NULL,
-    volume INTEGER NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(ticker, date)
-);
-
-CREATE INDEX IF NOT EXISTS idx_ticker_date ON daily_prices(ticker, date);
-```
+| Prepared Statements | `db.prepare()` | SQL 인젝션 방지 |
 
 ### yahoo-finance2 v3.11.2
 
@@ -246,6 +299,28 @@ CREATE INDEX IF NOT EXISTS idx_ticker_date ON daily_prices(ticker, date);
 ## 개발 환경
 
 ### 코드 품질 도구
+
+#### Vitest 4.0.17
+
+**역할:** 단위 및 통합 테스트 프레임워크
+
+**선택 이유:**
+- Vite 기반으로 빠른 테스트 실행
+- Jest 호환 API로 낮은 학습 곡선
+- TypeScript 네이티브 지원
+- 핫 모듈 리로드 지원
+
+**주요 기능:**
+
+| 기능 | 설명 |
+|------|------|
+| `vitest run` | 테스트 실행 |
+| `vitest --coverage` | 커버리지 리포트 생성 |
+| `vitest --ui` | UI 모드로 테스트 확인 |
+
+**설정 (vitest.config.ts):**
+- 테스트 파일 패턴: `**/*.{test,spec}.{ts,tsx}`
+- 커버리지 리포터: text, html, lcov
 
 #### ESLint v9.39.2
 
@@ -326,9 +401,15 @@ npx tsx src/index.ts init --ticker SOXL
 | `format` | `prettier --write src/` | 코드 포매팅 |
 | `format:check` | `prettier --check src/` | 포매팅 검사 |
 | `prepare` | `husky` | Husky 설치 |
+| `test` | `vitest` | 테스트 실행 |
+| `test:coverage` | `vitest run --coverage` | 커버리지 리포트 |
 | `web:dev` | `next dev --turbopack` | Next.js 개발 서버 (Turbopack) |
 | `web:build` | `next build` | Next.js 프로덕션 빌드 |
 | `web:start` | `next start` | Next.js 프로덕션 서버 |
+| `db:generate` | `drizzle-kit generate` | Drizzle 마이그레이션 파일 생성 |
+| `db:push` | `drizzle-kit push` | 스키마 동기화 |
+| `db:studio` | `drizzle-kit studio` | Drizzle Studio (DB GUI) |
+| `supabase:start` | `supabase start` | Supabase Local 시작 |
 
 ---
 
@@ -345,7 +426,16 @@ npx tsx src/index.ts init --ticker SOXL
 
 - **OS**: macOS, Linux, Windows (WSL 권장)
 - **디스크**: 최소 100MB (데이터베이스 포함)
-- **네트워크**: Yahoo Finance API 접근 가능
+- **네트워크**: Yahoo Finance API, Supabase 접근 가능
+
+### 환경 변수
+
+| 변수 | 설명 |
+|------|------|
+| `DATABASE_URL` | Supabase PostgreSQL 연결 문자열 |
+| `AUTH_SECRET` | NextAuth.js 시크릿 키 |
+| `AUTH_GOOGLE_ID` | Google OAuth 클라이언트 ID |
+| `AUTH_GOOGLE_SECRET` | Google OAuth 클라이언트 시크릿 |
 
 ### 설치 및 실행
 
@@ -357,10 +447,20 @@ cd buy-dip-sell-peak-system
 # 2. 의존성 설치
 npm install
 
-# 3. 데이터베이스 초기화 (SOXL)
+# 3. 환경 변수 설정
+cp .env.example .env.local
+# .env.local 파일에 필요한 환경 변수 설정
+
+# 4. 데이터베이스 스키마 동기화
+npm run db:push
+
+# 5. 데이터베이스 초기화 (SOXL)
 npm run dev init -- --ticker SOXL
 
-# 4. 데이터 조회
+# 6. 웹 개발 서버 실행
+npm run web:dev
+
+# 7. 데이터 조회
 npm run dev query -- --ticker SOXL --start 2024-01-01 --end 2024-12-31
 ```
 
@@ -374,47 +474,63 @@ npm run dev query -- --ticker SOXL --start 2024-01-01 --end 2024-12-31
 # TypeScript 컴파일
 npm run build
 
-# 빌드 결과 확인
-ls -la dist/
+# Next.js 프로덕션 빌드
+npm run web:build
 
 # 프로덕션 실행
-npm start init -- --ticker SOXL
+npm run web:start
 ```
 
-### 빌드 출력 구조
+### 배포 플랫폼
 
-```
-dist/
-├── index.js
-├── types/
-│   └── index.js
-├── database/
-│   ├── index.js
-│   └── schema.js
-└── services/
-    └── dataFetcher.js
-```
+| 플랫폼 | 용도 | 설명 |
+|--------|------|------|
+| **Vercel** | 웹 호스팅 | Next.js 최적화 배포 |
+| **Supabase** | 데이터베이스 | PostgreSQL 클라우드 호스팅 |
 
 ### 배포 고려사항
 
-1. **환경 변수**: 현재 하드코딩된 설정 없음 (추후 확장 시 고려)
-2. **데이터베이스 경로**: `data/prices.db` 상대 경로 사용
-3. **의존성**: `better-sqlite3`는 네이티브 모듈로 OS별 재빌드 필요
+1. **환경 변수**: Vercel에서 환경 변수 설정 필요
+2. **데이터베이스**: Supabase 프로젝트 연결
+3. **빌드 명령어**: `npm run web:build`
+4. **출력 디렉토리**: `.next`
 
 ---
 
 ## 기술 선택 근거
 
-### SQLite vs 클라우드 DB
+### Drizzle ORM vs Prisma
 
-| 기준 | SQLite | 클라우드 DB |
-|------|--------|------------|
-| **설치** | 로컬 파일, 즉시 사용 | 계정/설정 필요 |
-| **비용** | 무료 | 사용량 기반 과금 |
-| **성능** | 로컬 I/O로 빠름 | 네트워크 지연 |
-| **용도** | 개인 분석 도구에 적합 | 멀티 유저 서비스용 |
+| 기준 | Drizzle ORM | Prisma |
+|------|------------|--------|
+| **타입 안전성** | TypeScript 네이티브 | 코드 생성 필요 |
+| **런타임 크기** | 경량 | 상대적으로 큼 |
+| **SQL 친화성** | SQL에 가까운 문법 | 추상화된 문법 |
+| **마이그레이션** | Drizzle Kit | Prisma Migrate |
 
-**결론**: 개인 백테스팅 도구로서 SQLite가 최적
+**결론**: 경량화와 SQL 친화성을 위해 Drizzle ORM 선택
+
+### Supabase vs 직접 PostgreSQL 호스팅
+
+| 기준 | Supabase | 직접 호스팅 |
+|------|----------|------------|
+| **설정** | 즉시 사용 가능 | 서버 설정 필요 |
+| **비용** | 무료 티어 제공 | 서버 비용 발생 |
+| **관리** | 자동 백업/스케일링 | 직접 관리 |
+| **기능** | Auth, Storage 등 추가 기능 | 순수 DB만 |
+
+**결론**: 개인 프로젝트에 적합한 Supabase 선택
+
+### Vitest vs Jest
+
+| 기준 | Vitest | Jest |
+|------|--------|------|
+| **속도** | Vite 기반으로 빠름 | 상대적으로 느림 |
+| **설정** | 최소 설정 | 복잡한 설정 |
+| **TypeScript** | 네이티브 지원 | ts-jest 필요 |
+| **ESM** | 네이티브 지원 | 추가 설정 필요 |
+
+**결론**: 빠른 테스트 실행과 ESM 지원을 위해 Vitest 선택
 
 ### TypeScript vs JavaScript
 
@@ -441,12 +557,15 @@ dist/
 
 ## 향후 기술 확장 계획
 
-- [ ] **테스트**: Jest/Vitest를 활용한 유닛/통합 테스트
-- [ ] **CI/CD**: GitHub Actions를 통한 자동화 파이프라인
 - [ ] **Docker**: 컨테이너화를 통한 환경 독립성
+- [ ] **CI/CD**: GitHub Actions를 통한 자동화 파이프라인
+- [ ] **모니터링**: Sentry 또는 LogRocket 연동
+- [x] **테스트**: Vitest를 활용한 유닛/통합 테스트
 - [x] **웹 UI**: React/Next.js 기반 대시보드
 - [x] **인증**: NextAuth.js v5 기반 Google OAuth 로그인
+- [x] **ORM**: Drizzle ORM으로 마이그레이션
+- [x] **클라우드 DB**: Supabase PostgreSQL 연동
 
 ---
 
-*마지막 업데이트: 2026년 1월*
+*마지막 업데이트: 2026년 2월*
