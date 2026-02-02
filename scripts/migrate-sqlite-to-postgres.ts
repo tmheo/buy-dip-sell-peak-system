@@ -23,8 +23,15 @@ import {
 // SQLite 연결
 const sqlite = new Database("./data/prices.db", { readonly: true });
 
+// 환경 변수 검증
+if (!process.env.DATABASE_URL) {
+  console.error("❌ DATABASE_URL 환경 변수가 설정되지 않았습니다.");
+  console.error("사용법: DATABASE_URL=\"postgresql://...\" npx tsx scripts/migrate-sqlite-to-postgres.ts");
+  process.exit(1);
+}
+
 // PostgreSQL 연결
-const client = postgres(process.env.DATABASE_URL!, { max: 1 });
+const client = postgres(process.env.DATABASE_URL, { max: 1 });
 const pg = drizzle(client);
 
 // 배치 크기
