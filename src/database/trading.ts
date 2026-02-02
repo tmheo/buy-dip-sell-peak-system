@@ -1,11 +1,25 @@
 /**
  * 트레이딩 계좌 CRUD 함수 (PRD-TRADING-001)
+ * Drizzle ORM for PostgreSQL
  */
 
-import Database from "better-sqlite3";
 import Decimal from "decimal.js";
-import path from "path";
-import { randomUUID } from "crypto";
+import { eq, and, desc, asc, lte, sql } from "drizzle-orm";
+
+import { db } from "./db-drizzle";
+import {
+  tradingAccounts,
+  tierHoldings,
+  dailyOrders,
+  profitRecords,
+  dailyPrices,
+} from "./schema/index";
+import type {
+  TradingAccount as DrizzleTradingAccount,
+  TierHolding as DrizzleTierHolding,
+  DailyOrder as DrizzleDailyOrder,
+  ProfitRecord as DrizzleProfitRecord,
+} from "./schema/index";
 
 import type {
   TradingAccount,
@@ -44,184 +58,74 @@ import {
   calculateTradingDays,
   percentToThreshold,
 } from "@/utils/trading-core";
-import {
-  CREATE_TRADING_ACCOUNTS_TABLE,
-  CREATE_TRADING_ACCOUNTS_USER_INDEX,
-  CREATE_TIER_HOLDINGS_TABLE,
-  CREATE_TIER_HOLDINGS_ACCOUNT_INDEX,
-  CREATE_DAILY_ORDERS_TABLE,
-  CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX,
-  CREATE_PROFIT_RECORDS_TABLE,
-  CREATE_PROFIT_RECORDS_ACCOUNT_INDEX,
-  CREATE_PROFIT_RECORDS_SELL_DATE_INDEX,
-  INSERT_PROFIT_RECORD,
-  SELECT_PROFIT_RECORDS_BY_ACCOUNT,
-} from "./schema";
-
-const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "data", "prices.db");
-
-let db: Database.Database | null = null;
-let tablesInitialized = false;
-
-/**
- * 데이터베이스 연결 (싱글톤)
- */
-function getConnection(): Database.Database {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-    initTradingTables(db);
-  }
-  return db;
-}
-
-/**
- * Trading 테이블 초기화
- */
-function initTradingTables(database: Database.Database): void {
-  if (tablesInitialized) return;
-
-  database.exec(CREATE_TRADING_ACCOUNTS_TABLE);
-  database.exec(CREATE_TRADING_ACCOUNTS_USER_INDEX);
-  database.exec(CREATE_TIER_HOLDINGS_TABLE);
-  database.exec(CREATE_TIER_HOLDINGS_ACCOUNT_INDEX);
-  database.exec(CREATE_DAILY_ORDERS_TABLE);
-  database.exec(CREATE_DAILY_ORDERS_ACCOUNT_DATE_INDEX);
-  database.exec(CREATE_PROFIT_RECORDS_TABLE);
-  database.exec(CREATE_PROFIT_RECORDS_ACCOUNT_INDEX);
-  database.exec(CREATE_PROFIT_RECORDS_SELL_DATE_INDEX);
-
-  tablesInitialized = true;
-}
 
 // =====================================================
-// DB Row 타입 (snake_case)
+// Drizzle Row -> Application Type 변환 함수
+// Drizzle은 Date/Timestamp를 Date 객체로, Application은 string으로 사용
 // =====================================================
 
-interface TradingAccountRow {
-  id: string;
-  user_id: string;
-  name: string;
-  ticker: string;
-  seed_capital: number;
-  strategy: string;
-  cycle_start_date: string;
-  cycle_number: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface TierHoldingRow {
-  id: string;
-  account_id: string;
-  tier: number;
-  buy_price: number | null;
-  shares: number;
-  buy_date: string | null;
-  sell_target_price: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DailyOrderRow {
-  id: string;
-  account_id: string;
-  date: string;
-  tier: number;
-  type: string;
-  order_method: string;
-  limit_price: number;
-  shares: number;
-  executed: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProfitRecordRow {
-  id: string;
-  account_id: string;
-  tier: number;
-  ticker: string;
-  strategy: string;
-  buy_date: string;
-  buy_price: number;
-  buy_quantity: number;
-  sell_date: string;
-  sell_price: number;
-  buy_amount: number;
-  sell_amount: number;
-  profit: number;
-  profit_rate: number;
-  created_at: string;
-}
-
-// =====================================================
-// Row 변환 함수
-// =====================================================
-
-function mapTradingAccountRow(row: TradingAccountRow): TradingAccount {
+function mapDrizzleTradingAccount(row: DrizzleTradingAccount): TradingAccount {
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.userId,
     name: row.name,
     ticker: row.ticker as Ticker,
-    seedCapital: row.seed_capital,
+    seedCapital: row.seedCapital,
     strategy: row.strategy as Strategy,
-    cycleStartDate: row.cycle_start_date,
-    cycleNumber: row.cycle_number,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    cycleStartDate: row.cycleStartDate,
+    cycleNumber: row.cycleNumber,
+    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+    updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
   };
 }
 
-function mapTierHoldingRow(row: TierHoldingRow): TierHolding {
+function mapDrizzleTierHolding(row: DrizzleTierHolding): TierHolding {
   return {
     id: row.id,
-    accountId: row.account_id,
+    accountId: row.accountId,
     tier: row.tier,
-    buyPrice: row.buy_price,
+    buyPrice: row.buyPrice,
     shares: row.shares,
-    buyDate: row.buy_date,
-    sellTargetPrice: row.sell_target_price,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    buyDate: row.buyDate,
+    sellTargetPrice: row.sellTargetPrice,
+    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+    updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
   };
 }
 
-function mapDailyOrderRow(row: DailyOrderRow): DailyOrder {
+function mapDrizzleDailyOrder(row: DrizzleDailyOrder): DailyOrder {
   return {
     id: row.id,
-    accountId: row.account_id,
+    accountId: row.accountId,
     date: row.date,
     tier: row.tier,
     type: row.type as OrderType,
-    orderMethod: row.order_method as OrderMethod,
-    limitPrice: row.limit_price,
+    orderMethod: row.orderMethod as OrderMethod,
+    limitPrice: row.limitPrice,
     shares: row.shares,
-    executed: row.executed === 1,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    executed: row.executed,
+    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+    updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
   };
 }
 
-function mapProfitRecordRow(row: ProfitRecordRow): ProfitRecord {
+function mapDrizzleProfitRecord(row: DrizzleProfitRecord): ProfitRecord {
   return {
     id: row.id,
-    accountId: row.account_id,
+    accountId: row.accountId,
     tier: row.tier,
     ticker: row.ticker as Ticker,
     strategy: row.strategy as Strategy,
-    buyDate: row.buy_date,
-    buyPrice: row.buy_price,
-    buyQuantity: row.buy_quantity,
-    sellDate: row.sell_date,
-    sellPrice: row.sell_price,
-    buyAmount: row.buy_amount,
-    sellAmount: row.sell_amount,
+    buyDate: row.buyDate,
+    buyPrice: row.buyPrice,
+    buyQuantity: row.buyQuantity,
+    sellDate: row.sellDate,
+    sellPrice: row.sellPrice,
+    buyAmount: row.buyAmount,
+    sellAmount: row.sellAmount,
     profit: row.profit,
-    profitRate: row.profit_rate,
-    createdAt: row.created_at,
+    profitRate: row.profitRate,
+    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
   };
 }
 
@@ -232,78 +136,81 @@ function mapProfitRecordRow(row: ProfitRecordRow): ProfitRecord {
 /**
  * 트레이딩 계좌 생성 (티어 홀딩 7개 자동 생성)
  */
-export function createTradingAccount(
+export async function createTradingAccount(
   userId: string,
   request: CreateTradingAccountRequest
-): TradingAccount {
-  const database = getConnection();
-  const accountId = randomUUID();
-
-  const insertAccount = database.transaction(() => {
+): Promise<TradingAccount> {
+  return await db.transaction(async (tx) => {
     // 1. 계좌 생성
-    const accountStmt = database.prepare(
-      "INSERT INTO trading_accounts (id, user_id, name, ticker, seed_capital, strategy, cycle_start_date, cycle_number) VALUES (?, ?, ?, ?, ?, ?, ?, 1)"
-    );
-    accountStmt.run(
-      accountId,
-      userId,
-      request.name,
-      request.ticker,
-      request.seedCapital,
-      request.strategy,
-      request.cycleStartDate
-    );
+    const accountResult = await tx
+      .insert(tradingAccounts)
+      .values({
+        userId,
+        name: request.name,
+        ticker: request.ticker,
+        seedCapital: request.seedCapital,
+        strategy: request.strategy,
+        cycleStartDate: request.cycleStartDate,
+        cycleNumber: 1,
+      })
+      .returning();
+
+    const account = accountResult[0];
 
     // 2. 티어 홀딩 7개 자동 생성
-    const holdingStmt = database.prepare(
-      "INSERT INTO tier_holdings (id, account_id, tier, shares) VALUES (?, ?, ?, 0)"
-    );
     for (let tier = 1; tier <= TIER_COUNT; tier++) {
-      holdingStmt.run(randomUUID(), accountId, tier);
+      await tx.insert(tierHoldings).values({
+        accountId: account.id,
+        tier,
+        shares: 0,
+      });
     }
+
+    return mapDrizzleTradingAccount(account);
   });
-
-  insertAccount();
-
-  return getTradingAccountById(accountId, userId)!;
 }
 
 /**
  * 사용자의 모든 계좌 조회
  */
-export function getTradingAccountsByUserId(userId: string): TradingAccount[] {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "SELECT id, user_id, name, ticker, seed_capital, strategy, cycle_start_date, cycle_number, created_at, updated_at FROM trading_accounts WHERE user_id = ? ORDER BY created_at DESC"
-  );
-  const rows = stmt.all(userId) as TradingAccountRow[];
-  return rows.map(mapTradingAccountRow);
+export async function getTradingAccountsByUserId(userId: string): Promise<TradingAccount[]> {
+  const rows = await db
+    .select()
+    .from(tradingAccounts)
+    .where(eq(tradingAccounts.userId, userId))
+    .orderBy(desc(tradingAccounts.createdAt));
+
+  return rows.map(mapDrizzleTradingAccount);
 }
 
 /**
  * 단일 계좌 조회 (본인 확인)
  */
-export function getTradingAccountById(id: string, userId: string): TradingAccount | null {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "SELECT id, user_id, name, ticker, seed_capital, strategy, cycle_start_date, cycle_number, created_at, updated_at FROM trading_accounts WHERE id = ? AND user_id = ?"
-  );
-  const row = stmt.get(id, userId) as TradingAccountRow | undefined;
-  return row ? mapTradingAccountRow(row) : null;
+export async function getTradingAccountById(
+  id: string,
+  userId: string
+): Promise<TradingAccount | null> {
+  const rows = await db
+    .select()
+    .from(tradingAccounts)
+    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)))
+    .limit(1);
+
+  return rows[0] ? mapDrizzleTradingAccount(rows[0]) : null;
 }
 
 /**
  * 계좌 상세 조회 (holdings 포함)
  */
-export function getTradingAccountWithHoldings(
+export async function getTradingAccountWithHoldings(
   id: string,
   userId: string
-): TradingAccountWithHoldings | null {
-  const account = getTradingAccountById(id, userId);
+): Promise<TradingAccountWithHoldings | null> {
+  const account = await getTradingAccountById(id, userId);
   if (!account) return null;
 
-  const holdings = getTierHoldings(id);
-  const totalShares = getTotalShares(id);
+  const holdings = await getTierHoldings(id);
+  const totalShares = await getTotalShares(id);
 
   return {
     ...account,
@@ -316,67 +223,61 @@ export function getTradingAccountWithHoldings(
 /**
  * 계좌 수정 (사이클 미진행 시만)
  */
-export function updateTradingAccount(
+export async function updateTradingAccount(
   id: string,
   userId: string,
   data: UpdateTradingAccountRequest
-): TradingAccount | null {
-  const account = getTradingAccountById(id, userId);
+): Promise<TradingAccount | null> {
+  const account = await getTradingAccountById(id, userId);
   if (!account) return null;
 
   // 사이클 진행 중 확인
-  const totalShares = getTotalShares(id);
+  const totalShares = await getTotalShares(id);
   if (totalShares > 0) {
     throw new Error("Cannot update account while cycle is in progress");
   }
 
-  const database = getConnection();
-  const updates: string[] = [];
-  const values: unknown[] = [];
+  // 업데이트할 필드가 있는지 확인
+  const hasUpdates =
+    data.name !== undefined ||
+    data.ticker !== undefined ||
+    data.seedCapital !== undefined ||
+    data.strategy !== undefined ||
+    data.cycleStartDate !== undefined;
 
-  if (data.name !== undefined) {
-    updates.push("name = ?");
-    values.push(data.name);
-  }
-  if (data.ticker !== undefined) {
-    updates.push("ticker = ?");
-    values.push(data.ticker);
-  }
-  if (data.seedCapital !== undefined) {
-    updates.push("seed_capital = ?");
-    values.push(data.seedCapital);
-  }
-  if (data.strategy !== undefined) {
-    updates.push("strategy = ?");
-    values.push(data.strategy);
-  }
-  if (data.cycleStartDate !== undefined) {
-    updates.push("cycle_start_date = ?");
-    values.push(data.cycleStartDate);
-  }
-
-  if (updates.length === 0) {
+  if (!hasUpdates) {
     return account;
   }
 
-  updates.push("updated_at = CURRENT_TIMESTAMP");
-  values.push(id, userId);
+  // 업데이트 객체 구성
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  };
 
-  const sql = "UPDATE trading_accounts SET " + updates.join(", ") + " WHERE id = ? AND user_id = ?";
-  const stmt = database.prepare(sql);
-  stmt.run(...values);
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.ticker !== undefined) updateData.ticker = data.ticker;
+  if (data.seedCapital !== undefined) updateData.seedCapital = data.seedCapital;
+  if (data.strategy !== undefined) updateData.strategy = data.strategy;
+  if (data.cycleStartDate !== undefined) updateData.cycleStartDate = data.cycleStartDate;
 
-  return getTradingAccountById(id, userId);
+  await db
+    .update(tradingAccounts)
+    .set(updateData as typeof tradingAccounts.$inferInsert)
+    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)));
+
+  return await getTradingAccountById(id, userId);
 }
 
 /**
  * 계좌 삭제
  */
-export function deleteTradingAccount(id: string, userId: string): boolean {
-  const database = getConnection();
-  const stmt = database.prepare("DELETE FROM trading_accounts WHERE id = ? AND user_id = ?");
-  const result = stmt.run(id, userId);
-  return result.changes > 0;
+export async function deleteTradingAccount(id: string, userId: string): Promise<boolean> {
+  const result = await db
+    .delete(tradingAccounts)
+    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)))
+    .returning();
+
+  return result.length > 0;
 }
 
 // =====================================================
@@ -386,31 +287,32 @@ export function deleteTradingAccount(id: string, userId: string): boolean {
 /**
  * 티어별 보유 현황 조회
  */
-export function getTierHoldings(accountId: string): TierHolding[] {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "SELECT id, account_id, tier, buy_price, shares, buy_date, sell_target_price, created_at, updated_at FROM tier_holdings WHERE account_id = ? ORDER BY tier ASC"
-  );
-  const rows = stmt.all(accountId) as TierHoldingRow[];
-  return rows.map(mapTierHoldingRow);
+export async function getTierHoldings(accountId: string): Promise<TierHolding[]> {
+  const rows = await db
+    .select()
+    .from(tierHoldings)
+    .where(eq(tierHoldings.accountId, accountId))
+    .orderBy(asc(tierHoldings.tier));
+
+  return rows.map(mapDrizzleTierHolding);
 }
 
 /**
  * 총 보유 수량 조회
  */
-export function getTotalShares(accountId: string): number {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "SELECT COALESCE(SUM(shares), 0) as total FROM tier_holdings WHERE account_id = ?"
-  );
-  const result = stmt.get(accountId) as { total: number };
-  return result.total;
+export async function getTotalShares(accountId: string): Promise<number> {
+  const result = await db
+    .select({ total: sql<number>`COALESCE(SUM(${tierHoldings.shares}), 0)` })
+    .from(tierHoldings)
+    .where(eq(tierHoldings.accountId, accountId));
+
+  return result[0]?.total ?? 0;
 }
 
 /**
  * 티어 홀딩 업데이트
  */
-export function updateTierHolding(
+export async function updateTierHolding(
   accountId: string,
   tier: number,
   data: {
@@ -419,45 +321,40 @@ export function updateTierHolding(
     buyDate?: string | null;
     sellTargetPrice?: number | null;
   }
-): TierHolding | null {
-  const database = getConnection();
-  const updates: string[] = [];
-  const values: unknown[] = [];
+): Promise<TierHolding | null> {
+  // 업데이트할 필드가 있는지 확인
+  const hasUpdates =
+    data.buyPrice !== undefined ||
+    data.shares !== undefined ||
+    data.buyDate !== undefined ||
+    data.sellTargetPrice !== undefined;
 
-  if (data.buyPrice !== undefined) {
-    updates.push("buy_price = ?");
-    values.push(data.buyPrice);
-  }
-  if (data.shares !== undefined) {
-    updates.push("shares = ?");
-    values.push(data.shares);
-  }
-  if (data.buyDate !== undefined) {
-    updates.push("buy_date = ?");
-    values.push(data.buyDate);
-  }
-  if (data.sellTargetPrice !== undefined) {
-    updates.push("sell_target_price = ?");
-    values.push(data.sellTargetPrice);
-  }
-
-  if (updates.length === 0) {
+  if (!hasUpdates) {
     return null;
   }
 
-  updates.push("updated_at = CURRENT_TIMESTAMP");
-  values.push(accountId, tier);
+  // 업데이트 객체 구성
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  };
 
-  const sql =
-    "UPDATE tier_holdings SET " + updates.join(", ") + " WHERE account_id = ? AND tier = ?";
-  const stmt = database.prepare(sql);
-  stmt.run(...values);
+  if (data.buyPrice !== undefined) updateData.buyPrice = data.buyPrice;
+  if (data.shares !== undefined) updateData.shares = data.shares;
+  if (data.buyDate !== undefined) updateData.buyDate = data.buyDate;
+  if (data.sellTargetPrice !== undefined) updateData.sellTargetPrice = data.sellTargetPrice;
 
-  const selectStmt = database.prepare(
-    "SELECT id, account_id, tier, buy_price, shares, buy_date, sell_target_price, created_at, updated_at FROM tier_holdings WHERE account_id = ? AND tier = ?"
-  );
-  const row = selectStmt.get(accountId, tier) as TierHoldingRow | undefined;
-  return row ? mapTierHoldingRow(row) : null;
+  await db
+    .update(tierHoldings)
+    .set(updateData as typeof tierHoldings.$inferInsert)
+    .where(and(eq(tierHoldings.accountId, accountId), eq(tierHoldings.tier, tier)));
+
+  const rows = await db
+    .select()
+    .from(tierHoldings)
+    .where(and(eq(tierHoldings.accountId, accountId), eq(tierHoldings.tier, tier)))
+    .limit(1);
+
+  return rows[0] ? mapDrizzleTierHolding(rows[0]) : null;
 }
 
 // =====================================================
@@ -467,19 +364,20 @@ export function updateTierHolding(
 /**
  * 당일 주문표 조회
  */
-export function getDailyOrders(accountId: string, date: string): DailyOrder[] {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "SELECT id, account_id, date, tier, type, order_method, limit_price, shares, executed, created_at, updated_at FROM daily_orders WHERE account_id = ? AND date = ? ORDER BY tier ASC, type ASC"
-  );
-  const rows = stmt.all(accountId, date) as DailyOrderRow[];
-  return rows.map(mapDailyOrderRow);
+export async function getDailyOrders(accountId: string, date: string): Promise<DailyOrder[]> {
+  const rows = await db
+    .select()
+    .from(dailyOrders)
+    .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)))
+    .orderBy(asc(dailyOrders.tier), asc(dailyOrders.type));
+
+  return rows.map(mapDrizzleDailyOrder);
 }
 
 /**
  * 주문 생성
  */
-export function createDailyOrder(
+export async function createDailyOrder(
   accountId: string,
   data: {
     date: string;
@@ -489,62 +387,58 @@ export function createDailyOrder(
     limitPrice: number;
     shares: number;
   }
-): DailyOrder {
-  const database = getConnection();
-  const id = randomUUID();
+): Promise<DailyOrder> {
+  const result = await db
+    .insert(dailyOrders)
+    .values({
+      accountId,
+      date: data.date,
+      tier: data.tier,
+      type: data.type,
+      orderMethod: data.orderMethod,
+      limitPrice: data.limitPrice,
+      shares: data.shares,
+      executed: false,
+    })
+    .returning();
 
-  const stmt = database.prepare(
-    "INSERT INTO daily_orders (id, account_id, date, tier, type, order_method, limit_price, shares, executed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)"
-  );
-  stmt.run(
-    id,
-    accountId,
-    data.date,
-    data.tier,
-    data.type,
-    data.orderMethod,
-    data.limitPrice,
-    data.shares
-  );
-
-  const selectStmt = database.prepare(
-    "SELECT id, account_id, date, tier, type, order_method, limit_price, shares, executed, created_at, updated_at FROM daily_orders WHERE id = ?"
-  );
-  const row = selectStmt.get(id) as DailyOrderRow;
-  return mapDailyOrderRow(row);
+  return mapDrizzleDailyOrder(result[0]);
 }
 
 /**
  * 주문 실행 상태 업데이트
  */
-export function updateOrderExecuted(orderId: string, executed: boolean): boolean {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "UPDATE daily_orders SET executed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-  );
-  const result = stmt.run(executed ? 1 : 0, orderId);
-  return result.changes > 0;
+export async function updateOrderExecuted(orderId: string, executed: boolean): Promise<boolean> {
+  const result = await db
+    .update(dailyOrders)
+    .set({ executed, updatedAt: new Date() })
+    .where(eq(dailyOrders.id, orderId))
+    .returning();
+
+  return result.length > 0;
 }
 
 /**
  * 특정 날짜의 종가 조회
  */
-export function getClosingPrice(ticker: Ticker, date: string): number | null {
-  const database = getConnection();
-  const stmt = database.prepare(
-    "SELECT adj_close FROM daily_prices WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1"
-  );
-  const result = stmt.get(ticker, date) as { adj_close: number } | undefined;
-  return result?.adj_close ?? null;
+export async function getClosingPrice(ticker: Ticker, date: string): Promise<number | null> {
+  const rows = await db
+    .select({ adjClose: dailyPrices.adjClose })
+    .from(dailyPrices)
+    .where(and(eq(dailyPrices.ticker, ticker), lte(dailyPrices.date, date)))
+    .orderBy(desc(dailyPrices.date))
+    .limit(1);
+
+  return rows[0]?.adjClose ?? null;
 }
 
 /**
  * 당일 주문 삭제 (재생성 용)
  */
-export function deleteDailyOrders(accountId: string, date: string): void {
-  const database = getConnection();
-  const stmt = database.prepare("DELETE FROM daily_orders WHERE account_id = ? AND date = ?");
-  stmt.run(accountId, date);
+export async function deleteDailyOrders(accountId: string, date: string): Promise<void> {
+  await db
+    .delete(dailyOrders)
+    .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));
 }
 
 /**
@@ -552,17 +446,17 @@ export function deleteDailyOrders(accountId: string, date: string): void {
  * - 티어 고정 방식: 가장 낮은 빈 티어에만 매수 주문 (한 번에 하나의 티어만)
  * - 보유 티어: 매도 주문 생성
  */
-export function generateDailyOrders(
+export async function generateDailyOrders(
   accountId: string,
   date: string,
   ticker: Ticker,
   strategy: Strategy,
   seedCapital: number,
   holdings: TierHolding[]
-): DailyOrder[] {
+): Promise<DailyOrder[]> {
   // 전일 종가 조회 (주문 생성일 기준 이전 거래일)
   const prevDate = getPreviousTradingDate(date);
-  const closePrice = getClosingPrice(ticker, prevDate);
+  const closePrice = await getClosingPrice(ticker, prevDate);
 
   if (!closePrice) {
     return []; // 가격 데이터 없으면 주문 생성 불가
@@ -575,7 +469,7 @@ export function generateDailyOrders(
   const orders: DailyOrder[] = [];
 
   // 기존 주문 삭제
-  deleteDailyOrders(accountId, date);
+  await deleteDailyOrders(accountId, date);
 
   const stopLossDay = STOP_LOSS_DAYS[strategy];
 
@@ -587,7 +481,7 @@ export function generateDailyOrders(
 
       if (holdingDays >= stopLossDay) {
         // 손절일 도달: MOC 주문 (시장가, 무조건 체결)
-        const order = createDailyOrder(accountId, {
+        const order = await createDailyOrder(accountId, {
           date,
           tier: holding.tier,
           type: "SELL" as OrderType,
@@ -599,7 +493,7 @@ export function generateDailyOrders(
       } else {
         // 일반 매도: LOC 주문 (지정가)
         const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
-        const order = createDailyOrder(accountId, {
+        const order = await createDailyOrder(accountId, {
           date,
           tier: holding.tier,
           type: "SELL" as OrderType,
@@ -626,7 +520,7 @@ export function generateDailyOrders(
       const shares = calculateBuyQuantity(allocatedSeed, buyPrice);
 
       if (shares > 0) {
-        const order = createDailyOrder(accountId, {
+        const order = await createDailyOrder(accountId, {
           date,
           tier: nextBuyTier,
           type: "BUY" as OrderType,
@@ -691,19 +585,19 @@ export interface ExecutionResult {
  * @param ticker - 종목
  * @returns 체결 결과 목록
  */
-export function processOrderExecution(
+export async function processOrderExecution(
   accountId: string,
   date: string,
   ticker: Ticker
-): ExecutionResult[] {
+): Promise<ExecutionResult[]> {
   // 당일 종가 조회
-  const closePrice = getClosingPrice(ticker, date);
+  const closePrice = await getClosingPrice(ticker, date);
   if (!closePrice) {
     return []; // 종가 데이터 없으면 체결 처리 불가
   }
 
   // 당일 주문 조회
-  const orders = getDailyOrders(accountId, date);
+  const orders = await getDailyOrders(accountId, date);
   const results: ExecutionResult[] = [];
   // 이번에 새로 체결된 매도 여부 추적 (이미 체결된 주문은 제외)
   let hasNewSellExecution = false;
@@ -736,14 +630,16 @@ export function processOrderExecution(
 
     if (shouldExecute) {
       // 주문 체결 처리
-      updateOrderExecuted(order.id, true);
+      await updateOrderExecuted(order.id, true);
 
       if (order.type === "BUY") {
         // 매수 체결: 티어에 보유 정보 추가
-        const sellThreshold = percentToThreshold(SELL_THRESHOLDS[getAccountStrategy(accountId)]);
+        const sellThreshold = percentToThreshold(
+          SELL_THRESHOLDS[await getAccountStrategy(accountId)]
+        );
         const sellTargetPrice = calculateSellLimitPrice(closePrice, sellThreshold);
 
-        updateTierHolding(accountId, order.tier, {
+        await updateTierHolding(accountId, order.tier, {
           buyPrice: closePrice,
           shares: order.shares,
           buyDate: date,
@@ -752,12 +648,12 @@ export function processOrderExecution(
       } else {
         // 매도 체결: 수익 기록 생성 후 티어 보유 정보 초기화
         // 티어 초기화 전에 현재 보유 정보로 수익 기록 생성
-        const holdings = getTierHoldings(accountId);
+        const holdings = await getTierHoldings(accountId);
         const tierHolding = holdings.find((h) => h.tier === order.tier);
 
         if (tierHolding && tierHolding.buyPrice && tierHolding.buyDate && tierHolding.shares > 0) {
-          const strategy = getAccountStrategy(accountId);
-          createProfitRecord({
+          const strategy = await getAccountStrategy(accountId);
+          await createProfitRecord({
             accountId,
             tier: order.tier,
             ticker,
@@ -771,7 +667,7 @@ export function processOrderExecution(
         }
 
         // 티어 보유 정보 초기화
-        updateTierHolding(accountId, order.tier, {
+        await updateTierHolding(accountId, order.tier, {
           buyPrice: null,
           shares: 0,
           buyDate: null,
@@ -797,10 +693,10 @@ export function processOrderExecution(
   // 이번에 새로 체결된 매도가 있으면 사이클 완료 여부 확인
   // (이미 체결된 주문은 제외하여 중복 사이클 증가 방지)
   if (hasNewSellExecution) {
-    const remainingShares = getTotalShares(accountId);
+    const remainingShares = await getTotalShares(accountId);
     if (remainingShares === 0) {
       // 모든 티어가 비었으면 사이클 완료
-      completeCycleAndIncrement(accountId);
+      await completeCycleAndIncrement(accountId);
     }
   }
 
@@ -810,14 +706,17 @@ export function processOrderExecution(
 /**
  * 계좌의 전략 조회 (내부 헬퍼)
  */
-function getAccountStrategy(accountId: string): Strategy {
-  const database = getConnection();
-  const stmt = database.prepare("SELECT strategy FROM trading_accounts WHERE id = ?");
-  const result = stmt.get(accountId) as { strategy: string } | undefined;
-  if (!result) {
+async function getAccountStrategy(accountId: string): Promise<Strategy> {
+  const rows = await db
+    .select({ strategy: tradingAccounts.strategy })
+    .from(tradingAccounts)
+    .where(eq(tradingAccounts.id, accountId))
+    .limit(1);
+
+  if (!rows[0]) {
     throw new Error(`Account not found: ${accountId}`);
   }
-  return result.strategy as Strategy;
+  return rows[0].strategy as Strategy;
 }
 
 /**
@@ -827,23 +726,24 @@ function getAccountStrategy(accountId: string): Strategy {
  * @param accountId - 계좌 ID
  * @returns 업데이트된 cycleNumber, 계좌가 없으면 null
  */
-export function completeCycleAndIncrement(accountId: string): number | null {
-  const database = getConnection();
-
+export async function completeCycleAndIncrement(accountId: string): Promise<number | null> {
   // 1. 현재 cycle_number 조회
-  const selectStmt = database.prepare("SELECT cycle_number FROM trading_accounts WHERE id = ?");
-  const current = selectStmt.get(accountId) as { cycle_number: number } | undefined;
+  const rows = await db
+    .select({ cycleNumber: tradingAccounts.cycleNumber })
+    .from(tradingAccounts)
+    .where(eq(tradingAccounts.id, accountId))
+    .limit(1);
 
-  if (!current) {
+  if (!rows[0]) {
     return null;
   }
 
   // 2. cycle_number 증가
-  const newCycleNumber = current.cycle_number + 1;
-  const updateStmt = database.prepare(
-    "UPDATE trading_accounts SET cycle_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-  );
-  updateStmt.run(newCycleNumber, accountId);
+  const newCycleNumber = rows[0].cycleNumber + 1;
+  await db
+    .update(tradingAccounts)
+    .set({ cycleNumber: newCycleNumber, updatedAt: new Date() })
+    .where(eq(tradingAccounts.id, accountId));
 
   return newCycleNumber;
 }
@@ -859,22 +759,22 @@ export function completeCycleAndIncrement(accountId: string): number | null {
  * @param ticker - 종목
  * @returns 체결 결과 목록
  */
-export function processPreviousDayExecution(
+export async function processPreviousDayExecution(
   accountId: string,
   currentDate: string,
   ticker: Ticker
-): ExecutionResult[] {
+): Promise<ExecutionResult[]> {
   // 1. 이전 거래일 계산 (주말 제외)
   const prevDate = getPreviousTradingDate(currentDate);
 
   // 2. 이전 거래일 종가 확인 (CON-001 준수: 종가 없으면 체결 불가)
-  const closePrice = getClosingPrice(ticker, prevDate);
+  const closePrice = await getClosingPrice(ticker, prevDate);
   if (!closePrice) {
     return [];
   }
 
   // 3. 이전 거래일 미체결 주문 조회
-  const orders = getDailyOrders(accountId, prevDate);
+  const orders = await getDailyOrders(accountId, prevDate);
   const hasUnexecutedOrders = orders.some((o) => !o.executed);
 
   if (!hasUnexecutedOrders) {
@@ -882,7 +782,7 @@ export function processPreviousDayExecution(
   }
 
   // 4. 체결 처리 (기존 함수 재사용, CON-002 준수: 이미 체결된 주문은 스킵됨)
-  return processOrderExecution(accountId, prevDate, ticker);
+  return await processOrderExecution(accountId, prevDate, ticker);
 }
 
 /**
@@ -898,14 +798,14 @@ export function processPreviousDayExecution(
  * @param seedCapital - 시드 캐피털
  * @returns 전체 체결 결과 목록
  */
-export function processHistoricalOrders(
+export async function processHistoricalOrders(
   accountId: string,
   cycleStartDate: string,
   currentDate: string,
   ticker: Ticker,
   strategy: Strategy,
   seedCapital: number
-): ExecutionResult[] {
+): Promise<ExecutionResult[]> {
   const allResults: ExecutionResult[] = [];
 
   // 사이클 시작일부터 어제까지의 모든 거래일 순회
@@ -915,16 +815,16 @@ export function processHistoricalOrders(
   // 종료 조건: processingDate > yesterday
   while (processingDate <= yesterday) {
     // 1. 해당 날짜의 종가 확인
-    const closePrice = getClosingPrice(ticker, processingDate);
+    const closePrice = await getClosingPrice(ticker, processingDate);
 
     if (closePrice) {
       // 2. 해당 날짜의 주문 조회
-      let orders = getDailyOrders(accountId, processingDate);
+      let orders = await getDailyOrders(accountId, processingDate);
 
       // 3. 주문이 없으면 생성 (현재 holdings 상태 기준)
       if (orders.length === 0) {
-        const holdings = getTierHoldings(accountId);
-        orders = generateDailyOrders(
+        const holdings = await getTierHoldings(accountId);
+        orders = await generateDailyOrders(
           accountId,
           processingDate,
           ticker,
@@ -937,7 +837,7 @@ export function processHistoricalOrders(
       // 4. 미체결 주문이 있으면 체결 처리
       const hasUnexecutedOrders = orders.some((o) => !o.executed);
       if (hasUnexecutedOrders) {
-        const results = processOrderExecution(accountId, processingDate, ticker);
+        const results = await processOrderExecution(accountId, processingDate, ticker);
         allResults.push(...results);
       }
     }
@@ -959,11 +859,9 @@ function getNextTradingDate(date: string): string {
   // 주말이면 월요일로 이동
   const dayOfWeek = d.getUTCDay();
   if (dayOfWeek === 0) {
-    // Sunday -> Monday
-    d.setDate(d.getDate() + 1);
+    d.setDate(d.getDate() + 1); // 일요일 -> 월요일
   } else if (dayOfWeek === 6) {
-    // Saturday -> Monday
-    d.setDate(d.getDate() + 2);
+    d.setDate(d.getDate() + 2); // 토요일 -> 월요일
   }
 
   return d.toISOString().split("T")[0];
@@ -978,7 +876,7 @@ function getNextTradingDate(date: string): string {
  * 매도 체결 시 호출되어 수익 기록을 저장
  * Decimal.js로 정밀한 금융 계산 수행
  */
-export function createProfitRecord(data: {
+export async function createProfitRecord(data: {
   accountId: string;
   tier: number;
   ticker: Ticker;
@@ -988,10 +886,7 @@ export function createProfitRecord(data: {
   buyQuantity: number;
   sellDate: string;
   sellPrice: number;
-}): ProfitRecord {
-  const database = getConnection();
-  const id = randomUUID();
-
+}): Promise<ProfitRecord> {
   // Decimal.js로 정밀한 금융 계산
   const buyAmount = new Decimal(data.buyPrice)
     .mul(data.buyQuantity)
@@ -1015,51 +910,39 @@ export function createProfitRecord(data: {
     .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
     .toNumber();
 
-  const stmt = database.prepare(INSERT_PROFIT_RECORD);
-  stmt.run(
-    id,
-    data.accountId,
-    data.tier,
-    data.ticker,
-    data.strategy,
-    data.buyDate,
-    data.buyPrice,
-    data.buyQuantity,
-    data.sellDate,
-    data.sellPrice,
-    buyAmount,
-    sellAmount,
-    profit,
-    profitRate
-  );
+  const result = await db
+    .insert(profitRecords)
+    .values({
+      accountId: data.accountId,
+      tier: data.tier,
+      ticker: data.ticker,
+      strategy: data.strategy,
+      buyDate: data.buyDate,
+      buyPrice: data.buyPrice,
+      buyQuantity: data.buyQuantity,
+      sellDate: data.sellDate,
+      sellPrice: data.sellPrice,
+      buyAmount,
+      sellAmount,
+      profit,
+      profitRate,
+    })
+    .returning();
 
-  return {
-    id,
-    accountId: data.accountId,
-    tier: data.tier,
-    ticker: data.ticker,
-    strategy: data.strategy,
-    buyDate: data.buyDate,
-    buyPrice: data.buyPrice,
-    buyQuantity: data.buyQuantity,
-    sellDate: data.sellDate,
-    sellPrice: data.sellPrice,
-    buyAmount,
-    sellAmount,
-    profit,
-    profitRate,
-    createdAt: new Date().toISOString(),
-  };
+  return mapDrizzleProfitRecord(result[0]);
 }
 
 /**
  * 계좌의 모든 수익 기록 조회
  */
-export function getProfitRecords(accountId: string): ProfitRecord[] {
-  const database = getConnection();
-  const stmt = database.prepare(SELECT_PROFIT_RECORDS_BY_ACCOUNT);
-  const rows = stmt.all(accountId) as ProfitRecordRow[];
-  return rows.map(mapProfitRecordRow);
+export async function getProfitRecords(accountId: string): Promise<ProfitRecord[]> {
+  const rows = await db
+    .select()
+    .from(profitRecords)
+    .where(eq(profitRecords.accountId, accountId))
+    .orderBy(desc(profitRecords.sellDate));
+
+  return rows.map(mapDrizzleProfitRecord);
 }
 
 interface ProfitAggregate {
@@ -1100,8 +983,8 @@ function aggregateProfits(records: ProfitRecord[]): ProfitAggregate {
 /**
  * 수익 기록을 월별로 그룹화하여 요약 생성
  */
-export function groupProfitsByMonth(accountId: string): ProfitStatusResponse {
-  const records = getProfitRecords(accountId);
+export async function groupProfitsByMonth(accountId: string): Promise<ProfitStatusResponse> {
+  const records = await getProfitRecords(accountId);
 
   // 월별로 그룹화
   const monthlyMap = new Map<string, ProfitRecord[]>();

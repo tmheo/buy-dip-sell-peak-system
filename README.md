@@ -216,7 +216,8 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 
 ```
 scripts/
-└── precompute-recommendations.ts    # 추천 전략 사전 계산 스크립트
+├── precompute-recommendations.ts    # 추천 전략 사전 계산 스크립트
+└── migrate-sqlite-to-postgres.ts    # SQLite → Supabase 데이터 마이그레이션
 
 src/
 ├── index.ts                         # CLI 진입점 - 8개 명령어 핸들링
@@ -225,15 +226,16 @@ src/
 │   ├── index.ts                     # TypeScript 인터페이스 (DailyPrice, QueryOptions, Command)
 │   └── trading.ts                   # 트레이딩 타입 정의 (계좌, 티어, 주문, 전략 상수)
 ├── database/
-│   ├── index.ts                     # SQLite 연결 관리 및 CRUD 작업 (싱글톤 패턴, 추천 캐시 포함)
-│   ├── db-drizzle.ts                # Drizzle ORM PostgreSQL 클라이언트 (Supabase 연결)
-│   ├── schema.ts                    # 레거시 스키마 (SQLite 호환)
+│   ├── db.ts                        # Drizzle ORM PostgreSQL 클라이언트 (Supabase 연결)
 │   ├── schema/                      # Drizzle ORM 스키마 정의
 │   │   ├── index.ts                 # 스키마 통합 export
 │   │   ├── auth.ts                  # 인증 테이블 (users, accounts, sessions)
 │   │   ├── prices.ts                # 가격 테이블 (daily_prices, daily_metrics)
 │   │   ├── trading.ts               # 트레이딩 테이블 (accounts, holdings, orders)
 │   │   └── cache.ts                 # 캐시 테이블 (recommendation_cache)
+│   ├── prices.ts                    # 가격 데이터 CRUD (Drizzle ORM)
+│   ├── metrics.ts                   # 기술지표 CRUD (Drizzle ORM)
+│   ├── recommend-cache.ts           # 추천 캐시 CRUD (Drizzle ORM)
 │   └── trading.ts                   # 트레이딩 CRUD 및 주문 생성/체결 로직
 ├── services/
 │   ├── dataFetcher.ts               # Yahoo Finance API 연동 (재시도 로직 포함)

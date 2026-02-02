@@ -1,14 +1,21 @@
 /**
  * Auth.js v5 설정
- * Google OAuth 인증 구현
+ * Google OAuth 인증 구현 (Drizzle ORM + PostgreSQL)
  */
 
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import { SQLiteAdapter } from "@/lib/auth/adapter";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { db } from "@/database/db-drizzle";
+import * as schema from "@/database/schema/index";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: SQLiteAdapter(),
+  adapter: DrizzleAdapter(db, {
+    usersTable: schema.users,
+    accountsTable: schema.accounts,
+    sessionsTable: schema.sessions,
+    verificationTokensTable: schema.verificationTokens,
+  }),
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,

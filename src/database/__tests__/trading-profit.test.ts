@@ -1,21 +1,10 @@
 /**
  * 수익 기록 DB 함수 단위 테스트 (SPEC-TRADING-002)
+ * Drizzle ORM + PostgreSQL 환경
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import Database from "better-sqlite3";
-import path from "path";
-import fs from "fs";
 import { randomUUID } from "crypto";
-
-// Test database path (unique per test run)
-const TEST_DB_PATH = path.join(process.cwd(), "data", `test-profit-${Date.now()}.db`);
-
-// Set environment variable before importing trading module
-process.env.DB_PATH = TEST_DB_PATH;
-
-// Import schema for users table
-import { CREATE_USERS_TABLE, CREATE_DAILY_PRICES_TABLE, CREATE_TICKER_DATE_INDEX } from "../schema";
 
 // Test user IDs
 const TEST_USER_ID = randomUUID();
@@ -28,34 +17,11 @@ describe("Profit Records DB Functions", () => {
   let testAccountId: string;
 
   beforeAll(async () => {
-    // Create data directory if not exists
-    const dataDir = path.dirname(TEST_DB_PATH);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-
-    // Set up users table before importing trading module
-    const db = new Database(TEST_DB_PATH);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-
-    // Create users table
-    db.exec(CREATE_USERS_TABLE);
-
-    // Create daily_prices table
-    db.exec(CREATE_DAILY_PRICES_TABLE);
-    db.exec(CREATE_TICKER_DATE_INDEX);
-
-    // Add test user
-    const stmt = db.prepare("INSERT OR IGNORE INTO users (id, name, email) VALUES (?, ?, ?)");
-    stmt.run(TEST_USER_ID, "Profit Test User", `test-profit-${TEST_USER_ID}@example.com`);
-    db.close();
-
-    // Now import trading module
+    // Import trading module (uses Drizzle ORM)
     tradingModule = await import("../trading");
 
     // Create a test account
-    const account = tradingModule.createTradingAccount(TEST_USER_ID, {
+    const account = await tradingModule.createTradingAccount(TEST_USER_ID, {
       name: "수익 테스트 계좌",
       ticker: "SOXL",
       seedCapital: 10000,
@@ -65,27 +31,17 @@ describe("Profit Records DB Functions", () => {
     testAccountId = account.id;
   });
 
-  afterAll(() => {
-    // Clean up test DB files
-    try {
-      if (fs.existsSync(TEST_DB_PATH)) {
-        fs.unlinkSync(TEST_DB_PATH);
-      }
-      if (fs.existsSync(`${TEST_DB_PATH}-wal`)) {
-        fs.unlinkSync(`${TEST_DB_PATH}-wal`);
-      }
-      if (fs.existsSync(`${TEST_DB_PATH}-shm`)) {
-        fs.unlinkSync(`${TEST_DB_PATH}-shm`);
-      }
-    } catch {
-      // Ignore cleanup errors
+  afterAll(async () => {
+    // Clean up test account
+    if (testAccountId) {
+      await tradingModule.deleteTradingAccount(testAccountId, TEST_USER_ID);
     }
   });
 
   describe("createProfitRecord", () => {
-    it("should create a profit record with correct calculations", () => {
+    it("should create a profit record with correct calculations", async () => {
       // SPEC: AC-009 Decimal.js 정밀도 검증 (63.72 * 157 = 10,004.04)
-      const record = tradingModule.createProfitRecord({
+      const record = await tradingModule.createProfitRecord({
         accountId: testAccountId,
         tier: 1,
         ticker: "SOXL",
@@ -118,9 +74,9 @@ describe("Profit Records DB Functions", () => {
       expect(record.profitRate).toBeCloseTo(0.44, 1);
     });
 
-    it("should handle negative profit (stop-loss scenario)", () => {
+    it("should handle negative profit (stop-loss scenario)", async () => {
       // SPEC: AC-003 손절 매도 시 음수 수익 기록
-      const record = tradingModule.createProfitRecord({
+      const record = await tradingModule.createProfitRecord({
         accountId: testAccountId,
         tier: 2,
         ticker: "SOXL",
@@ -138,9 +94,9 @@ describe("Profit Records DB Functions", () => {
       expect(record.profitRate).toBe(-10.0);
     });
 
-    it("should create individual records for multiple tiers (AC-002)", () => {
+    it("should create individual records for multiple tiers (AC-002)", async () => {
       // SPEC: AC-002 다중 티어 동시 매도 시 개별 기록
-      const record1 = tradingModule.createProfitRecord({
+      const record1 = await tradingModule.createProfitRecord({
         accountId: testAccountId,
         tier: 3,
         ticker: "SOXL",
@@ -152,7 +108,7 @@ describe("Profit Records DB Functions", () => {
         sellPrice: 51.0,
       });
 
-      const record2 = tradingModule.createProfitRecord({
+      const record2 = await tradingModule.createProfitRecord({
         accountId: testAccountId,
         tier: 4,
         ticker: "SOXL",
@@ -171,29 +127,29 @@ describe("Profit Records DB Functions", () => {
   });
 
   describe("getProfitRecords", () => {
-    it("should return records for the account", () => {
+    it("should return records for the account", async () => {
       // Records were created in previous tests
-      const records = tradingModule.getProfitRecords(testAccountId);
+      const records = await tradingModule.getProfitRecords(testAccountId);
       expect(records.length).toBeGreaterThanOrEqual(4);
     });
 
-    it("should return empty array for non-existent account", () => {
-      const records = tradingModule.getProfitRecords("non-existent-account");
+    it("should return empty array for non-existent account", async () => {
+      const records = await tradingModule.getProfitRecords("non-existent-account");
       expect(records).toEqual([]);
     });
   });
 
   describe("groupProfitsByMonth", () => {
-    it("should group records by month and calculate summaries", () => {
-      const result = tradingModule.groupProfitsByMonth(testAccountId);
+    it("should group records by month and calculate summaries", async () => {
+      const result = await tradingModule.groupProfitsByMonth(testAccountId);
 
       expect(result.accountId).toBe(testAccountId);
       expect(result.months.length).toBeGreaterThanOrEqual(1);
       expect(result.grandTotal.totalTrades).toBeGreaterThanOrEqual(4);
     });
 
-    it("should return empty months for non-existent account", () => {
-      const result = tradingModule.groupProfitsByMonth("non-existent-account");
+    it("should return empty months for non-existent account", async () => {
+      const result = await tradingModule.groupProfitsByMonth("non-existent-account");
 
       expect(result.accountId).toBe("non-existent-account");
       expect(result.months).toEqual([]);
@@ -204,9 +160,9 @@ describe("Profit Records DB Functions", () => {
       expect(result.grandTotal.averageProfitRate).toBe(0);
     });
 
-    it("should calculate average profit rate correctly", () => {
+    it("should calculate average profit rate correctly", async () => {
       // Create a new account for isolated testing
-      const isolatedAccount = tradingModule.createTradingAccount(TEST_USER_ID, {
+      const isolatedAccount = await tradingModule.createTradingAccount(TEST_USER_ID, {
         name: "수익률 테스트 계좌",
         ticker: "TQQQ",
         seedCapital: 50000,
@@ -215,7 +171,7 @@ describe("Profit Records DB Functions", () => {
       });
 
       // Two trades with different profit rates
-      tradingModule.createProfitRecord({
+      await tradingModule.createProfitRecord({
         accountId: isolatedAccount.id,
         tier: 1,
         ticker: "TQQQ",
@@ -227,7 +183,7 @@ describe("Profit Records DB Functions", () => {
         sellPrice: 102.0, // sellAmount: 10200, profit: 200 (2%)
       });
 
-      tradingModule.createProfitRecord({
+      await tradingModule.createProfitRecord({
         accountId: isolatedAccount.id,
         tier: 2,
         ticker: "TQQQ",
@@ -239,7 +195,7 @@ describe("Profit Records DB Functions", () => {
         sellPrice: 104.0, // sellAmount: 10400, profit: 400 (4%)
       });
 
-      const result = tradingModule.groupProfitsByMonth(isolatedAccount.id);
+      const result = await tradingModule.groupProfitsByMonth(isolatedAccount.id);
 
       // Total: buyAmount=20000, sellAmount=20600, profit=600
       // Average rate: 600/20000 * 100 = 3%
@@ -249,7 +205,7 @@ describe("Profit Records DB Functions", () => {
       expect(result.grandTotal.averageProfitRate).toBe(3);
 
       // Cleanup
-      tradingModule.deleteTradingAccount(isolatedAccount.id, TEST_USER_ID);
+      await tradingModule.deleteTradingAccount(isolatedAccount.id, TEST_USER_ID);
     });
   });
 });

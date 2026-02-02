@@ -37,7 +37,7 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   const { id } = await params;
 
   // 본인 계좌 확인
-  const account = getTradingAccountById(id, session.user.id);
+  const account = await getTradingAccountById(id, session.user.id);
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
@@ -56,7 +56,7 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // [REQ-001] 사이클 시작일부터 어제까지의 모든 주문 처리
   // - 각 거래일에 대해 주문 생성 및 체결 조건 확인
   // - 체결 결과에 따라 holdings 업데이트
-  const executedPreviousOrders = processHistoricalOrders(
+  const executedPreviousOrders = await processHistoricalOrders(
     id,
     account.cycleStartDate,
     date,
@@ -68,11 +68,11 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // 이전 거래일 체결이 발생했으면 오늘 주문 재생성 필요 (holdings가 변경됨)
   // regenerate 옵션이 있어도 마찬가지로 삭제
   if (executedPreviousOrders.length > 0 || regenerate) {
-    deleteDailyOrders(id, date);
+    await deleteDailyOrders(id, date);
   }
 
   // 기존 주문 조회 (체결 처리로 업데이트된 holdings 기반)
-  let orders = getDailyOrders(id, date);
+  let orders = await getDailyOrders(id, date);
 
   // 계좌 설정 변경 감지: 미체결 주문이 있고, 계좌가 주문 생성 이후 수정되었으면 재생성
   if (orders.length > 0) {
@@ -84,15 +84,15 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
 
     // 체결된 주문이 없고, 계좌가 주문 생성 이후 수정되었으면 재생성
     if (!hasExecutedOrder && account.updatedAt > oldestOrderCreatedAt) {
-      deleteDailyOrders(id, date);
+      await deleteDailyOrders(id, date);
       orders = [];
     }
   }
 
   // 주문이 없으면 자동 생성
   if (orders.length === 0) {
-    const holdings = getTierHoldings(id);
-    orders = generateDailyOrders(
+    const holdings = await getTierHoldings(id);
+    orders = await generateDailyOrders(
       id,
       date,
       account.ticker,
@@ -125,7 +125,7 @@ export async function POST(request: Request, { params }: RouteParams): Promise<N
   const { id } = await params;
 
   // 본인 계좌 확인
-  const account = getTradingAccountById(id, session.user.id);
+  const account = await getTradingAccountById(id, session.user.id);
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
@@ -139,7 +139,7 @@ export async function POST(request: Request, { params }: RouteParams): Promise<N
   }
 
   // 주문 체결 처리
-  const results = processOrderExecution(id, date, account.ticker);
+  const results = await processOrderExecution(id, date, account.ticker);
 
   return NextResponse.json({
     date,
