@@ -1,10 +1,13 @@
 /**
  * 회원 탈퇴 API
  * DELETE /api/user/delete
+ * Drizzle ORM for PostgreSQL
  */
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
-import { deleteUser } from "@/lib/auth/queries";
+import { db } from "@/database/db-drizzle";
+import { users } from "@/database/schema/index";
 
 export async function DELETE(): Promise<NextResponse> {
   const session = await auth();
@@ -13,6 +16,6 @@ export async function DELETE(): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  deleteUser(session.user.id);
+  await db.delete(users).where(eq(users.id, session.user.id));
   return NextResponse.json({ success: true });
 }

@@ -25,13 +25,13 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   const { id } = await params;
 
   // Verify account ownership
-  const account = getTradingAccountById(id, session.user.id);
+  const account = await getTradingAccountById(id, session.user.id);
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
   // Get profit status grouped by month
-  const profitStatus = groupProfitsByMonth(id);
+  const profitStatus = await groupProfitsByMonth(id);
 
   return NextResponse.json(profitStatus);
 }

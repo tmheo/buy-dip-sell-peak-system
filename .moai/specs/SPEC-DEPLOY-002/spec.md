@@ -6,7 +6,8 @@
 |------|------|
 | **SPEC ID** | SPEC-DEPLOY-002 |
 | **제목** | better-sqlite3에서 Drizzle ORM으로 DB 레이어 마이그레이션 |
-| **상태** | Draft |
+| **상태** | Completed |
+| **완료일** | 2026-02-02 |
 | **우선순위** | High |
 | **생성일** | 2026-02-02 |
 | **라이프사이클** | spec-anchored |

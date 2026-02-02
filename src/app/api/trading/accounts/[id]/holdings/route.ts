@@ -25,13 +25,13 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   const { id } = await params;
 
   // 본인 계좌 확인
-  const account = getTradingAccountById(id, session.user.id);
+  const account = await getTradingAccountById(id, session.user.id);
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
-  const holdings = getTierHoldings(id);
-  const totalShares = getTotalShares(id);
+  const holdings = await getTierHoldings(id);
+  const totalShares = await getTotalShares(id);
 
   return NextResponse.json({
     holdings,

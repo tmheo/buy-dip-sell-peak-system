@@ -30,7 +30,7 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   }
 
   const { id } = await params;
-  const account = getTradingAccountWithHoldings(id, session.user.id);
+  const account = await getTradingAccountWithHoldings(id, session.user.id);
 
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -67,7 +67,7 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
       );
     }
 
-    const account = updateTradingAccount(id, session.user.id, parsed.data);
+    const account = await updateTradingAccount(id, session.user.id, parsed.data);
 
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -99,7 +99,7 @@ export async function DELETE(_request: Request, { params }: RouteParams): Promis
   }
 
   const { id } = await params;
-  const deleted = deleteTradingAccount(id, session.user.id);
+  const deleted = await deleteTradingAccount(id, session.user.id);
 
   if (!deleted) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });

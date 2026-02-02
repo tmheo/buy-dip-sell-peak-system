@@ -17,16 +17,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
-import fs from "fs";
-import path from "path";
-import Database from "better-sqlite3";
-
-// 테스트용 임시 DB 경로 설정 (모듈 로드 전에 설정해야 함)
-const TEST_DB_PATH = path.join(process.cwd(), "data", `test-trading-${Date.now()}.db`);
-process.env.DB_PATH = TEST_DB_PATH;
-
-// 스키마 import (users 테이블 + daily_prices 테이블 필요)
-import { CREATE_USERS_TABLE, CREATE_DAILY_PRICES_TABLE, CREATE_TICKER_DATE_INDEX } from "../schema";
 import type { CreateTradingAccountRequest } from "@/types/trading";
 
 // 테스트 유저 ID
@@ -39,57 +29,33 @@ type TradingModule = typeof import("../trading");
 // trading 모듈 레퍼런스
 let tradingModule: TradingModule;
 
+// 테스트에서 생성한 계좌 ID 추적 (cleanup용)
+const createdAccountIds: string[] = [];
+
 describe("트레이딩 계좌 CRUD 테스트", () => {
   beforeAll(async () => {
-    // 테스트용 data 디렉토리 생성
-    const dataDir = path.dirname(TEST_DB_PATH);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-
-    // 먼저 users 테이블 생성 및 테스트 유저 추가
-    // (trading 모듈 import 전에 수행하여 foreign key 제약 충족)
-    const db = new Database(TEST_DB_PATH);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-
-    // users 테이블 생성
-    db.exec(CREATE_USERS_TABLE);
-
-    // daily_prices 테이블 생성 (processPreviousDayExecution 테스트에 필요)
-    db.exec(CREATE_DAILY_PRICES_TABLE);
-    db.exec(CREATE_TICKER_DATE_INDEX);
-
-    // 테스트 유저 추가
-    const stmt = db.prepare("INSERT OR IGNORE INTO users (id, name, email) VALUES (?, ?, ?)");
-    stmt.run(TEST_USER_ID, "Test User", `test-${TEST_USER_ID}@example.com`);
-    stmt.run(OTHER_USER_ID, "Other User", `test-${OTHER_USER_ID}@example.com`);
-    db.close();
-
-    // 이제 trading 모듈을 동적으로 import
+    // trading 모듈을 동적으로 import
     tradingModule = await import("../trading");
   });
 
-  afterAll(() => {
-    // 테스트 DB 파일 삭제
-    try {
-      if (fs.existsSync(TEST_DB_PATH)) {
-        fs.unlinkSync(TEST_DB_PATH);
+  afterAll(async () => {
+    // 테스트에서 생성한 계좌 삭제 (역순으로 삭제하여 의존성 문제 방지)
+    for (const accountId of createdAccountIds.reverse()) {
+      try {
+        await tradingModule.deleteTradingAccount(accountId, TEST_USER_ID);
+      } catch {
+        // 이미 삭제된 계좌는 무시
       }
-      // WAL 파일도 삭제
-      if (fs.existsSync(`${TEST_DB_PATH}-wal`)) {
-        fs.unlinkSync(`${TEST_DB_PATH}-wal`);
+      try {
+        await tradingModule.deleteTradingAccount(accountId, OTHER_USER_ID);
+      } catch {
+        // 이미 삭제된 계좌는 무시
       }
-      if (fs.existsSync(`${TEST_DB_PATH}-shm`)) {
-        fs.unlinkSync(`${TEST_DB_PATH}-shm`);
-      }
-    } catch {
-      // 파일 삭제 실패는 무시
     }
   });
 
   describe("createTradingAccount()", () => {
-    it("계좌를 생성하고 생성된 계좌 정보를 반환해야 한다", () => {
+    it("계좌를 생성하고 생성된 계좌 정보를 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "테스트 계좌",
         ticker: "SOXL",
@@ -98,7 +64,8 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         cycleStartDate: "2025-01-02",
       };
 
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
 
       expect(account).toBeDefined();
       expect(account.id).toBeDefined();
@@ -113,7 +80,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(account.updatedAt).toBeDefined();
     });
 
-    it("계좌 생성 시 7개의 티어 홀딩이 자동 생성되어야 한다", () => {
+    it("계좌 생성 시 7개의 티어 홀딩이 자동 생성되어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "티어 테스트 계좌",
         ticker: "TQQQ",
@@ -122,8 +89,9 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         cycleStartDate: "2025-01-03",
       };
 
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
-      const holdings = tradingModule.getTierHoldings(account.id);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
+      const holdings = await tradingModule.getTierHoldings(account.id);
 
       expect(holdings).toHaveLength(7);
       holdings.forEach((holding, index) => {
@@ -136,7 +104,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       });
     });
 
-    it("SOXL과 TQQQ 티커 모두 생성 가능해야 한다", () => {
+    it("SOXL과 TQQQ 티커 모두 생성 가능해야 한다", async () => {
       const soxlRequest: CreateTradingAccountRequest = {
         name: "SOXL 계좌",
         ticker: "SOXL",
@@ -152,17 +120,19 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         cycleStartDate: "2025-01-02",
       };
 
-      const soxlAccount = tradingModule.createTradingAccount(TEST_USER_ID, soxlRequest);
-      const tqqqAccount = tradingModule.createTradingAccount(TEST_USER_ID, tqqqRequest);
+      const soxlAccount = await tradingModule.createTradingAccount(TEST_USER_ID, soxlRequest);
+      createdAccountIds.push(soxlAccount.id);
+      const tqqqAccount = await tradingModule.createTradingAccount(TEST_USER_ID, tqqqRequest);
+      createdAccountIds.push(tqqqAccount.id);
 
       expect(soxlAccount.ticker).toBe("SOXL");
       expect(tqqqAccount.ticker).toBe("TQQQ");
     });
 
-    it("Pro1, Pro2, Pro3 전략 모두 생성 가능해야 한다", () => {
+    it("Pro1, Pro2, Pro3 전략 모두 생성 가능해야 한다", async () => {
       const strategies = ["Pro1", "Pro2", "Pro3"] as const;
 
-      strategies.forEach((strategy) => {
+      for (const strategy of strategies) {
         const request: CreateTradingAccountRequest = {
           name: `${strategy} 전략 계좌`,
           ticker: "SOXL",
@@ -171,14 +141,15 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
           cycleStartDate: "2025-01-02",
         };
 
-        const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+        const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+        createdAccountIds.push(account.id);
         expect(account.strategy).toBe(strategy);
-      });
+      }
     });
   });
 
   describe("getTradingAccountsByUserId()", () => {
-    it("사용자의 모든 계좌를 조회해야 한다", () => {
+    it("사용자의 모든 계좌를 조회해야 한다", async () => {
       // 테스트용 계좌 생성
       const request1: CreateTradingAccountRequest = {
         name: "사용자 계좌 1",
@@ -195,10 +166,12 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         cycleStartDate: "2025-01-03",
       };
 
-      tradingModule.createTradingAccount(TEST_USER_ID, request1);
-      tradingModule.createTradingAccount(TEST_USER_ID, request2);
+      const account1 = await tradingModule.createTradingAccount(TEST_USER_ID, request1);
+      createdAccountIds.push(account1.id);
+      const account2 = await tradingModule.createTradingAccount(TEST_USER_ID, request2);
+      createdAccountIds.push(account2.id);
 
-      const accounts = tradingModule.getTradingAccountsByUserId(TEST_USER_ID);
+      const accounts = await tradingModule.getTradingAccountsByUserId(TEST_USER_ID);
 
       expect(accounts.length).toBeGreaterThanOrEqual(2);
       accounts.forEach((account) => {
@@ -206,8 +179,8 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       });
     });
 
-    it("계좌가 생성일 역순으로 정렬되어야 한다", () => {
-      const accounts = tradingModule.getTradingAccountsByUserId(TEST_USER_ID);
+    it("계좌가 생성일 역순으로 정렬되어야 한다", async () => {
+      const accounts = await tradingModule.getTradingAccountsByUserId(TEST_USER_ID);
 
       for (let i = 0; i < accounts.length - 1; i++) {
         const current = new Date(accounts[i].createdAt);
@@ -216,23 +189,23 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       }
     });
 
-    it("다른 사용자의 계좌는 조회되지 않아야 한다", () => {
-      const otherUserAccounts = tradingModule.getTradingAccountsByUserId(OTHER_USER_ID);
-      const testUserAccounts = tradingModule.getTradingAccountsByUserId(TEST_USER_ID);
+    it("다른 사용자의 계좌는 조회되지 않아야 한다", async () => {
+      const otherUserAccounts = await tradingModule.getTradingAccountsByUserId(OTHER_USER_ID);
+      const testUserAccounts = await tradingModule.getTradingAccountsByUserId(TEST_USER_ID);
 
       // OTHER_USER_ID로 생성된 계좌가 없으므로 빈 배열이어야 함
       expect(otherUserAccounts).toHaveLength(0);
       expect(testUserAccounts.length).toBeGreaterThan(0);
     });
 
-    it("존재하지 않는 사용자는 빈 배열을 반환해야 한다", () => {
-      const accounts = tradingModule.getTradingAccountsByUserId(randomUUID());
+    it("존재하지 않는 사용자는 빈 배열을 반환해야 한다", async () => {
+      const accounts = await tradingModule.getTradingAccountsByUserId(randomUUID());
       expect(accounts).toHaveLength(0);
     });
   });
 
   describe("getTradingAccountById()", () => {
-    it("본인 계좌를 조회할 수 있어야 한다", () => {
+    it("본인 계좌를 조회할 수 있어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "조회 테스트 계좌",
         ticker: "SOXL",
@@ -240,9 +213,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro3",
         cycleStartDate: "2025-01-04",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const account = tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
+      const account = await tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
 
       expect(account).not.toBeNull();
       expect(account!.id).toBe(created.id);
@@ -250,7 +224,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(account!.name).toBe("조회 테스트 계좌");
     });
 
-    it("다른 사용자의 계좌는 조회할 수 없어야 한다 (null 반환)", () => {
+    it("다른 사용자의 계좌는 조회할 수 없어야 한다 (null 반환)", async () => {
       const request: CreateTradingAccountRequest = {
         name: "보안 테스트 계좌",
         ticker: "SOXL",
@@ -258,21 +232,22 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const account = tradingModule.getTradingAccountById(created.id, OTHER_USER_ID);
+      const account = await tradingModule.getTradingAccountById(created.id, OTHER_USER_ID);
 
       expect(account).toBeNull();
     });
 
-    it("존재하지 않는 계좌 ID는 null을 반환해야 한다", () => {
-      const account = tradingModule.getTradingAccountById(randomUUID(), TEST_USER_ID);
+    it("존재하지 않는 계좌 ID는 null을 반환해야 한다", async () => {
+      const account = await tradingModule.getTradingAccountById(randomUUID(), TEST_USER_ID);
       expect(account).toBeNull();
     });
   });
 
   describe("getTradingAccountWithHoldings()", () => {
-    it("계좌 상세 정보와 함께 holdings를 반환해야 한다", () => {
+    it("계좌 상세 정보와 함께 holdings를 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "상세 조회 테스트",
         ticker: "SOXL",
@@ -280,9 +255,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const accountWithHoldings = tradingModule.getTradingAccountWithHoldings(
+      const accountWithHoldings = await tradingModule.getTradingAccountWithHoldings(
         created.id,
         TEST_USER_ID
       );
@@ -293,7 +269,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(accountWithHoldings!.isCycleInProgress).toBe(false);
     });
 
-    it("보유 수량이 있으면 isCycleInProgress가 true여야 한다", () => {
+    it("보유 수량이 있으면 isCycleInProgress가 true여야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "사이클 진행 테스트",
         ticker: "SOXL",
@@ -301,17 +277,18 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 티어 1에 보유 수량 추가
-      tradingModule.updateTierHolding(created.id, 1, {
+      await tradingModule.updateTierHolding(created.id, 1, {
         buyPrice: 100,
         shares: 10,
         buyDate: "2025-01-02",
         sellTargetPrice: 101.5,
       });
 
-      const accountWithHoldings = tradingModule.getTradingAccountWithHoldings(
+      const accountWithHoldings = await tradingModule.getTradingAccountWithHoldings(
         created.id,
         TEST_USER_ID
       );
@@ -322,7 +299,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
   });
 
   describe("updateTradingAccount()", () => {
-    it("사이클 미진행 시 계좌 정보를 수정할 수 있어야 한다", () => {
+    it("사이클 미진행 시 계좌 정보를 수정할 수 있어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "수정 테스트 계좌",
         ticker: "SOXL",
@@ -330,9 +307,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const updated = tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
+      const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
         name: "수정된 계좌 이름",
         seedCapital: 15000,
         strategy: "Pro3",
@@ -344,14 +322,14 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(updated!.strategy).toBe("Pro3");
     });
 
-    it("존재하지 않는 계좌 수정 시 null을 반환해야 한다", () => {
-      const result = tradingModule.updateTradingAccount(randomUUID(), TEST_USER_ID, {
+    it("존재하지 않는 계좌 수정 시 null을 반환해야 한다", async () => {
+      const result = await tradingModule.updateTradingAccount(randomUUID(), TEST_USER_ID, {
         name: "새 이름",
       });
       expect(result).toBeNull();
     });
 
-    it("다른 사용자의 계좌는 수정할 수 없어야 한다", () => {
+    it("다른 사용자의 계좌는 수정할 수 없어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "보안 수정 테스트",
         ticker: "SOXL",
@@ -359,16 +337,17 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const result = tradingModule.updateTradingAccount(created.id, OTHER_USER_ID, {
+      const result = await tradingModule.updateTradingAccount(created.id, OTHER_USER_ID, {
         name: "해킹된 이름",
       });
 
       expect(result).toBeNull();
     });
 
-    it("사이클 진행 중에는 수정할 수 없어야 한다 (에러 발생)", () => {
+    it("사이클 진행 중에는 수정할 수 없어야 한다 (에러 발생)", async () => {
       const request: CreateTradingAccountRequest = {
         name: "사이클 진행 중 수정 테스트",
         ticker: "SOXL",
@@ -376,21 +355,22 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 티어 1에 보유 수량 추가 (사이클 진행 상태로 만듦)
-      tradingModule.updateTierHolding(created.id, 1, {
+      await tradingModule.updateTierHolding(created.id, 1, {
         buyPrice: 100,
         shares: 10,
         buyDate: "2025-01-02",
       });
 
-      expect(() => {
-        tradingModule.updateTradingAccount(created.id, TEST_USER_ID, { name: "새 이름" });
-      }).toThrow("Cannot update account while cycle is in progress");
+      await expect(
+        tradingModule.updateTradingAccount(created.id, TEST_USER_ID, { name: "새 이름" })
+      ).rejects.toThrow("Cannot update account while cycle is in progress");
     });
 
-    it("빈 업데이트 요청 시 기존 계좌를 그대로 반환해야 한다", () => {
+    it("빈 업데이트 요청 시 기존 계좌를 그대로 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "빈 수정 테스트",
         ticker: "SOXL",
@@ -398,15 +378,16 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const result = tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {});
+      const result = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {});
 
       expect(result).not.toBeNull();
       expect(result!.name).toBe("빈 수정 테스트");
     });
 
-    it("티커를 SOXL에서 TQQQ로 변경할 수 있어야 한다", () => {
+    it("티커를 SOXL에서 TQQQ로 변경할 수 있어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "티커 변경 테스트",
         ticker: "SOXL",
@@ -414,9 +395,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const updated = tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
+      const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
         ticker: "TQQQ",
       });
 
@@ -424,7 +406,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(updated!.ticker).toBe("TQQQ");
     });
 
-    it("사이클 시작일을 변경할 수 있어야 한다", () => {
+    it("사이클 시작일을 변경할 수 있어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "시작일 변경 테스트",
         ticker: "SOXL",
@@ -432,9 +414,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const updated = tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
+      const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
         cycleStartDate: "2025-02-01",
       });
 
@@ -444,7 +427,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
   });
 
   describe("deleteTradingAccount()", () => {
-    it("계좌를 삭제하고 true를 반환해야 한다", () => {
+    it("계좌를 삭제하고 true를 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "삭제 테스트 계좌",
         ticker: "SOXL",
@@ -452,15 +435,16 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      // 삭제될 계좌이므로 createdAccountIds에 추가하지 않음
 
-      const result = tradingModule.deleteTradingAccount(created.id, TEST_USER_ID);
+      const result = await tradingModule.deleteTradingAccount(created.id, TEST_USER_ID);
 
       expect(result).toBe(true);
-      expect(tradingModule.getTradingAccountById(created.id, TEST_USER_ID)).toBeNull();
+      expect(await tradingModule.getTradingAccountById(created.id, TEST_USER_ID)).toBeNull();
     });
 
-    it("계좌 삭제 시 연관된 티어 홀딩도 CASCADE 삭제되어야 한다", () => {
+    it("계좌 삭제 시 연관된 티어 홀딩도 CASCADE 삭제되어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "CASCADE 삭제 테스트",
         ticker: "SOXL",
@@ -468,25 +452,26 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
       const accountId = created.id;
+      // 삭제될 계좌이므로 createdAccountIds에 추가하지 않음
 
       // 삭제 전 티어 홀딩 확인
-      expect(tradingModule.getTierHoldings(accountId)).toHaveLength(7);
+      expect(await tradingModule.getTierHoldings(accountId)).toHaveLength(7);
 
       // 계좌 삭제
-      tradingModule.deleteTradingAccount(accountId, TEST_USER_ID);
+      await tradingModule.deleteTradingAccount(accountId, TEST_USER_ID);
 
       // CASCADE 삭제 확인
-      expect(tradingModule.getTierHoldings(accountId)).toHaveLength(0);
+      expect(await tradingModule.getTierHoldings(accountId)).toHaveLength(0);
     });
 
-    it("존재하지 않는 계좌 삭제 시 false를 반환해야 한다", () => {
-      const result = tradingModule.deleteTradingAccount(randomUUID(), TEST_USER_ID);
+    it("존재하지 않는 계좌 삭제 시 false를 반환해야 한다", async () => {
+      const result = await tradingModule.deleteTradingAccount(randomUUID(), TEST_USER_ID);
       expect(result).toBe(false);
     });
 
-    it("다른 사용자의 계좌는 삭제할 수 없어야 한다", () => {
+    it("다른 사용자의 계좌는 삭제할 수 없어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "보안 삭제 테스트",
         ticker: "SOXL",
@@ -494,17 +479,18 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const result = tradingModule.deleteTradingAccount(created.id, OTHER_USER_ID);
+      const result = await tradingModule.deleteTradingAccount(created.id, OTHER_USER_ID);
 
       expect(result).toBe(false);
-      expect(tradingModule.getTradingAccountById(created.id, TEST_USER_ID)).not.toBeNull();
+      expect(await tradingModule.getTradingAccountById(created.id, TEST_USER_ID)).not.toBeNull();
     });
   });
 
   describe("getTierHoldings()", () => {
-    it("계좌의 모든 티어 홀딩을 조회해야 한다", () => {
+    it("계좌의 모든 티어 홀딩을 조회해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "티어 홀딩 조회 테스트",
         ticker: "SOXL",
@@ -512,16 +498,17 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const holdings = tradingModule.getTierHoldings(created.id);
+      const holdings = await tradingModule.getTierHoldings(created.id);
 
       expect(holdings).toHaveLength(7);
       expect(holdings[0].tier).toBe(1);
       expect(holdings[6].tier).toBe(7);
     });
 
-    it("티어 번호 순으로 정렬되어야 한다", () => {
+    it("티어 번호 순으로 정렬되어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "티어 정렬 테스트",
         ticker: "SOXL",
@@ -529,23 +516,24 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const holdings = tradingModule.getTierHoldings(created.id);
+      const holdings = await tradingModule.getTierHoldings(created.id);
 
       for (let i = 0; i < holdings.length - 1; i++) {
         expect(holdings[i].tier).toBeLessThan(holdings[i + 1].tier);
       }
     });
 
-    it("존재하지 않는 계좌는 빈 배열을 반환해야 한다", () => {
-      const holdings = tradingModule.getTierHoldings(randomUUID());
+    it("존재하지 않는 계좌는 빈 배열을 반환해야 한다", async () => {
+      const holdings = await tradingModule.getTierHoldings(randomUUID());
       expect(holdings).toHaveLength(0);
     });
   });
 
   describe("getTotalShares()", () => {
-    it("모든 티어의 보유 수량 합계를 반환해야 한다", () => {
+    it("모든 티어의 보유 수량 합계를 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "총 수량 테스트",
         ticker: "SOXL",
@@ -553,19 +541,20 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 여러 티어에 수량 추가
-      tradingModule.updateTierHolding(created.id, 1, { shares: 10 });
-      tradingModule.updateTierHolding(created.id, 2, { shares: 15 });
-      tradingModule.updateTierHolding(created.id, 3, { shares: 20 });
+      await tradingModule.updateTierHolding(created.id, 1, { shares: 10 });
+      await tradingModule.updateTierHolding(created.id, 2, { shares: 15 });
+      await tradingModule.updateTierHolding(created.id, 3, { shares: 20 });
 
-      const totalShares = tradingModule.getTotalShares(created.id);
+      const totalShares = await tradingModule.getTotalShares(created.id);
 
       expect(totalShares).toBe(45); // 10 + 15 + 20
     });
 
-    it("보유 수량이 없으면 0을 반환해야 한다", () => {
+    it("보유 수량이 없으면 0을 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "수량 없음 테스트",
         ticker: "SOXL",
@@ -573,21 +562,22 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const totalShares = tradingModule.getTotalShares(created.id);
+      const totalShares = await tradingModule.getTotalShares(created.id);
 
       expect(totalShares).toBe(0);
     });
 
-    it("존재하지 않는 계좌는 0을 반환해야 한다", () => {
-      const totalShares = tradingModule.getTotalShares(randomUUID());
+    it("존재하지 않는 계좌는 0을 반환해야 한다", async () => {
+      const totalShares = await tradingModule.getTotalShares(randomUUID());
       expect(totalShares).toBe(0);
     });
   });
 
   describe("updateTierHolding()", () => {
-    it("티어 홀딩 정보를 업데이트해야 한다", () => {
+    it("티어 홀딩 정보를 업데이트해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "티어 업데이트 테스트",
         ticker: "SOXL",
@@ -595,9 +585,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const updated = tradingModule.updateTierHolding(created.id, 1, {
+      const updated = await tradingModule.updateTierHolding(created.id, 1, {
         buyPrice: 100,
         shares: 10,
         buyDate: "2025-01-02",
@@ -611,7 +602,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(updated!.sellTargetPrice).toBe(101.5);
     });
 
-    it("부분 업데이트가 가능해야 한다", () => {
+    it("부분 업데이트가 가능해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "부분 업데이트 테스트",
         ticker: "SOXL",
@@ -619,17 +610,18 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 먼저 전체 설정
-      tradingModule.updateTierHolding(created.id, 2, {
+      await tradingModule.updateTierHolding(created.id, 2, {
         buyPrice: 100,
         shares: 10,
         buyDate: "2025-01-02",
       });
 
       // 수량만 업데이트
-      const updated = tradingModule.updateTierHolding(created.id, 2, {
+      const updated = await tradingModule.updateTierHolding(created.id, 2, {
         shares: 20,
       });
 
@@ -637,7 +629,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(updated!.shares).toBe(20); // 새 값
     });
 
-    it("빈 업데이트 요청 시 null을 반환해야 한다", () => {
+    it("빈 업데이트 요청 시 null을 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "빈 티어 업데이트 테스트",
         ticker: "SOXL",
@@ -645,14 +637,15 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const result = tradingModule.updateTierHolding(created.id, 1, {});
+      const result = await tradingModule.updateTierHolding(created.id, 1, {});
 
       expect(result).toBeNull();
     });
 
-    it("null 값으로 필드를 초기화할 수 있어야 한다", () => {
+    it("null 값으로 필드를 초기화할 수 있어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "null 초기화 테스트",
         ticker: "SOXL",
@@ -660,16 +653,17 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 먼저 값 설정
-      tradingModule.updateTierHolding(created.id, 3, {
+      await tradingModule.updateTierHolding(created.id, 3, {
         buyPrice: 100,
         buyDate: "2025-01-02",
       });
 
       // null로 초기화
-      const updated = tradingModule.updateTierHolding(created.id, 3, {
+      const updated = await tradingModule.updateTierHolding(created.id, 3, {
         buyPrice: null,
         buyDate: null,
       });
@@ -680,7 +674,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
   });
 
   describe("getDailyOrders()", () => {
-    it("특정 날짜의 주문을 조회해야 한다", () => {
+    it("특정 날짜의 주문을 조회해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 조회 테스트",
         ticker: "SOXL",
@@ -688,10 +682,11 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 주문 생성
-      tradingModule.createDailyOrder(created.id, {
+      await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-03",
         tier: 1,
         type: "BUY",
@@ -700,14 +695,14 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         shares: 10,
       });
 
-      const orders = tradingModule.getDailyOrders(created.id, "2025-01-03");
+      const orders = await tradingModule.getDailyOrders(created.id, "2025-01-03");
 
       expect(orders).toHaveLength(1);
       expect(orders[0].date).toBe("2025-01-03");
       expect(orders[0].type).toBe("BUY");
     });
 
-    it("주문이 없는 날짜는 빈 배열을 반환해야 한다", () => {
+    it("주문이 없는 날짜는 빈 배열을 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "빈 주문 테스트",
         ticker: "SOXL",
@@ -715,14 +710,15 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const orders = tradingModule.getDailyOrders(created.id, "2025-12-31");
+      const orders = await tradingModule.getDailyOrders(created.id, "2025-12-31");
 
       expect(orders).toHaveLength(0);
     });
 
-    it("티어 및 주문 유형 순으로 정렬되어야 한다", () => {
+    it("티어 및 주문 유형 순으로 정렬되어야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 정렬 테스트",
         ticker: "SOXL",
@@ -730,10 +726,11 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 여러 주문 생성 (순서 무관하게)
-      tradingModule.createDailyOrder(created.id, {
+      await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-04",
         tier: 2,
         type: "SELL",
@@ -741,7 +738,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         limitPrice: 101,
         shares: 10,
       });
-      tradingModule.createDailyOrder(created.id, {
+      await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-04",
         tier: 1,
         type: "BUY",
@@ -749,7 +746,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         limitPrice: 99,
         shares: 10,
       });
-      tradingModule.createDailyOrder(created.id, {
+      await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-04",
         tier: 2,
         type: "BUY",
@@ -758,7 +755,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         shares: 15,
       });
 
-      const orders = tradingModule.getDailyOrders(created.id, "2025-01-04");
+      const orders = await tradingModule.getDailyOrders(created.id, "2025-01-04");
 
       expect(orders).toHaveLength(3);
       // tier 순 정렬 확인
@@ -767,7 +764,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
   });
 
   describe("createDailyOrder()", () => {
-    it("새 주문을 생성해야 한다", () => {
+    it("새 주문을 생성해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 생성 테스트",
         ticker: "SOXL",
@@ -775,9 +772,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const order = tradingModule.createDailyOrder(created.id, {
+      const order = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-05",
         tier: 1,
         type: "BUY",
@@ -798,7 +796,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(order.executed).toBe(false);
     });
 
-    it("LOC와 MOC 주문 유형 모두 생성 가능해야 한다", () => {
+    it("LOC와 MOC 주문 유형 모두 생성 가능해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 유형 테스트",
         ticker: "SOXL",
@@ -806,9 +804,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const locOrder = tradingModule.createDailyOrder(created.id, {
+      const locOrder = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-06",
         tier: 1,
         type: "BUY",
@@ -816,7 +815,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         limitPrice: 99,
         shares: 10,
       });
-      const mocOrder = tradingModule.createDailyOrder(created.id, {
+      const mocOrder = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-06",
         tier: 2,
         type: "SELL",
@@ -829,7 +828,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(mocOrder.orderMethod).toBe("MOC");
     });
 
-    it("BUY와 SELL 주문 모두 생성 가능해야 한다", () => {
+    it("BUY와 SELL 주문 모두 생성 가능해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "매매 유형 테스트",
         ticker: "SOXL",
@@ -837,9 +836,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const buyOrder = tradingModule.createDailyOrder(created.id, {
+      const buyOrder = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-07",
         tier: 1,
         type: "BUY",
@@ -847,7 +847,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         limitPrice: 99,
         shares: 10,
       });
-      const sellOrder = tradingModule.createDailyOrder(created.id, {
+      const sellOrder = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-07",
         tier: 1,
         type: "SELL",
@@ -862,7 +862,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
   });
 
   describe("updateOrderExecuted()", () => {
-    it("주문 실행 상태를 true로 변경해야 한다", () => {
+    it("주문 실행 상태를 true로 변경해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 실행 테스트",
         ticker: "SOXL",
@@ -870,9 +870,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const order = tradingModule.createDailyOrder(created.id, {
+      const order = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-08",
         tier: 1,
         type: "BUY",
@@ -883,16 +884,16 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
 
       expect(order.executed).toBe(false);
 
-      const result = tradingModule.updateOrderExecuted(order.id, true);
+      const result = await tradingModule.updateOrderExecuted(order.id, true);
 
       expect(result).toBe(true);
 
       // 변경 확인
-      const orders = tradingModule.getDailyOrders(created.id, "2025-01-08");
+      const orders = await tradingModule.getDailyOrders(created.id, "2025-01-08");
       expect(orders[0].executed).toBe(true);
     });
 
-    it("주문 실행 상태를 false로 변경해야 한다", () => {
+    it("주문 실행 상태를 false로 변경해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 취소 테스트",
         ticker: "SOXL",
@@ -900,9 +901,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
-      const order = tradingModule.createDailyOrder(created.id, {
+      const order = await tradingModule.createDailyOrder(created.id, {
         date: "2025-01-09",
         tier: 1,
         type: "BUY",
@@ -912,25 +914,25 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       });
 
       // 먼저 실행 상태로 변경
-      tradingModule.updateOrderExecuted(order.id, true);
+      await tradingModule.updateOrderExecuted(order.id, true);
 
       // 다시 미실행 상태로 변경
-      const result = tradingModule.updateOrderExecuted(order.id, false);
+      const result = await tradingModule.updateOrderExecuted(order.id, false);
 
       expect(result).toBe(true);
 
-      const orders = tradingModule.getDailyOrders(created.id, "2025-01-09");
+      const orders = await tradingModule.getDailyOrders(created.id, "2025-01-09");
       expect(orders[0].executed).toBe(false);
     });
 
-    it("존재하지 않는 주문 ID는 false를 반환해야 한다", () => {
-      const result = tradingModule.updateOrderExecuted(randomUUID(), true);
+    it("존재하지 않는 주문 ID는 false를 반환해야 한다", async () => {
+      const result = await tradingModule.updateOrderExecuted(randomUUID(), true);
       expect(result).toBe(false);
     });
   });
 
   describe("processPreviousDayExecution()", () => {
-    it("TC-001: 이전 거래일 미체결 매수 주문을 체결해야 한다", () => {
+    it("TC-001: 이전 거래일 미체결 매수 주문을 체결해야 한다", async () => {
       // 계좌 생성
       const request: CreateTradingAccountRequest = {
         name: "이전일 체결 테스트",
@@ -939,11 +941,12 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-06",
       };
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
 
       // 이전 거래일(금요일) 주문 생성
       const prevDate = "2025-01-10"; // 금요일
-      tradingModule.createDailyOrder(account.id, {
+      await tradingModule.createDailyOrder(account.id, {
         date: prevDate,
         tier: 1,
         type: "BUY",
@@ -953,20 +956,24 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       });
 
       // 주문이 미체결 상태인지 확인
-      const ordersBefore = tradingModule.getDailyOrders(account.id, prevDate);
+      const ordersBefore = await tradingModule.getDailyOrders(account.id, prevDate);
       expect(ordersBefore[0].executed).toBe(false);
 
       // 현재일(월요일)에서 이전 거래일 체결 처리
       // Note: 실제로는 종가 데이터가 DB에 있어야 체결됨
       // 테스트 DB에 종가 데이터가 없으므로 빈 배열 반환 예상
       const currentDate = "2025-01-13"; // 월요일
-      const results = tradingModule.processPreviousDayExecution(account.id, currentDate, "SOXL");
+      const results = await tradingModule.processPreviousDayExecution(
+        account.id,
+        currentDate,
+        "SOXL"
+      );
 
       // 종가 데이터가 없으므로 빈 배열 반환 (CON-001 준수)
       expect(results).toHaveLength(0);
     });
 
-    it("TC-002: 종가 데이터 없으면 체결하지 않아야 한다 (CON-001)", () => {
+    it("TC-002: 종가 데이터 없으면 체결하지 않아야 한다 (CON-001)", async () => {
       const request: CreateTradingAccountRequest = {
         name: "종가 없음 테스트",
         ticker: "TQQQ", // 종가 데이터가 없는 티커
@@ -974,10 +981,11 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-06",
       };
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
 
       // 주문 생성
-      tradingModule.createDailyOrder(account.id, {
+      await tradingModule.createDailyOrder(account.id, {
         date: "2025-01-10",
         tier: 1,
         type: "BUY",
@@ -987,17 +995,21 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       });
 
       // 체결 시도 - 종가 데이터 없음
-      const results = tradingModule.processPreviousDayExecution(account.id, "2025-01-13", "TQQQ");
+      const results = await tradingModule.processPreviousDayExecution(
+        account.id,
+        "2025-01-13",
+        "TQQQ"
+      );
 
       // 종가 데이터가 없으므로 빈 배열 반환
       expect(results).toHaveLength(0);
 
       // 주문은 여전히 미체결 상태
-      const orders = tradingModule.getDailyOrders(account.id, "2025-01-10");
+      const orders = await tradingModule.getDailyOrders(account.id, "2025-01-10");
       expect(orders[0].executed).toBe(false);
     });
 
-    it("TC-003: 이미 체결된 주문은 스킵해야 한다 (CON-002)", () => {
+    it("TC-003: 이미 체결된 주문은 스킵해야 한다 (CON-002)", async () => {
       const request: CreateTradingAccountRequest = {
         name: "중복 체결 방지 테스트",
         ticker: "SOXL",
@@ -1005,10 +1017,11 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-06",
       };
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
 
       // 이미 체결된 주문 생성
-      const order = tradingModule.createDailyOrder(account.id, {
+      const order = await tradingModule.createDailyOrder(account.id, {
         date: "2025-01-10",
         tier: 1,
         type: "BUY",
@@ -1016,16 +1029,20 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         limitPrice: 100,
         shares: 10,
       });
-      tradingModule.updateOrderExecuted(order.id, true);
+      await tradingModule.updateOrderExecuted(order.id, true);
 
       // 체결 시도
-      const results = tradingModule.processPreviousDayExecution(account.id, "2025-01-13", "SOXL");
+      const results = await tradingModule.processPreviousDayExecution(
+        account.id,
+        "2025-01-13",
+        "SOXL"
+      );
 
       // 미체결 주문이 없으므로 빈 배열 반환
       expect(results).toHaveLength(0);
     });
 
-    it("TC-004: 주말을 건너뛰어 이전 거래일을 계산해야 한다", () => {
+    it("TC-004: 주말을 건너뛰어 이전 거래일을 계산해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주말 건너뛰기 테스트",
         ticker: "SOXL",
@@ -1033,10 +1050,11 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro3",
         cycleStartDate: "2025-01-06",
       };
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
 
       // 금요일에 주문 생성
-      tradingModule.createDailyOrder(account.id, {
+      await tradingModule.createDailyOrder(account.id, {
         date: "2025-01-10", // 금요일
         tier: 1,
         type: "BUY",
@@ -1046,7 +1064,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       });
 
       // 월요일에서 이전 거래일 체결 처리 (금요일이어야 함)
-      const results = tradingModule.processPreviousDayExecution(
+      const results = await tradingModule.processPreviousDayExecution(
         account.id,
         "2025-01-13", // 월요일
         "SOXL"
@@ -1058,7 +1076,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(Array.isArray(results)).toBe(true);
     });
 
-    it("주문이 없는 경우 빈 배열을 반환해야 한다", () => {
+    it("주문이 없는 경우 빈 배열을 반환해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "주문 없음 테스트",
         ticker: "SOXL",
@@ -1066,17 +1084,22 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-06",
       };
-      const account = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(account.id);
 
       // 주문 없이 체결 시도
-      const results = tradingModule.processPreviousDayExecution(account.id, "2025-01-13", "SOXL");
+      const results = await tradingModule.processPreviousDayExecution(
+        account.id,
+        "2025-01-13",
+        "SOXL"
+      );
 
       expect(results).toHaveLength(0);
     });
   });
 
   describe("completeCycleAndIncrement()", () => {
-    it("cycleNumber를 1 증가시켜야 한다", () => {
+    it("cycleNumber를 1 증가시켜야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "사이클 증가 테스트",
         ticker: "SOXL",
@@ -1084,22 +1107,23 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro2",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 초기 cycleNumber는 1
       expect(created.cycleNumber).toBe(1);
 
       // 사이클 완료 처리
-      const newCycleNumber = tradingModule.completeCycleAndIncrement(created.id);
+      const newCycleNumber = await tradingModule.completeCycleAndIncrement(created.id);
 
       expect(newCycleNumber).toBe(2);
 
       // DB에서 조회하여 확인
-      const account = tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
+      const account = await tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
       expect(account?.cycleNumber).toBe(2);
     });
 
-    it("여러 번 호출 시 cycleNumber가 계속 증가해야 한다", () => {
+    it("여러 번 호출 시 cycleNumber가 계속 증가해야 한다", async () => {
       const request: CreateTradingAccountRequest = {
         name: "다중 사이클 테스트",
         ticker: "SOXL",
@@ -1107,21 +1131,22 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
-      const created = tradingModule.createTradingAccount(TEST_USER_ID, request);
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      createdAccountIds.push(created.id);
 
       // 3번 호출
-      tradingModule.completeCycleAndIncrement(created.id);
-      tradingModule.completeCycleAndIncrement(created.id);
-      const result = tradingModule.completeCycleAndIncrement(created.id);
+      await tradingModule.completeCycleAndIncrement(created.id);
+      await tradingModule.completeCycleAndIncrement(created.id);
+      const result = await tradingModule.completeCycleAndIncrement(created.id);
 
       expect(result).toBe(4); // 1 + 3 = 4
 
-      const account = tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
+      const account = await tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
       expect(account?.cycleNumber).toBe(4);
     });
 
-    it("존재하지 않는 계좌는 null을 반환해야 한다", () => {
-      const result = tradingModule.completeCycleAndIncrement(randomUUID());
+    it("존재하지 않는 계좌는 null을 반환해야 한다", async () => {
+      const result = await tradingModule.completeCycleAndIncrement(randomUUID());
       expect(result).toBeNull();
     });
   });

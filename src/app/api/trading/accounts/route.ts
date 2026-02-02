@@ -25,12 +25,14 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const accounts = getTradingAccountsByUserId(session.user.id);
-  const accountsWithHoldings = accounts.map((account) => ({
-    ...account,
-    holdings: getTierHoldings(account.id),
-    totalShares: getTotalShares(account.id),
-  }));
+  const accounts = await getTradingAccountsByUserId(session.user.id);
+  const accountsWithHoldings = await Promise.all(
+    accounts.map(async (account) => ({
+      ...account,
+      holdings: await getTierHoldings(account.id),
+      totalShares: await getTotalShares(account.id),
+    }))
+  );
   return NextResponse.json({ accounts: accountsWithHoldings });
 }
 
@@ -56,7 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const account = createTradingAccount(session.user.id, parsed.data);
+    const account = await createTradingAccount(session.user.id, parsed.data);
     return NextResponse.json({ account }, { status: 201 });
   } catch (error) {
     console.error("Failed to create trading account:", error);
