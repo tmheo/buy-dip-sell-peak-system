@@ -29,7 +29,40 @@
 npm install
 ```
 
-### 2. 데이터 초기화
+### 2. 환경 변수 설정
+
+`.env.local` 파일을 생성하고 환경 변수를 설정합니다:
+
+```bash
+# 개발 환경 (Supabase Local)
+DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
+
+# NextAuth.js 설정
+AUTH_SECRET=your-auth-secret-key  # openssl rand -base64 32로 생성
+AUTH_GOOGLE_ID=your-google-client-id
+AUTH_GOOGLE_SECRET=your-google-client-secret
+```
+
+### 3. Supabase Local 시작
+
+Docker가 설치되어 있어야 합니다.
+
+```bash
+npm run supabase:start
+```
+
+로컬 환경:
+- **PostgreSQL**: localhost:54322
+- **API**: localhost:54321
+- **Studio**: localhost:54323
+
+### 4. 데이터베이스 스키마 적용
+
+```bash
+npm run db:push
+```
+
+### 5. 데이터 초기화
 
 ```bash
 npm run dev init-all
@@ -37,7 +70,7 @@ npm run dev init-all
 
 모든 티커(SOXL, TQQQ)의 전체 히스토리를 다운로드하고 기술적 지표를 계산합니다.
 
-### 3. 웹 개발 서버 실행
+### 6. 웹 개발 서버 실행
 
 ```bash
 npm run web:dev
@@ -79,6 +112,8 @@ http://localhost:3000 에서 웹 UI에 접속할 수 있습니다.
 
 ### CLI 명령어
 
+#### 데이터 관리 명령어
+
 | 명령어 | 설명 |
 |--------|------|
 | `init` | 데이터베이스 초기화 및 전체 히스토리 다운로드 (지표 포함) |
@@ -89,6 +124,22 @@ http://localhost:3000 에서 웹 UI에 접속할 수 있습니다.
 | `verify-metrics` | 지표 계산 결과 검증 |
 | `query` | 데이터 조회 |
 | `help` | 도움말 표시 |
+
+#### 데이터베이스 명령어 (Drizzle ORM)
+
+| 명령어 | 설명 |
+|--------|------|
+| `npm run db:generate` | 마이그레이션 파일 생성 |
+| `npm run db:migrate` | 마이그레이션 실행 |
+| `npm run db:push` | 스키마 직접 적용 (개발용) |
+| `npm run db:studio` | Drizzle Studio 실행 |
+
+#### Supabase 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `npm run supabase:start` | Supabase Local 시작 |
+| `npm run supabase:stop` | Supabase Local 종료 |
 
 #### 명령어 예시
 
@@ -175,7 +226,14 @@ src/
 │   └── trading.ts                   # 트레이딩 타입 정의 (계좌, 티어, 주문, 전략 상수)
 ├── database/
 │   ├── index.ts                     # SQLite 연결 관리 및 CRUD 작업 (싱글톤 패턴, 추천 캐시 포함)
-│   ├── schema.ts                    # daily_prices, daily_metrics, recommendation_cache 테이블 스키마
+│   ├── db-drizzle.ts                # Drizzle ORM PostgreSQL 클라이언트 (Supabase 연결)
+│   ├── schema.ts                    # 레거시 스키마 (SQLite 호환)
+│   ├── schema/                      # Drizzle ORM 스키마 정의
+│   │   ├── index.ts                 # 스키마 통합 export
+│   │   ├── auth.ts                  # 인증 테이블 (users, accounts, sessions)
+│   │   ├── prices.ts                # 가격 테이블 (daily_prices, daily_metrics)
+│   │   ├── trading.ts               # 트레이딩 테이블 (accounts, holdings, orders)
+│   │   └── cache.ts                 # 캐시 테이블 (recommendation_cache)
 │   └── trading.ts                   # 트레이딩 CRUD 및 주문 생성/체결 로직
 ├── services/
 │   ├── dataFetcher.ts               # Yahoo Finance API 연동 (재시도 로직 포함)
@@ -255,7 +313,9 @@ src/
 | 런타임 | Node.js (ESM) | - |
 | 언어 | TypeScript (strict 모드) | - |
 | 프레임워크 | Next.js 15 (App Router) | React 19 |
-| 데이터베이스 | SQLite (WAL 모드) | better-sqlite3 |
+| 데이터베이스 (개발) | Supabase Local (Docker PostgreSQL) | PostgreSQL 17 |
+| 데이터베이스 (프로덕션) | Supabase Cloud PostgreSQL | Connection Pooler 지원 |
+| ORM | Drizzle ORM | 타입 안전 쿼리 빌더 |
 | 데이터 소스 | Yahoo Finance API | yahoo-finance2 |
 | CSS | Bootstrap 5.3.3 | Bootswatch Solar 테마 |
 | 차트 | Recharts 3.6 | - |
@@ -265,7 +325,17 @@ src/
 ### 데이터 흐름
 
 ```
-Yahoo Finance API → dataFetcher (재시도/파싱) → database (트랜잭션) → SQLite (prices.db)
+Yahoo Finance API → dataFetcher (재시도/파싱) → Drizzle ORM (타입 안전 쿼리) → PostgreSQL
+```
+
+개발 환경:
+```
+Next.js App → Drizzle ORM → Supabase Local (localhost:54322)
+```
+
+프로덕션 환경:
+```
+Vercel → Drizzle ORM → Supabase Cloud (Connection Pooler)
 ```
 
 ---
@@ -538,7 +608,7 @@ NextAuth.js v5 (Auth.js)를 사용한 Google OAuth 인증 시스템입니다.
 1. 미인증 사용자가 보호된 페이지 접근 시 `/info`로 리다이렉트
 2. `/info` 페이지에서 Google 로그인 버튼 클릭
 3. Google OAuth 인증 완료 후 원래 페이지로 리다이렉트
-4. 세션은 SQLite 데이터베이스에 저장 (better-sqlite3)
+4. 세션은 PostgreSQL 데이터베이스에 저장 (Drizzle ORM)
 
 </details>
 
@@ -551,6 +621,13 @@ NextAuth.js v5 (Auth.js)를 사용한 Google OAuth 인증 시스템입니다.
 `.env.local` 파일에 다음 환경 변수를 설정합니다:
 
 ```bash
+# 데이터베이스 (개발: Supabase Local)
+DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
+
+# 데이터베이스 (프로덕션: Supabase Cloud - Vercel 환경변수)
+# DATABASE_URL=postgresql://[user]:[password]@[host]:6543/postgres?pgbouncer=true
+# DIRECT_URL=postgresql://[user]:[password]@[host]:5432/postgres
+
 # NextAuth.js 설정
 AUTH_SECRET=your-auth-secret-key  # openssl rand -base64 32로 생성
 

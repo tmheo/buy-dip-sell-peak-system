@@ -6,7 +6,7 @@
 |------|------|
 | **SPEC ID** | SPEC-DEPLOY-001 |
 | **제목** | Supabase 인프라 및 Drizzle ORM 기반 구축 |
-| **상태** | Draft |
+| **상태** | Completed |
 | **우선순위** | High |
 | **생성일** | 2026-02-02 |
 | **라이프사이클** | spec-anchored |
