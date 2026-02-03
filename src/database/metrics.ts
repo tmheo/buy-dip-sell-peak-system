@@ -118,29 +118,3 @@ export async function upsertMetrics(data: NewDailyMetric[]): Promise<void> {
       });
   }
 }
-
-// =====================================================
-// 레거시 호환성 래퍼 함수 (SQLite → Drizzle 마이그레이션)
-// =====================================================
-
-/** 레거시 QueryOptions 인터페이스 */
-export interface QueryOptions {
-  startDate?: string;
-  endDate?: string;
-}
-
-/**
- * 날짜 범위로 기술적 지표 조회 (레거시 호환성 래퍼)
- * @param options - 시작/종료 날짜 옵션
- * @param ticker - 조회할 티커 (기본값: SOXL)
- * @returns 지표 데이터 배열 (날짜 오름차순)
- */
-export async function getMetricsByDateRange(
-  options: QueryOptions,
-  ticker: string = "SOXL"
-): Promise<DailyMetric[]> {
-  if (!options.startDate || !options.endDate) {
-    return [];
-  }
-  return getMetricsRange(ticker, options.startDate, options.endDate);
-}

@@ -140,29 +140,3 @@ export async function getTotalCount(): Promise<number> {
   // PostgreSQL COUNT 결과가 문자열로 반환될 수 있으므로 숫자로 변환
   return Number(rows[0]?.count ?? 0);
 }
-
-// =====================================================
-// 레거시 호환성 래퍼 함수 (SQLite → Drizzle 마이그레이션)
-// =====================================================
-
-/** 레거시 QueryOptions 인터페이스 */
-export interface QueryOptions {
-  startDate?: string;
-  endDate?: string;
-}
-
-/**
- * 날짜 범위로 가격 데이터 조회 (레거시 호환성 래퍼)
- * @param options - 시작/종료 날짜 옵션
- * @param ticker - 조회할 티커 (기본값: SOXL)
- * @returns 가격 데이터 배열 (날짜 오름차순)
- */
-export async function getPricesByDateRange(
-  options: QueryOptions,
-  ticker: string = "SOXL"
-): Promise<DailyPrice[]> {
-  if (options.startDate && options.endDate) {
-    return getPriceRange(ticker, options.startDate, options.endDate);
-  }
-  return getAllPricesByTicker(ticker);
-}

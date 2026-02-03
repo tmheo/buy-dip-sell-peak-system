@@ -9,8 +9,8 @@ import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 import { BacktestEngine, applySOXLDowngrade, checkDivergenceCondition } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
-import { getPricesByDateRange, getLatestDate } from "@/database/prices";
-import { getMetricsByDateRange } from "@/database/metrics";
+import { getPriceRange, getLatestDate } from "@/database/prices";
+import { getMetricsRange } from "@/database/metrics";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -178,13 +178,7 @@ export async function POST(request: Request): Promise<Response> {
     const latestDateInDb = await getLatestDate(ticker);
 
     // 전체 가격 데이터 조회 (기준일 이후 성과 확인 구간 데이터도 포함)
-    const allPrices = await getPricesByDateRange(
-      {
-        startDate: lookbackDateStr,
-        endDate: latestDateInDb || referenceDate,
-      },
-      ticker
-    );
+    const allPrices = await getPriceRange(ticker, lookbackDateStr, latestDateInDb || referenceDate);
 
     // 기준일 인덱스 찾기
     const referenceDateIndex = allPrices.findIndex((p) => p.date === referenceDate);
@@ -247,10 +241,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // DB에서 기술적 지표 조회 시도
-    const metricsFromDb = await getMetricsByDateRange(
-      { startDate: lookbackDateStr, endDate: maxHistoricalDate },
-      ticker
-    );
+    const metricsFromDb = await getMetricsRange(ticker, lookbackDateStr, maxHistoricalDate);
 
     if (metricsFromDb.length > 0) {
       // DB 지표 사용 (최적화된 경로)
