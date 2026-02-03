@@ -2,13 +2,12 @@
  * 추천 전략 사전 계산 스크립트
  * 전체 날짜에 대해 추천 전략을 계산하고 DB에 저장
  */
+import { getPricesByDateRange } from "@/database/prices";
 import {
-  initTables,
-  getPricesByDateRange,
-  bulkSaveRecommendations,
+  bulkSaveRecommendationsLegacy,
   getRecommendationCacheCount,
-} from "@/database";
-import type { RecommendationCacheItem } from "@/database";
+  type RecommendationCacheItem,
+} from "@/database/recommend-cache";
 import type { DailyPrice } from "@/types";
 import { getQuickRecommendation, clearRecommendationCache } from "@/backtest-recommend";
 
@@ -30,12 +29,12 @@ function showProgress(current: number, total: number, ticker: string): void {
 /**
  * 특정 티커에 대한 추천 사전 계산
  */
-function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
+async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
   console.log(`\n\n=== ${ticker} 추천 사전 계산 시작 ===`);
 
   // 전체 가격 데이터 로드
   const endDate = new Date().toISOString().split("T")[0];
-  const allPrices: DailyPrice[] = getPricesByDateRange(
+  const allPrices: DailyPrice[] = await getPricesByDateRange(
     { startDate: START_DATE, endDate },
     ticker
   );
@@ -67,8 +66,8 @@ function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
   for (let i = startIndex; i < allPrices.length; i++) {
     const referenceDate = allPrices[i].date;
 
-    // 추천 계산 (DB 저장은 bulkSaveRecommendations에서 일괄 처리하므로 persistToDb: false)
-    const result = getQuickRecommendation(ticker, referenceDate, allPrices, dateToIndexMap, {
+    // 추천 계산 (DB 저장은 bulkSaveRecommendationsLegacy에서 일괄 처리하므로 persistToDb: false)
+    const result = await getQuickRecommendation(ticker, referenceDate, allPrices, dateToIndexMap, {
       persistToDb: false,
     });
 
@@ -84,7 +83,7 @@ function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
 
       // 배치 저장
       if (cacheItems.length >= BATCH_SIZE) {
-        bulkSaveRecommendations(cacheItems);
+        await bulkSaveRecommendationsLegacy(cacheItems);
         cacheItems.length = 0;
       }
     }
@@ -95,7 +94,7 @@ function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
 
   // 남은 데이터 저장
   if (cacheItems.length > 0) {
-    bulkSaveRecommendations(cacheItems);
+    await bulkSaveRecommendationsLegacy(cacheItems);
   }
 
   console.log(`\n${ticker}: ${cachedCount}개 추천 결과 저장 완료`);
@@ -105,18 +104,15 @@ function precomputeForTicker(ticker: "SOXL" | "TQQQ"): number {
 /**
  * 메인 실행
  */
-function main(): void {
+async function main(): Promise<void> {
   console.log("=== 추천 전략 사전 계산 시작 ===");
   console.log(`시작 날짜: ${START_DATE}`);
   console.log(`대상 티커: ${TICKERS.join(", ")}`);
 
-  // 테이블 초기화
-  initTables();
-
   let totalCached = 0;
 
   for (const ticker of TICKERS) {
-    const count = precomputeForTicker(ticker);
+    const count = await precomputeForTicker(ticker);
     totalCached += count;
   }
 
@@ -125,14 +121,13 @@ function main(): void {
   console.log(`총 캐시된 추천: ${totalCached}개`);
 
   for (const ticker of TICKERS) {
-    const count = getRecommendationCacheCount(ticker);
+    const count = await getRecommendationCacheCount(ticker);
     console.log(`  ${ticker}: ${count}개`);
   }
 }
 
 // 실행
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.error(error);
-}
+  process.exit(1);
+});

@@ -174,11 +174,11 @@ function generateFineTuneVariations(base: SimilarityParams, count: number): Simi
 // 다년도 백테스트
 // ============================================================
 
-function runMultiYearBacktest(
+async function runMultiYearBacktest(
   params: SimilarityParams | null,
   priceData: PriceDataResult,
   parentIndex: number
-): MultiYearResult {
+): Promise<MultiYearResult> {
   const yearResults: YearResult[] = [];
   let totalStrategyScore = 0;
   let totalReturnRate = 0;
@@ -200,7 +200,7 @@ function runMultiYearBacktest(
       topCandidates: 3,
     };
 
-    const result = runBacktestWithParams(config, params, priceData);
+    const result = await runBacktestWithParams(config, params, priceData);
 
     yearResults.push({
       year: yearInfo.year,
@@ -248,14 +248,14 @@ async function main(): Promise<void> {
 
   // 1. 가격 데이터 로드
   logProgress("SOXL 가격 데이터 로드 중...");
-  const priceData = loadPriceData("SOXL");
+  const priceData = await loadPriceData("SOXL");
   logProgress(`가격 데이터 로드 완료: ${priceData.prices.length}개 일자`);
 
   // 2. 현재 Top 후보들의 성능 재확인
   logProgress("Top 후보들 성능 확인 중...");
   const topResults: MultiYearResult[] = [];
   for (let i = 0; i < TOP_CANDIDATES.length; i++) {
-    const result = runMultiYearBacktest(TOP_CANDIDATES[i], priceData, i);
+    const result = await runMultiYearBacktest(TOP_CANDIDATES[i], priceData, i);
     topResults.push(result);
     logProgress(`Top #${i + 1}: 통합점수=${formatScore(result.combinedScore)}, 평균수익률=${formatPercent(result.avgReturnRate)}`);
   }
@@ -267,7 +267,7 @@ async function main(): Promise<void> {
     const variations = generateFineTuneVariations(TOP_CANDIDATES[candIdx], VARIATIONS_PER_CANDIDATE);
 
     for (let i = 0; i < variations.length; i++) {
-      const result = runMultiYearBacktest(variations[i], priceData, candIdx);
+      const result = await runMultiYearBacktest(variations[i], priceData, candIdx);
       allVariationResults.push(result);
 
       if ((i + 1) % 10 === 0) {

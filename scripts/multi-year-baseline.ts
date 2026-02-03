@@ -22,61 +22,68 @@ const targets = [
   { year: 2025, returnRate: 0.8039, mdd: -0.1816 },
 ];
 
-console.log("=== 5개년 베이스라인 측정 (현재 파라미터) ===\n");
+async function main(): Promise<void> {
+  console.log("=== 5개년 베이스라인 측정 (현재 파라미터) ===\n");
 
-// Load price data once
-const priceData = loadPriceData("SOXL");
-console.log("가격 데이터 로드 완료: " + priceData.prices.length + "개 일자\n");
+  // Load price data once
+  const priceData = await loadPriceData("SOXL");
+  console.log("가격 데이터 로드 완료: " + priceData.prices.length + "개 일자\n");
 
-console.log("| 연도 | 수익률(현재) | 수익률(타겟) | 차이 | MDD(현재) | MDD(타겟) | 전략점수 |");
-console.log("|------|-------------|-------------|------|----------|----------|----------|");
+  console.log("| 연도 | 수익률(현재) | 수익률(타겟) | 차이 | MDD(현재) | MDD(타겟) | 전략점수 |");
+  console.log("|------|-------------|-------------|------|----------|----------|----------|");
 
-for (let i = 0; i < years.length; i++) {
-  const yearInfo = years[i];
-  const target = targets[i];
+  for (let i = 0; i < years.length; i++) {
+    const yearInfo = years[i];
+    const target = targets[i];
 
-  const config: OptimizationConfig = {
-    ticker: "SOXL",
-    startDate: yearInfo.start,
-    endDate: yearInfo.end,
-    initialCapital: 10000,
-    randomCombinations: 50,
-    variationsPerTop: 10,
-    topCandidates: 3,
-  };
+    const config: OptimizationConfig = {
+      ticker: "SOXL",
+      startDate: yearInfo.start,
+      endDate: yearInfo.end,
+      initialCapital: 10000,
+      randomCombinations: 50,
+      variationsPerTop: 10,
+      topCandidates: 3,
+    };
 
-  try {
-    const result = runBacktestWithParams(config, null, priceData);
-    const returnPct = new Decimal(result.returnRate).mul(100).toDecimalPlaces(2).toNumber();
-    const mddPct = new Decimal(result.mdd).mul(100).toDecimalPlaces(2).toNumber();
-    const targetReturnPct = new Decimal(target.returnRate).mul(100).toDecimalPlaces(2).toNumber();
-    const targetMddPct = new Decimal(target.mdd).mul(100).toDecimalPlaces(2).toNumber();
-    const score = new Decimal(result.strategyScore).toDecimalPlaces(2).toNumber();
-    const diff = new Decimal(returnPct).sub(targetReturnPct).toDecimalPlaces(2).toNumber();
-    const diffSign = diff >= 0 ? "+" : "";
+    try {
+      const result = await runBacktestWithParams(config, null, priceData);
+      const returnPct = new Decimal(result.returnRate).mul(100).toDecimalPlaces(2).toNumber();
+      const mddPct = new Decimal(result.mdd).mul(100).toDecimalPlaces(2).toNumber();
+      const targetReturnPct = new Decimal(target.returnRate).mul(100).toDecimalPlaces(2).toNumber();
+      const targetMddPct = new Decimal(target.mdd).mul(100).toDecimalPlaces(2).toNumber();
+      const score = new Decimal(result.strategyScore).toDecimalPlaces(2).toNumber();
+      const diff = new Decimal(returnPct).sub(targetReturnPct).toDecimalPlaces(2).toNumber();
+      const diffSign = diff >= 0 ? "+" : "";
 
-    console.log(
-      "| " +
-        yearInfo.year +
-        " | " +
-        returnPct +
-        "% | " +
-        targetReturnPct +
-        "% | " +
-        diffSign +
-        diff +
-        "% | " +
-        mddPct +
-        "% | " +
-        targetMddPct +
-        "% | " +
-        score +
-        " |"
-    );
-  } catch (e) {
-    const err = e as Error;
-    console.log("| " + yearInfo.year + " | ERROR: " + err.message + " |");
+      console.log(
+        "| " +
+          yearInfo.year +
+          " | " +
+          returnPct +
+          "% | " +
+          targetReturnPct +
+          "% | " +
+          diffSign +
+          diff +
+          "% | " +
+          mddPct +
+          "% | " +
+          targetMddPct +
+          "% | " +
+          score +
+          " |"
+      );
+    } catch (e) {
+      const err = e as Error;
+      console.log("| " + yearInfo.year + " | ERROR: " + err.message + " |");
+    }
   }
+
+  console.log("\n완료");
 }
 
-console.log("\n완료");
+main().catch((err) => {
+  console.error("오류 발생:", err);
+  process.exit(1);
+});

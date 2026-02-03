@@ -30,7 +30,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { BacktestEngine } from "../engine";
-import { getPricesByDateRange } from "@/database";
+import { getPricesByDateRange } from "@/database/prices";
 import type { BacktestRequest, BacktestResult, StrategyName } from "../types";
 import type { DailyPrice } from "@/types";
 
@@ -88,9 +88,12 @@ describe("기준값 검증 테스트", () => {
   let prices: DailyPrice[] = [];
   let hasData = false;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     try {
-      prices = getPricesByDateRange({ startDate: TEST_START_DATE, endDate: TEST_END_DATE }, "SOXL");
+      prices = await getPricesByDateRange(
+        { startDate: TEST_START_DATE, endDate: TEST_END_DATE },
+        "SOXL"
+      );
       hasData = prices.length >= 200; // 약 1년치 거래일
       if (!hasData) {
         console.log(

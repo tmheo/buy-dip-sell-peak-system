@@ -16,7 +16,7 @@ import type {
 } from "./types";
 import { DEFAULT_OPTIMIZATION_CONFIG } from "./types";
 import { generateRandomParams, generateVariations } from "./param-generator";
-import { loadPriceData, runBacktestWithParams } from "./backtest-runner";
+import { loadPriceData, runBacktestWithParams, type PriceDataResult } from "./backtest-runner";
 import { analyzeResults } from "./analyzer";
 
 /** CLI 인자 파싱 결과 */
@@ -208,18 +208,18 @@ function logProgress(message: string): void {
 type BacktestResult = { params: SimilarityParams; metrics: BacktestMetrics };
 
 /** 파라미터 배열에 대해 백테스트 실행 (진행 상황 출력 포함) */
-function runBatchBacktest(
+async function runBatchBacktest(
   config: OptimizationConfig,
   params: SimilarityParams[],
-  priceData: ReturnType<typeof loadPriceData>,
+  priceData: PriceDataResult,
   label: string,
   logInterval: number = 10
-): BacktestResult[] {
+): Promise<BacktestResult[]> {
   logProgress(`${label} 백테스트 실행 중 (0/${params.length})...`);
 
   const results: BacktestResult[] = [];
   for (let i = 0; i < params.length; i++) {
-    const metrics = runBacktestWithParams(config, params[i], priceData);
+    const metrics = await runBacktestWithParams(config, params[i], priceData);
     results.push({ params: params[i], metrics });
 
     if ((i + 1) % logInterval === 0) {
@@ -266,12 +266,12 @@ export async function main(): Promise<void> {
 
     // 2. 가격 데이터 로드
     logProgress(`${config.ticker} 가격 데이터 로드 중...`);
-    const priceData = loadPriceData(config.ticker);
+    const priceData = await loadPriceData(config.ticker);
     logProgress(`가격 데이터 로드 완료: ${priceData.prices.length}개 일자`);
 
     // 3. 베이스라인 백테스트
     logProgress("베이스라인 백테스트 실행 중...");
-    const baseline = runBacktestWithParams(config, null, priceData);
+    const baseline = await runBacktestWithParams(config, null, priceData);
     logProgress(
       `베이스라인 결과: 수익률=${formatPercent(baseline.returnRate)}, ` +
         `MDD=${formatPercent(baseline.mdd)}, 전략점수=${formatScore(baseline.strategyScore)}`
@@ -280,7 +280,7 @@ export async function main(): Promise<void> {
     // 4. 랜덤 파라미터 백테스트
     logProgress(`랜덤 파라미터 ${config.randomCombinations}개 생성 중...`);
     const randomParams = generateRandomParams(config.randomCombinations);
-    const randomResults = runBatchBacktest(config, randomParams, priceData, "랜덤 파라미터");
+    const randomResults = await runBatchBacktest(config, randomParams, priceData, "랜덤 파라미터");
     logProgress("랜덤 파라미터 백테스트 완료");
 
     // 5. 상위 후보 선택
@@ -297,7 +297,13 @@ export async function main(): Promise<void> {
     for (let i = 0; i < topRandomResults.length; i++) {
       logProgress(`후보 #${i + 1} 변형 ${config.variationsPerTop}개 생성 중...`);
       const variations = generateVariations(topRandomResults[i].params, config.variationsPerTop);
-      const results = runBatchBacktest(config, variations, priceData, `후보 #${i + 1} 변형`, 5);
+      const results = await runBatchBacktest(
+        config,
+        variations,
+        priceData,
+        `후보 #${i + 1} 변형`,
+        5
+      );
       variationResults.push(...results);
     }
     logProgress(`변형 백테스트 완료: ${variationResults.length}개`);
