@@ -81,21 +81,6 @@ export async function bulkSaveRecommendations(items: NewRecommendationCache[]): 
 // 레거시 호환성 래퍼 함수 및 타입 (SQLite → Drizzle 마이그레이션)
 // =====================================================
 
-/** 레거시 RecommendationCacheRow 타입 (호환성) */
-export interface RecommendationCacheRow {
-  ticker: string;
-  date: string;
-  strategy: string;
-  reason: string | null;
-  rsi14: number | null;
-  isGoldenCross: boolean;
-  maSlope: number | null;
-  disparity: number | null;
-  roc12: number | null;
-  volatility20: number | null;
-  goldenCross: number | null;
-}
-
 /** 레거시 RecommendationCacheItem 인터페이스 (벌크 저장용) */
 export interface RecommendationCacheItem {
   ticker: string;
