@@ -8,7 +8,7 @@
  * - getLatestPrices: 최근 N일 조회
  */
 
-import { eq, and, between, desc, asc } from "drizzle-orm";
+import { eq, and, between, desc, asc, count } from "drizzle-orm";
 import { db } from "./db-drizzle";
 import { dailyPrices } from "./schema/index";
 import type { DailyPrice, NewDailyPrice } from "./schema/index";
@@ -113,4 +113,30 @@ export async function getLatestPrices(
     .limit(limit);
 
   return rows;
+}
+
+/**
+ * 특정 티커의 저장된 데이터 수 조회
+ * @param ticker - 조회할 티커 (기본값: SOXL)
+ * @returns 레코드 수
+ */
+export async function getCount(ticker: string = "SOXL"): Promise<number> {
+  const rows = await db
+    .select({ count: count() })
+    .from(dailyPrices)
+    .where(eq(dailyPrices.ticker, ticker));
+
+  // PostgreSQL COUNT 결과가 문자열로 반환될 수 있으므로 숫자로 변환
+  return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * 전체 데이터 수 조회
+ * @returns 전체 레코드 수
+ */
+export async function getTotalCount(): Promise<number> {
+  const rows = await db.select({ count: count() }).from(dailyPrices);
+
+  // PostgreSQL COUNT 결과가 문자열로 반환될 수 있으므로 숫자로 변환
+  return Number(rows[0]?.count ?? 0);
 }

@@ -1,7 +1,7 @@
 // Sidebar 컴포넌트 - 최근 주가 사이드바
-// Server Component
+// Server Component (async)
 
-import { getLatestPrices } from "@/database";
+import { getLatestPrices } from "@/database/prices";
 
 interface PriceData {
   date: string;
@@ -10,7 +10,7 @@ interface PriceData {
 }
 
 // 원본 데이터를 변동률 포함 PriceData 배열로 변환
-function calculatePriceData(rawData: ReturnType<typeof getLatestPrices>): PriceData[] {
+function calculatePriceData(rawData: { date: string; adjClose: number }[]): PriceData[] {
   const priceData: PriceData[] = [];
 
   for (let i = 0; i < rawData.length - 1 && i < 10; i++) {
@@ -81,10 +81,11 @@ function PriceTable({ ticker, priceData }: { ticker: string; priceData: PriceDat
   );
 }
 
-export default function Sidebar() {
+export default async function Sidebar() {
   // 11일 데이터 조회 (10일 표시 + 변동률 계산용 1일)
-  const soxlRawData = getLatestPrices(11, "SOXL");
-  const tqqqRawData = getLatestPrices(11, "TQQQ");
+  // PostgreSQL 버전: getLatestPrices(ticker, limit)
+  const soxlRawData = await getLatestPrices("SOXL", 11);
+  const tqqqRawData = await getLatestPrices("TQQQ", 11);
 
   // 변동률 계산하여 PriceData 배열 생성 (최근 10일만)
   const soxlPriceData = calculatePriceData(soxlRawData);

@@ -6,7 +6,7 @@
  * - getLatestMetricDate: 가장 최근 지표 날짜 조회
  */
 
-import { eq, and, between, desc, asc } from "drizzle-orm";
+import { eq, and, between, desc, asc, count } from "drizzle-orm";
 import { db } from "./db-drizzle";
 import { dailyMetrics } from "./schema/index";
 import type { DailyMetric, NewDailyMetric } from "./schema/index";
@@ -73,4 +73,48 @@ export async function getLatestMetricDate(ticker: string = "SOXL"): Promise<stri
     .limit(1);
 
   return rows[0]?.date ?? null;
+}
+
+/**
+ * 특정 티커의 저장된 지표 데이터 수 조회
+ * @param ticker - 조회할 티커 (기본값: SOXL)
+ * @returns 레코드 수
+ */
+export async function getMetricsCount(ticker: string = "SOXL"): Promise<number> {
+  const rows = await db
+    .select({ count: count() })
+    .from(dailyMetrics)
+    .where(eq(dailyMetrics.ticker, ticker));
+
+  // PostgreSQL COUNT 결과가 문자열로 반환될 수 있으므로 숫자로 변환
+  return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * 기술적 지표 UPSERT (기존 데이터 갱신)
+ * @param data - 삽입/갱신할 지표 데이터 배열
+ */
+export async function upsertMetrics(data: NewDailyMetric[]): Promise<void> {
+  if (data.length === 0) return;
+
+  // PostgreSQL의 ON CONFLICT DO UPDATE 사용
+  for (const metric of data) {
+    await db
+      .insert(dailyMetrics)
+      .values(metric)
+      .onConflictDoUpdate({
+        target: [dailyMetrics.ticker, dailyMetrics.date],
+        set: {
+          ma20: metric.ma20,
+          ma60: metric.ma60,
+          maSlope: metric.maSlope,
+          disparity: metric.disparity,
+          rsi14: metric.rsi14,
+          roc12: metric.roc12,
+          volatility20: metric.volatility20,
+          goldenCross: metric.goldenCross,
+          isGoldenCross: metric.isGoldenCross,
+        },
+      });
+  }
 }

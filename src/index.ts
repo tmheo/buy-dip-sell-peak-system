@@ -1,16 +1,18 @@
+/**
+ * 주가 데이터베이스 관리 CLI 도구
+ * PostgreSQL (Drizzle ORM) 버전
+ */
+
 import {
-  close,
   getAllPricesByTicker,
   getCount,
   getLatestDate,
-  getMetricsCount,
-  getPricesByDateRange,
+  getPriceRange,
   getTotalCount,
-  initTables,
-  insertMetrics,
-  insertPrices,
-  upsertMetrics,
-} from "./database/index.js";
+  insertDailyPrices,
+} from "./database/prices.js";
+import { getMetricsCount, insertMetrics, upsertMetrics } from "./database/metrics.js";
+import { closeConnection } from "./database/db-drizzle.js";
 import {
   fetchAllHistory,
   fetchSince,
@@ -18,7 +20,7 @@ import {
   type SupportedTicker,
 } from "./services/dataFetcher.js";
 import { calculateMetricsBatch, verifyMetrics } from "./services/metricsCalculator.js";
-import type { DailyPrice } from "./types/index.js";
+import type { DailyMetricRow, DailyPrice } from "./types/index.js";
 
 const SUPPORTED_TICKERS = getSupportedTickers();
 const DEFAULT_TICKER: SupportedTicker = "SOXL";
@@ -28,13 +30,13 @@ const DEFAULT_TICKER: SupportedTicker = "SOXL";
  */
 function showHelp(): void {
   console.log(`
-주가 데이터베이스 관리 도구
+주가 데이터베이스 관리 도구 (PostgreSQL)
 
 사용법:
   npx tsx src/index.ts <command> [options]
 
 명령어:
-  init [--ticker TICKER]  데이터베이스 초기화 및 전체 히스토리 다운로드 (지표 포함)
+  init [--ticker TICKER]  전체 히스토리 다운로드 (지표 포함)
   init-all                모든 티커의 전체 히스토리 다운로드 (지표 포함)
   update [--ticker TICKER] 최신 데이터로 업데이트 (증분, 지표 포함)
   update-all              모든 티커 업데이트 (지표 포함)
@@ -87,33 +89,95 @@ function getTickerFromArgs(args: string[]): SupportedTicker {
 }
 
 /**
- * init 명령어: DB 초기화 및 전체 히스토리 다운로드 (지표 포함)
+ * DailyPrice를 PostgreSQL INSERT용 형식으로 변환
+ */
+function convertToPgPrices(
+  prices: DailyPrice[],
+  ticker: string
+): Array<{
+  ticker: string;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjClose: number;
+  volume: number;
+}> {
+  return prices.map((p) => ({
+    ticker,
+    date: p.date,
+    open: p.open,
+    high: p.high,
+    low: p.low,
+    close: p.close,
+    adjClose: p.adjClose,
+    volume: p.volume,
+  }));
+}
+
+/**
+ * DailyMetricRow를 PostgreSQL INSERT용 형식으로 변환
+ */
+function convertToPgMetrics(
+  metrics: DailyMetricRow[],
+  ticker: string
+): Array<{
+  ticker: string;
+  date: string;
+  ma20: number | null;
+  ma60: number | null;
+  maSlope: number | null;
+  disparity: number | null;
+  rsi14: number | null;
+  roc12: number | null;
+  volatility20: number | null;
+  goldenCross: number | null;
+  isGoldenCross: boolean | null;
+}> {
+  return metrics.map((m) => ({
+    ticker,
+    date: m.date,
+    ma20: m.ma20 ?? null,
+    ma60: m.ma60 ?? null,
+    maSlope: m.maSlope ?? null,
+    disparity: m.disparity ?? null,
+    rsi14: m.rsi14 ?? null,
+    roc12: m.roc12 ?? null,
+    volatility20: m.volatility20 ?? null,
+    goldenCross: m.goldenCross ?? null,
+    isGoldenCross: m.isGoldenCross ?? null,
+  }));
+}
+
+/**
+ * init 명령어: 전체 히스토리 다운로드 (지표 포함)
  */
 async function handleInit(ticker: SupportedTicker): Promise<void> {
   console.log(`=== ${ticker} 데이터베이스 초기화 ===\n`);
 
-  initTables();
-
   const prices = await fetchAllHistory(ticker);
 
   if (prices.length > 0) {
-    const count = insertPrices(prices, ticker);
-    console.log(`\n${count}개의 가격 레코드가 저장되었습니다.`);
+    const pgPrices = convertToPgPrices(prices, ticker);
+    await insertDailyPrices(pgPrices);
+    console.log(`\n${prices.length}개의 가격 레코드가 저장되었습니다.`);
 
-    // 기술적 지표 계산 및 저장 (SPEC-PERFORMANCE-001)
+    // 기술적 지표 계산 및 저장
     console.log("\n기술적 지표 계산 중...");
     const adjClosePrices = prices.map((p) => p.adjClose);
     const dates = prices.map((p) => p.date);
     const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
 
     if (metrics.length > 0) {
-      const metricsCount = insertMetrics(metrics, ticker);
-      console.log(`✅ ${metricsCount}개의 기술적 지표가 저장되었습니다.`);
+      const pgMetrics = convertToPgMetrics(metrics, ticker);
+      await insertMetrics(pgMetrics);
+      console.log(`✅ ${metrics.length}개의 기술적 지표가 저장되었습니다.`);
     }
   }
 
-  const tickerCount = getCount(ticker);
-  const metricsCount = getMetricsCount(ticker);
+  const tickerCount = await getCount(ticker);
+  const metricsCount = await getMetricsCount(ticker);
   console.log(`\n${ticker} 총 저장된 가격 레코드 수: ${tickerCount}`);
   console.log(`${ticker} 총 저장된 지표 레코드 수: ${metricsCount}`);
 }
@@ -124,14 +188,12 @@ async function handleInit(ticker: SupportedTicker): Promise<void> {
 async function handleInitAll(): Promise<void> {
   console.log("=== 모든 티커 데이터베이스 초기화 ===\n");
 
-  initTables();
-
   for (const ticker of SUPPORTED_TICKERS) {
     await handleInit(ticker);
     console.log("");
   }
 
-  const totalCount = getTotalCount();
+  const totalCount = await getTotalCount();
   console.log(`\n전체 저장된 레코드 수: ${totalCount}`);
 }
 
@@ -141,9 +203,7 @@ async function handleInitAll(): Promise<void> {
 async function handleUpdate(ticker: SupportedTicker): Promise<void> {
   console.log(`=== ${ticker} 데이터 업데이트 ===\n`);
 
-  initTables();
-
-  const latestDate = getLatestDate(ticker);
+  const latestDate = await getLatestDate(ticker);
 
   if (!latestDate) {
     console.log(`${ticker}의 저장된 데이터가 없습니다. init 명령어를 먼저 실행하세요.`);
@@ -155,13 +215,14 @@ async function handleUpdate(ticker: SupportedTicker): Promise<void> {
   const prices = await fetchSince(latestDate, ticker);
 
   if (prices.length > 0) {
-    const count = insertPrices(prices, ticker);
-    console.log(`\n${count}개의 새 가격 레코드가 저장되었습니다.`);
+    const pgPrices = convertToPgPrices(prices, ticker);
+    await insertDailyPrices(pgPrices);
+    console.log(`\n${prices.length}개의 새 가격 레코드가 저장되었습니다.`);
 
-    // 지표 재계산 (SPEC-PERFORMANCE-001)
+    // 지표 재계산
     // 새 데이터 추가 시 영향받는 지표도 업데이트 (MA60 등으로 인해 과거 60일 영향)
     console.log("\n기술적 지표 업데이트 중...");
-    const allPrices = getAllPricesByTicker(ticker);
+    const allPrices = await getAllPricesByTicker(ticker);
     const adjClosePrices = allPrices.map((p) => p.adjClose);
     const dates = allPrices.map((p) => p.date);
 
@@ -176,15 +237,16 @@ async function handleUpdate(ticker: SupportedTicker): Promise<void> {
     );
 
     if (metrics.length > 0) {
-      const metricsCount = upsertMetrics(metrics, ticker);
-      console.log(`✅ ${metricsCount}개의 기술적 지표가 업데이트되었습니다.`);
+      const pgMetrics = convertToPgMetrics(metrics, ticker);
+      await upsertMetrics(pgMetrics);
+      console.log(`✅ ${metrics.length}개의 기술적 지표가 업데이트되었습니다.`);
     }
   } else {
     console.log("\n새 데이터가 없습니다.");
   }
 
-  const tickerCount = getCount(ticker);
-  const metricsCount = getMetricsCount(ticker);
+  const tickerCount = await getCount(ticker);
+  const metricsCount = await getMetricsCount(ticker);
   console.log(`\n${ticker} 총 저장된 가격 레코드 수: ${tickerCount}`);
   console.log(`${ticker} 총 저장된 지표 레코드 수: ${metricsCount}`);
 }
@@ -195,28 +257,45 @@ async function handleUpdate(ticker: SupportedTicker): Promise<void> {
 async function handleUpdateAll(): Promise<void> {
   console.log("=== 모든 티커 데이터 업데이트 ===\n");
 
-  initTables();
-
   for (const ticker of SUPPORTED_TICKERS) {
     await handleUpdate(ticker);
     console.log("");
   }
 
-  const totalCount = getTotalCount();
+  const totalCount = await getTotalCount();
   console.log(`\n전체 저장된 레코드 수: ${totalCount}`);
 }
 
 /**
  * 가격 데이터 한 줄 출력
  */
-function formatPriceRow(price: DailyPrice): string {
+function formatPriceRow(price: {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjClose: number;
+  volume: number;
+}): string {
   return `${price.date}\t${price.open.toFixed(2)}\t${price.high.toFixed(2)}\t${price.low.toFixed(2)}\t${price.close.toFixed(2)}\t${price.adjClose.toFixed(2)}\t${price.volume.toLocaleString()}`;
 }
 
 /**
  * 가격 목록 출력 (처음/마지막 N개)
  */
-function printPrices(prices: DailyPrice[], displayCount: number): void {
+function printPrices(
+  prices: Array<{
+    date: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    adjClose: number;
+    volume: number;
+  }>,
+  displayCount: number
+): void {
   const header = "날짜\t\t시가\t고가\t저가\t종가\t수정종가\t거래량";
 
   console.log(`--- 처음 ${displayCount}개 ---`);
@@ -236,14 +315,11 @@ function printPrices(prices: DailyPrice[], displayCount: number): void {
 
 /**
  * init-metrics 명령어: 기존 가격 데이터로 기술적 지표 일괄 계산
- * SPEC-PERFORMANCE-001
  */
-function handleInitMetrics(ticker: SupportedTicker): void {
+async function handleInitMetrics(ticker: SupportedTicker): Promise<void> {
   console.log(`=== ${ticker} 기술적 지표 일괄 계산 ===\n`);
 
-  initTables();
-
-  const prices = getAllPricesByTicker(ticker);
+  const prices = await getAllPricesByTicker(ticker);
 
   if (prices.length === 0) {
     console.log(`${ticker}의 가격 데이터가 없습니다. init 명령어를 먼저 실행하세요.`);
@@ -258,24 +334,24 @@ function handleInitMetrics(ticker: SupportedTicker): void {
   const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
 
   if (metrics.length > 0) {
-    const metricsCount = insertMetrics(metrics, ticker);
-    console.log(`\n✅ ${metricsCount}개의 기술적 지표가 저장되었습니다.`);
+    const pgMetrics = convertToPgMetrics(metrics, ticker);
+    await insertMetrics(pgMetrics);
+    console.log(`\n✅ ${metrics.length}개의 기술적 지표가 저장되었습니다.`);
   } else {
     console.log("\n계산된 지표가 없습니다. (데이터 부족)");
   }
 
-  const totalMetrics = getMetricsCount(ticker);
+  const totalMetrics = await getMetricsCount(ticker);
   console.log(`${ticker} 총 저장된 지표 레코드 수: ${totalMetrics}`);
 }
 
 /**
  * verify-metrics 명령어: 지표 계산 결과 검증
- * SPEC-PERFORMANCE-001
  */
 async function handleVerifyMetrics(ticker: SupportedTicker): Promise<void> {
   console.log(`=== ${ticker} 기술적 지표 검증 ===\n`);
 
-  const prices = getAllPricesByTicker(ticker);
+  const prices = await getAllPricesByTicker(ticker);
 
   if (prices.length === 0) {
     console.log(`${ticker}의 가격 데이터가 없습니다.`);
@@ -314,14 +390,19 @@ async function handleVerifyMetrics(ticker: SupportedTicker): Promise<void> {
 /**
  * query 명령어: 데이터 조회
  */
-function handleQuery(args: string[]): void {
+async function handleQuery(args: string[]): Promise<void> {
   const ticker = getTickerFromArgs(args);
   const startDate = getArgValue(args, "--start");
   const endDate = getArgValue(args, "--end");
 
   console.log(`=== ${ticker} 데이터 조회 ===\n`);
 
-  const prices = getPricesByDateRange({ startDate, endDate }, ticker);
+  let prices;
+  if (startDate && endDate) {
+    prices = await getPriceRange(ticker, startDate, endDate);
+  } else {
+    prices = await getAllPricesByTicker(ticker);
+  }
 
   if (prices.length === 0) {
     console.log("조회된 데이터가 없습니다.");
@@ -355,13 +436,13 @@ async function main(): Promise<void> {
         await handleUpdateAll();
         break;
       case "init-metrics":
-        handleInitMetrics(ticker);
+        await handleInitMetrics(ticker);
         break;
       case "verify-metrics":
         await handleVerifyMetrics(ticker);
         break;
       case "query":
-        handleQuery(args);
+        await handleQuery(args);
         break;
       case "help":
       default:
@@ -372,7 +453,7 @@ async function main(): Promise<void> {
     console.error("오류 발생:", error);
     process.exit(1);
   } finally {
-    close();
+    await closeConnection();
   }
 }
 

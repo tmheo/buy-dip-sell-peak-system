@@ -306,7 +306,8 @@ export async function getTotalShares(accountId: string): Promise<number> {
     .from(tierHoldings)
     .where(eq(tierHoldings.accountId, accountId));
 
-  return result[0]?.total ?? 0;
+  // PostgreSQL SUM 결과가 문자열로 반환될 수 있으므로 숫자로 변환
+  return Number(result[0]?.total ?? 0);
 }
 
 /**
