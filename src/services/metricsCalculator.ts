@@ -9,7 +9,7 @@
 
 import Decimal from "decimal.js";
 import type { DailyMetricRow } from "@/types";
-import { floorToDecimal } from "@/backtest/order";
+import { floorToDecimal } from "@/utils/trading-core";
 
 /** 기술적 지표 계산을 위한 기간 상수 */
 const RSI_PERIOD = 14;

@@ -18,7 +18,7 @@ import {
   calculateBuyQuantity,
   shouldExecuteBuy,
   shouldExecuteSell,
-} from "./order";
+} from "@/utils/trading-core";
 import { calculateSMA } from "./metrics";
 
 /**
