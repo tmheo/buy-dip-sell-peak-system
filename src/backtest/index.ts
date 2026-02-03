@@ -28,7 +28,7 @@ export type {
 // 전략 내보내기
 export { PRO_STRATEGIES, getStrategy } from "./strategy";
 
-// 주문 계산 함수 내보내기
+// 주문 계산 함수 내보내기 (trading-core에서 re-export)
 export {
   floorToDecimal,
   calculateBuyLimitPrice,
@@ -36,7 +36,7 @@ export {
   calculateBuyQuantity,
   shouldExecuteBuy,
   shouldExecuteSell,
-} from "./order";
+} from "@/utils/trading-core";
 
 // 사이클 관리 클래스 내보내기
 export { CycleManager } from "./cycle";

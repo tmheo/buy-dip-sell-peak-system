@@ -1,5 +1,5 @@
 /**
- * order.ts 단위 테스트
+ * trading-core.ts 단위 테스트
  * SPEC-BACKTEST-001 REQ-002, REQ-003, REQ-004, REQ-005
  */
 import { describe, it, expect } from "vitest";
@@ -11,7 +11,7 @@ import {
   calculateBuyQuantity,
   shouldExecuteBuy,
   shouldExecuteSell,
-} from "../order";
+} from "@/utils/trading-core";
 
 describe("floorToDecimal", () => {
   it("소수점 2자리로 내림해야 한다", () => {

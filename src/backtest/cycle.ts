@@ -5,7 +5,7 @@
 import Decimal from "decimal.js";
 import type { StrategyConfig, TierState } from "./types";
 import { BASE_TIER_COUNT, RESERVE_TIER_NUMBER, MIN_TIER_NUMBER } from "./types";
-import { calculateSellLimitPrice } from "./order";
+import { calculateSellLimitPrice } from "@/utils/trading-core";
 
 /**
  * 사이클 관리 클래스
