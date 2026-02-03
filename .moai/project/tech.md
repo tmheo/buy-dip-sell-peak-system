@@ -18,9 +18,9 @@
 │  │  (Type-safe ORM)    │  │   (Data Source)     │              │
 │  └─────────────────────┘  └─────────────────────┘              │
 │  ┌─────────────────────┐  ┌─────────────────────┐              │
-│  │     Supabase        │  │   better-sqlite3    │              │
-│  │   (PostgreSQL)      │  │      v11.7.0        │              │
-│  │   (Production)      │  │  (Local Dev)        │              │
+│  │ Supabase Cloud      │  │  Supabase Local     │              │
+│  │   (PostgreSQL)      │  │    (Docker)         │              │
+│  │   (Production)      │  │  (Development)      │              │
 │  └─────────────────────┘  └─────────────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
 ┌─────────────────────────────────────────────────────────────────┐
@@ -261,20 +261,26 @@
 | Connection Pooling | 연결 풀링으로 성능 최적화 |
 | Row Level Security | 데이터 보안 (선택적) |
 
-### better-sqlite3 v11.7.0 (로컬 개발용)
+### Supabase Local (개발 환경)
 
 **선택 이유:**
-- **성능**: 동기식 API로 Node.js에서 가장 빠른 SQLite 드라이버
-- **개발 편의성**: 로컬 개발 환경에서 빠른 테스트
-- **네이티브 바인딩**: 직접 SQLite 라이브러리 호출
+- **프로덕션 일관성**: 프로덕션과 동일한 PostgreSQL 환경에서 개발
+- **Docker 기반**: 간편한 로컬 환경 설정 및 정리
+- **Studio 포함**: localhost:54323에서 DB GUI 제공
 
 **주요 기능 활용:**
 
 | 기능 | 구현 | 설명 |
 |------|------|------|
-| WAL 모드 | `db.pragma("journal_mode = WAL")` | 동시 읽기 성능 향상 |
-| 트랜잭션 | `db.transaction()` | 대량 삽입 시 원자성 보장 |
-| Prepared Statements | `db.prepare()` | SQL 인젝션 방지 |
+| PostgreSQL | localhost:54322 | 로컬 PostgreSQL 인스턴스 |
+| Studio | localhost:54323 | 데이터베이스 GUI |
+| API | localhost:54321 | Supabase API 엔드포인트 |
+
+**로컬 환경 시작:**
+```bash
+npm run supabase:start   # Supabase Local 시작
+npm run supabase:stop    # Supabase Local 종료
+```
 
 ### yahoo-finance2 v3.11.2
 

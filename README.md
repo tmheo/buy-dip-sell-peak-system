@@ -172,11 +172,14 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 
 | 페이지 | 경로 | 설명 |
 |--------|------|------|
+| Home | `/` | 홈페이지 (/info 리다이렉트) |
 | Info | `/info` | 서비스 소개 및 전략 설명 |
 | Backtest | `/backtest` | 백테스트 결과 시각화 |
 | Recommend | `/recommend` | 전략 추천 분석 |
 | Backtest Recommend | `/backtest-recommend` | 추천 전략 백테스트 |
-| Trading | `/trading` | 트레이딩 계좌 목록 |
+| Trading List | `/trading` | 트레이딩 계좌 목록 |
+| Trading Detail | `/trading/[accountId]` | 계좌 상세 (보유현황, 주문, 수익) |
+| Trading New | `/trading/new` | 새 계좌 생성 |
 | MyPage | `/mypage` | 프로필 및 회원 탈퇴 |
 
 ### REST API 엔드포인트
@@ -187,10 +190,11 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 | POST | `/api/recommend` | 전략 추천 | 필요 |
 | POST | `/api/backtest-recommend` | 추천 전략 백테스트 | 필요 |
 | DELETE | `/api/user/delete` | 회원 탈퇴 | 필요 |
-| GET/POST | `/api/trading/accounts` | 계좌 CRUD | 필요 |
+| GET/POST | `/api/trading/accounts` | 계좌 목록 조회/생성 | 필요 |
+| GET/PUT/DELETE | `/api/trading/accounts/[id]` | 계좌 상세 조회/수정/삭제 | 필요 |
 | GET | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 | 필요 |
 | GET/POST | `/api/trading/accounts/[id]/orders` | 당일 주문 | 필요 |
-| GET | `/api/trading/accounts/[id]/profits` | 수익 현황 | 필요 |
+| GET | `/api/trading/accounts/[id]/profits` | 수익 현황 (월별) | 필요 |
 
 ---
 
@@ -204,11 +208,11 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 | 레이어 | 구성요소 | 역할 |
 |--------|----------|------|
 | 외부 시스템 | Yahoo Finance, Google OAuth | 데이터 소스, 인증 제공 |
-| 프론트엔드 | Next.js 15 페이지 5개 | 사용자 인터페이스 |
-| API | REST 엔드포인트 3개 | 비즈니스 로직 접근점 |
+| 프론트엔드 | Next.js 15 페이지 9개 | 사용자 인터페이스 |
+| API | REST 엔드포인트 10개 | 비즈니스 로직 접근점 |
 | 비즈니스 로직 | 백테스트/추천 엔진 | 핵심 알고리즘 |
 | 서비스 | DataFetcher, MetricsCalculator | 데이터 수집/가공 |
-| 데이터 | SQLite 테이블 4종 | 영속성 |
+| 데이터 | PostgreSQL(Drizzle ORM) 테이블 9종 | 영속성 |
 
 </details>
 
@@ -226,7 +230,7 @@ src/
 │   ├── index.ts                     # TypeScript 인터페이스 (DailyPrice, QueryOptions, Command)
 │   └── trading.ts                   # 트레이딩 타입 정의 (계좌, 티어, 주문, 전략 상수)
 ├── database/
-│   ├── db.ts                        # Drizzle ORM PostgreSQL 클라이언트 (Supabase 연결)
+│   ├── db-drizzle.ts                # Drizzle ORM PostgreSQL 클라이언트 (Supabase 연결)
 │   ├── schema/                      # Drizzle ORM 스키마 정의
 │   │   ├── index.ts                 # 스키마 통합 export
 │   │   ├── auth.ts                  # 인증 테이블 (users, accounts, sessions)
@@ -236,6 +240,7 @@ src/
 │   ├── prices.ts                    # 가격 데이터 CRUD (Drizzle ORM)
 │   ├── metrics.ts                   # 기술지표 CRUD (Drizzle ORM)
 │   ├── recommend-cache.ts           # 추천 캐시 CRUD (Drizzle ORM)
+│   ├── users.ts                     # 사용자 데이터 접근 (Drizzle ORM)
 │   └── trading.ts                   # 트레이딩 CRUD 및 주문 생성/체결 로직
 ├── services/
 │   ├── dataFetcher.ts               # Yahoo Finance API 연동 (재시도 로직 포함)

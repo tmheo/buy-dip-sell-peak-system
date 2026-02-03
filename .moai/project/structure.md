@@ -50,14 +50,16 @@ buy-dip-sell-peak-system/
 │   │   └── trading/                  # 트레이딩 컴포넌트
 │   ├── database/                     # 데이터베이스 모듈
 │   │   ├── schema/                   # Drizzle ORM 스키마
+│   │   │   ├── index.ts              # 스키마 통합 export
 │   │   │   ├── auth.ts               # 인증 테이블 (users, accounts, sessions)
 │   │   │   ├── cache.ts              # 추천 캐시 테이블
 │   │   │   ├── prices.ts             # 가격 데이터 테이블
 │   │   │   └── trading.ts            # 트레이딩 테이블
-│   │   ├── db-drizzle.ts             # Drizzle 클라이언트
-│   │   ├── index.ts                  # 가격 데이터 CRUD
+│   │   ├── db-drizzle.ts             # Drizzle 클라이언트 (PostgreSQL 연결)
+│   │   ├── prices.ts                 # 가격 데이터 CRUD
 │   │   ├── metrics.ts                # 기술적 지표 CRUD
 │   │   ├── recommend-cache.ts        # 추천 캐시 CRUD
+│   │   ├── users.ts                  # 사용자 데이터 접근
 │   │   └── trading.ts                # 트레이딩 CRUD
 │   ├── services/                     # 외부 서비스 연동
 │   │   ├── dataFetcher.ts            # Yahoo Finance API
@@ -73,8 +75,8 @@ buy-dip-sell-peak-system/
 │   │   └── trading-core.ts           # 트레이딩 코어 로직
 │   └── styles/
 │       └── globals.css               # 글로벌 스타일
-├── data/                             # 로컬 데이터 저장 디렉토리
-│   └── prices.db                     # SQLite 데이터베이스 (로컬 개발용)
+├── data/                             # 로컬 데이터 저장 디렉토리 (레거시)
+│   └── prices.db                     # SQLite 데이터베이스 (deprecated, Supabase로 마이그레이션됨)
 ├── dist/                             # 컴파일된 JavaScript 출력
 ├── node_modules/                     # npm 패키지 의존성
 ├── .moai/                            # MoAI 프로젝트 설정
@@ -118,9 +120,9 @@ Pro1/Pro2/Pro3 전략 기반의 백테스트 시뮬레이션 로직입니다.
 
 기술적 지표 기반 유사 구간 분석 및 전략 점수 계산 모듈입니다.
 
-### `data/` - 로컬 데이터 저장소
+### `data/` - 로컬 데이터 저장소 (레거시)
 
-SQLite 데이터베이스 파일(`prices.db`)이 저장되는 디렉토리입니다. 로컬 개발 환경에서 사용됩니다.
+SQLite 데이터베이스 파일(`prices.db`)이 저장되는 디렉토리입니다. 현재는 Supabase PostgreSQL로 완전 마이그레이션되어 더 이상 사용되지 않습니다. 로컬 개발 환경에서도 Supabase Local(Docker)을 사용합니다.
 
 ### `dist/` - 빌드 출력
 
@@ -231,15 +233,16 @@ PostgreSQL 데이터베이스 테이블 스키마를 Drizzle ORM으로 정의합
 Supabase PostgreSQL 연결을 관리하는 Drizzle ORM 클라이언트입니다.
 
 **주요 기능:**
-- Supabase PostgreSQL 연결 관리
+- Supabase PostgreSQL 연결 관리 (개발: localhost:54322, 프로덕션: Supabase Cloud)
+- Connection Pooler 지원 (프로덕션 환경)
 - 트랜잭션 지원
 - 타입 안전한 쿼리 빌더
 
 ---
 
-### `src/database/index.ts` - 가격 데이터 모듈
+### `src/database/prices.ts` - 가격 데이터 모듈
 
-가격 데이터 CRUD 작업을 담당합니다.
+가격 데이터 CRUD 작업을 담당합니다. Drizzle ORM을 사용한 타입 안전한 쿼리 구현.
 
 **주요 함수:**
 
@@ -414,8 +417,9 @@ const TICKER_CONFIG = {
 │  │  - recommendation_cache: 추천 캐시                       │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │            SQLite (Local Development)                    │    │
-│  │  - data/prices.db                                        │    │
+│  │          Supabase Local (Development - Docker)           │    │
+│  │  - PostgreSQL: localhost:54322                           │    │
+│  │  - Studio: localhost:54323                               │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -453,11 +457,11 @@ Yahoo Finance API
 │   (PostgreSQL)   │     (트랜잭션 처리)
 └──────────────────┘
        │
-       │ SQL INSERT
+       │ SQL INSERT/UPSERT
        ▼
 ┌──────────────────┐
 │    Supabase      │ ◄── UNIQUE 제약 (중복 방지)
-│   PostgreSQL     │     ON CONFLICT DO UPDATE
+│   PostgreSQL     │     onConflictDoUpdate
 └──────────────────┘
 ```
 
@@ -490,38 +494,46 @@ Yahoo Finance API
 
 ```
 src/components/
-├── auth/                             # 인증 컴포넌트
-│   └── SignInButton.tsx              # 로그인 버튼
-├── backtest/                         # 백테스트 결과 시각화
+├── auth/                             # 인증 컴포넌트 (2개)
+│   ├── LoginButton.tsx               # 로그인 버튼
+│   └── LogoutButton.tsx              # 로그아웃 버튼
+├── backtest/                         # 백테스트 결과 시각화 (3개)
 │   ├── PriceChart.tsx                # 가격 차트 (종가 + MA20/MA60)
 │   ├── MetricsCharts.tsx             # 6개 기술적 지표 차트
 │   └── ProResultCard.tsx             # Pro 전략 결과 카드
-├── backtest-recommend/               # 추천 백테스트 컴포넌트
+├── backtest-recommend/               # 추천 백테스트 컴포넌트 (5개)
+│   ├── AssetMddChart.tsx             # 자산/MDD 차트
+│   ├── CycleStrategyTable.tsx        # 사이클별 전략 테이블
+│   ├── DailyHistoryTable.tsx         # 일별 히스토리 테이블
 │   ├── RecommendResultCard.tsx       # 추천 백테스트 결과 카드
-│   └── StrategyUsageChart.tsx        # 전략 사용 통계 차트
-├── mypage/                           # 마이페이지 컴포넌트
+│   └── StrategySummaryCards.tsx      # 전략 요약 카드
+├── mypage/                           # 마이페이지 컴포넌트 (2개)
 │   ├── UserProfile.tsx               # 사용자 프로필 카드
 │   └── DeleteAccountModal.tsx        # 회원 탈퇴 확인 모달
-├── recommend/                        # 전략 추천 컴포넌트
-│   ├── RecommendForm.tsx             # 추천 요청 폼
-│   ├── RecommendResult.tsx           # 추천 결과 표시
-│   └── SimilarityTable.tsx           # 유사 구간 테이블
-├── trading/                          # 트레이딩 컴포넌트
+├── recommend/                        # 전략 추천 컴포넌트 (4개)
+│   ├── RecommendationCard.tsx        # 추천 결과 카드
+│   ├── ReferenceChart.tsx            # 기준일 차트
+│   ├── SimilarPeriodCard.tsx         # 유사 구간 카드
+│   └── StrategyScoreTable.tsx        # 전략 점수 테이블
+├── trading/                          # 트레이딩 컴포넌트 (9개)
 │   ├── AccountForm.tsx               # 계좌 생성/수정 폼
 │   ├── AccountListTable.tsx          # 계좌 목록 테이블
 │   ├── AccountSettingsCard.tsx       # 계좌 설정 카드
 │   ├── AssetSummary.tsx              # 자산 요약 카드
 │   ├── DailyOrdersTable.tsx          # 당일 주문표 테이블
-│   ├── TierHoldingsTable.tsx         # 티어별 보유현황 테이블
+│   ├── DeleteAccountModal.tsx        # 계좌 삭제 확인 모달
 │   ├── InvestmentRatioBar.tsx        # 투자 비율 막대 그래프
-│   └── DeleteAccountModal.tsx        # 계좌 삭제 확인 모달
-├── TopControlBar.tsx                 # 상단 컨트롤 바
+│   ├── ProfitStatusTable.tsx         # 수익 현황 테이블
+│   └── TierHoldingsTable.tsx         # 티어별 보유현황 테이블
+├── FlowChart.tsx                     # 사용법 플로우차트
 ├── MainNavigation.tsx                # 메인 네비게이션
+├── PremiumModal.tsx                  # 프리미엄 모달
 ├── Sidebar.tsx                       # 우측 사이드바
 ├── StrategyCard.tsx                  # 전략 카드
-├── FlowChart.tsx                     # 사용법 플로우차트
-└── PremiumModal.tsx                  # 프리미엄 모달
+└── TopControlBar.tsx                 # 상단 컨트롤 바
 ```
+
+총 31개 컴포넌트 파일.
 
 ### 컴포넌트 설명
 
@@ -529,16 +541,22 @@ src/components/
 |----------|--------|------|
 | TopControlBar | `TopControlBar.tsx` | 상단 사용자 네비게이션 |
 | MainNavigation | `MainNavigation.tsx` | 메인 메뉴 (로고 + 메뉴 링크) |
-| Sidebar | `Sidebar.tsx` | 우측 최근 주가 패널 |
+| Sidebar | `Sidebar.tsx` | 우측 최근 주가 패널 (SOXL/TQQQ DB 연동) |
 | StrategyCard | `StrategyCard.tsx` | Pro1/Pro2/Pro3 전략 카드 |
 | FlowChart | `FlowChart.tsx` | 사용법 5단계 플로우차트 |
 | PremiumModal | `PremiumModal.tsx` | 프리미엄 기능 안내 모달 |
+| LoginButton | `auth/LoginButton.tsx` | Google OAuth 로그인 버튼 |
+| LogoutButton | `auth/LogoutButton.tsx` | 로그아웃 버튼 |
 | UserProfile | `mypage/UserProfile.tsx` | 사용자 프로필 카드 |
-| RecommendForm | `recommend/RecommendForm.tsx` | 전략 추천 요청 폼 |
-| RecommendResult | `recommend/RecommendResult.tsx` | 추천 결과 및 점수 표시 |
+| DeleteAccountModal | `mypage/DeleteAccountModal.tsx` | 회원 탈퇴 확인 모달 |
+| RecommendationCard | `recommend/RecommendationCard.tsx` | 추천 결과 카드 |
+| ReferenceChart | `recommend/ReferenceChart.tsx` | 기준일 차트 |
+| SimilarPeriodCard | `recommend/SimilarPeriodCard.tsx` | 유사 구간 카드 |
+| StrategyScoreTable | `recommend/StrategyScoreTable.tsx` | 전략 점수 테이블 |
 | AccountForm | `trading/AccountForm.tsx` | 계좌 생성/수정 폼 |
 | TierHoldingsTable | `trading/TierHoldingsTable.tsx` | 티어별 보유현황 테이블 |
 | DailyOrdersTable | `trading/DailyOrdersTable.tsx` | 당일 주문표 테이블 |
+| ProfitStatusTable | `trading/ProfitStatusTable.tsx` | 수익 현황 테이블 |
 
 ---
 
@@ -574,13 +592,13 @@ src/components/
 |--------|------|------|
 | POST | `/api/trading/accounts` | 계좌 생성 |
 | GET | `/api/trading/accounts` | 계좌 목록 조회 |
-| GET | `/api/trading/accounts/[id]` | 계좌 상세 조회 |
-| PUT | `/api/trading/accounts/[id]` | 계좌 수정 |
+| GET | `/api/trading/accounts/[id]` | 계좌 상세 조회 (holdings 포함) |
+| PUT | `/api/trading/accounts/[id]` | 계좌 설정 수정 (사이클 미진행 시만) |
 | DELETE | `/api/trading/accounts/[id]` | 계좌 삭제 |
 | GET | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 조회 |
-| PUT | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 수정 |
 | GET | `/api/trading/accounts/[id]/orders` | 당일 주문 조회 |
 | POST | `/api/trading/accounts/[id]/orders` | 주문 생성 |
+| GET | `/api/trading/accounts/[id]/profits` | 수익 현황 조회 (월별 그룹화) |
 
 ### 사용자 API
 
