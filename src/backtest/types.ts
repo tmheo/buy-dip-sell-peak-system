@@ -4,6 +4,8 @@
  * SPEC-METRICS-001 기술적 지표
  */
 
+import type { Strategy } from "@/types/trading";
+
 // ============================================================
 // 상수 정의
 // ============================================================
@@ -26,8 +28,10 @@ export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
 
 /**
  * 전략 이름 타입
+ * @deprecated Strategy 타입을 직접 사용하세요 (@/types/trading)
+ * 하위 호환성을 위해 Strategy의 alias로 유지됩니다.
  */
-export type StrategyName = "Pro1" | "Pro2" | "Pro3";
+export type StrategyName = Strategy;
 
 /**
  * 전략별 테마 색상
