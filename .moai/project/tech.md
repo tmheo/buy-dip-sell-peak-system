@@ -366,6 +366,35 @@ npm run supabase:stop    # Supabase Local 종료
 npx tsx src/index.ts init --ticker SOXL
 ```
 
+#### 추가 개발 도구
+
+**@ast-grep/cli v0.40.5**
+
+**역할:** AST 기반 코드 검색 및 변환
+
+**특징:**
+- 구조적 코드 패턴 검색
+- 정규식보다 정확한 코드 매칭
+- 리팩토링 자동화 지원
+
+**dotenv-cli v11.0.0**
+
+**역할:** 환경 변수 파일 로드하여 스크립트 실행
+
+**특징:**
+- npm scripts에서 환경 변수 주입
+- 다중 .env 파일 지원
+- 개발/프로덕션 환경 분리
+
+**sharp v0.34.5 + png-to-ico v3.0.1**
+
+**역할:** 이미지 처리 및 파비콘 생성
+
+**특징:**
+- 고성능 이미지 변환
+- PNG에서 ICO 포맷 변환
+- favicon 자동 생성 스크립트 지원
+
 #### Husky v9.1.7 + lint-staged v16.2.7
 
 **역할:** Git 커밋 전 자동 코드 검사

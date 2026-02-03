@@ -220,8 +220,12 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 
 ```
 scripts/
+├── generate-favicon.mjs             # 파비콘 생성 스크립트
+├── multi-year-baseline.ts           # 다년 베이스라인 계산 스크립트
+├── multi-year-finetune.ts           # 다년 파인튜닝 스크립트
+├── multi-year-optimize.ts           # 다년 최적화 스크립트
 ├── precompute-recommendations.ts    # 추천 전략 사전 계산 스크립트
-└── migrate-sqlite-to-postgres.ts    # SQLite → Supabase 데이터 마이그레이션
+└── test-recommend-backtest.ts       # 추천 백테스트 테스트 스크립트
 
 src/
 ├── index.ts                         # CLI 진입점 - 8개 명령어 핸들링

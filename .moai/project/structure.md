@@ -4,6 +4,13 @@
 
 ```
 buy-dip-sell-peak-system/
+├── scripts/                          # 유틸리티 스크립트
+│   ├── generate-favicon.mjs          # 파비콘 생성 스크립트
+│   ├── multi-year-baseline.ts        # 다년 베이스라인 계산
+│   ├── multi-year-finetune.ts        # 다년 파인튜닝 최적화
+│   ├── multi-year-optimize.ts        # 다년 파라미터 최적화
+│   ├── precompute-recommendations.ts # 추천 캐시 사전 계산
+│   └── test-recommend-backtest.ts    # 추천 백테스트 테스트
 ├── src/                              # 소스 코드 디렉토리
 │   ├── index.ts                      # CLI 진입점 및 명령어 라우터
 │   ├── app/                          # Next.js App Router 페이지
@@ -95,6 +102,19 @@ buy-dip-sell-peak-system/
 ---
 
 ## 디렉토리별 설명
+
+### `scripts/` - 유틸리티 스크립트
+
+독립 실행 가능한 유틸리티 스크립트 모음입니다.
+
+| 스크립트 | 설명 |
+|----------|------|
+| `generate-favicon.mjs` | sharp 및 png-to-ico를 사용한 파비콘 생성 |
+| `multi-year-baseline.ts` | 유사도 파라미터의 다년 베이스라인 성과 계산 |
+| `multi-year-finetune.ts` | 다년 데이터 기반 파라미터 파인튜닝 |
+| `multi-year-optimize.ts` | 유사도 가중치/허용오차 최적화 |
+| `precompute-recommendations.ts` | 모든 날짜의 추천 전략 사전 계산 |
+| `test-recommend-backtest.ts` | 추천 백테스트 엔진 검증 테스트 |
 
 ### `src/` - 소스 코드
 
