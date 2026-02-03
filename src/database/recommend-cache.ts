@@ -3,12 +3,18 @@
  * - getCachedRecommendation: 캐시된 추천 조회
  * - cacheRecommendation: 추천 결과 캐시 저장
  * - bulkSaveRecommendations: 추천 결과 일괄 저장
+ * - getRecommendationFromCache: 레거시 호환성 alias
+ * - saveRecommendationToCache: 레거시 호환성 래퍼
+ * - getRecommendationCacheCount: 캐시 카운트 조회
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { db } from "./db-drizzle";
 import { recommendationCache } from "./schema/index";
 import type { RecommendationCache, NewRecommendationCache } from "./schema/index";
+
+// Re-export 타입
+export type { RecommendationCache, NewRecommendationCache };
 
 /**
  * 캐시에서 특정 날짜의 추천 조회
@@ -69,4 +75,127 @@ export async function bulkSaveRecommendations(items: NewRecommendationCache[]): 
   }
 
   return items.length;
+}
+
+// =====================================================
+// 레거시 호환성 래퍼 함수 및 타입 (SQLite → Drizzle 마이그레이션)
+// =====================================================
+
+/** 레거시 RecommendationCacheRow 타입 (호환성) */
+export interface RecommendationCacheRow {
+  ticker: string;
+  date: string;
+  strategy: string;
+  reason: string | null;
+  rsi14: number | null;
+  isGoldenCross: boolean;
+  maSlope: number | null;
+  disparity: number | null;
+  roc12: number | null;
+  volatility20: number | null;
+  goldenCross: number | null;
+}
+
+/** 레거시 RecommendationCacheItem 인터페이스 (벌크 저장용) */
+export interface RecommendationCacheItem {
+  ticker: string;
+  date: string;
+  strategy: string;
+  reason: string | null;
+  metrics: {
+    rsi14?: number;
+    isGoldenCross?: boolean;
+    maSlope?: number;
+    disparity?: number;
+    roc12?: number;
+    volatility20?: number;
+    goldenCross?: number;
+  };
+}
+
+/**
+ * 캐시에서 특정 날짜의 추천 조회 (레거시 호환성 alias)
+ * @param ticker - 조회할 티커
+ * @param date - 조회할 날짜 (YYYY-MM-DD)
+ * @returns 캐시된 추천 데이터 또는 null
+ */
+export const getRecommendationFromCache = getCachedRecommendation;
+
+/**
+ * 추천 결과를 캐시에 저장 (레거시 호환성 래퍼)
+ * @param ticker - 티커
+ * @param date - 날짜
+ * @param strategy - 전략명
+ * @param reason - 추천 사유
+ * @param metrics - 기술적 지표
+ */
+export async function saveRecommendationToCache(
+  ticker: string,
+  date: string,
+  strategy: string,
+  reason: string | null,
+  metrics: {
+    rsi14?: number;
+    isGoldenCross?: boolean;
+    maSlope?: number;
+    disparity?: number;
+    roc12?: number;
+    volatility20?: number;
+    goldenCross?: number;
+  }
+): Promise<void> {
+  await cacheRecommendation({
+    ticker,
+    date,
+    strategy,
+    reason,
+    rsi14: metrics.rsi14 ?? null,
+    isGoldenCross: metrics.isGoldenCross ?? false,
+    maSlope: metrics.maSlope ?? null,
+    disparity: metrics.disparity ?? null,
+    roc12: metrics.roc12 ?? null,
+    volatility20: metrics.volatility20 ?? null,
+    goldenCross: metrics.goldenCross ?? null,
+  });
+}
+
+/**
+ * 레거시 RecommendationCacheItem을 NewRecommendationCache로 변환하여 벌크 저장
+ * @param items - 레거시 형식의 추천 데이터 배열
+ * @returns 저장된 항목 수
+ */
+export async function bulkSaveRecommendationsLegacy(
+  items: RecommendationCacheItem[]
+): Promise<number> {
+  if (items.length === 0) return 0;
+
+  const convertedItems: NewRecommendationCache[] = items.map((item) => ({
+    ticker: item.ticker,
+    date: item.date,
+    strategy: item.strategy,
+    reason: item.reason,
+    rsi14: item.metrics.rsi14 ?? null,
+    isGoldenCross: item.metrics.isGoldenCross ?? false,
+    maSlope: item.metrics.maSlope ?? null,
+    disparity: item.metrics.disparity ?? null,
+    roc12: item.metrics.roc12 ?? null,
+    volatility20: item.metrics.volatility20 ?? null,
+    goldenCross: item.metrics.goldenCross ?? null,
+  }));
+
+  return bulkSaveRecommendations(convertedItems);
+}
+
+/**
+ * 특정 티커의 캐시된 추천 데이터 수 조회
+ * @param ticker - 조회할 티커 (기본값: SOXL)
+ * @returns 레코드 수
+ */
+export async function getRecommendationCacheCount(ticker: string = "SOXL"): Promise<number> {
+  const rows = await db
+    .select({ count: count() })
+    .from(recommendationCache)
+    .where(eq(recommendationCache.ticker, ticker));
+
+  return Number(rows[0]?.count ?? 0);
 }

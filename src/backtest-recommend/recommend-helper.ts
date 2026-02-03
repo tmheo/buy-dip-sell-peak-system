@@ -5,11 +5,8 @@
 import type { DailyPrice } from "@/types";
 import type { StrategyName, TechnicalMetrics } from "@/backtest/types";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
-import {
-  getMetricsByDateRange,
-  getRecommendationFromCache,
-  saveRecommendationToCache,
-} from "@/database";
+import { getMetricsByDateRange } from "@/database/metrics";
+import { getRecommendationFromCache, saveRecommendationToCache } from "@/database/recommend-cache";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -74,13 +71,13 @@ function createDefaultMetrics(): TechnicalMetrics {
  * @param options - 옵션 (persistToDb: DB 캐시 저장 여부, 기본값 true)
  * @returns 추천 전략 정보 또는 null (데이터 부족 시)
  */
-export function getQuickRecommendation(
+export async function getQuickRecommendation(
   ticker: "SOXL" | "TQQQ",
   referenceDate: string,
   allPrices: DailyPrice[],
   dateToIndexMap: Map<string, number>,
   options: QuickRecommendationOptions = {}
-): QuickRecommendResult | null {
+): Promise<QuickRecommendResult | null> {
   const { persistToDb = true, skipDbCache = false } = options;
   // 0. 메모이제이션 캐시 확인 (skipDbCache가 true면 건너뜀)
   const cacheKey = `${ticker}:${referenceDate}`;
@@ -93,14 +90,14 @@ export function getQuickRecommendation(
 
   // 0-1. DB 캐시 확인 (skipDbCache가 true면 건너뜀)
   if (!skipDbCache) {
-    const dbCached = getRecommendationFromCache(ticker, referenceDate);
+    const dbCached = await getRecommendationFromCache(ticker, referenceDate);
     if (dbCached) {
       const result: QuickRecommendResult = {
         strategy: dbCached.strategy as StrategyName,
         reason: dbCached.reason ?? "캐시된 추천",
         metrics: {
           goldenCross: dbCached.goldenCross ?? 0,
-          isGoldenCross: dbCached.isGoldenCross,
+          isGoldenCross: dbCached.isGoldenCross ?? false,
           maSlope: dbCached.maSlope ?? 0,
           disparity: dbCached.disparity ?? 0,
           rsi14: dbCached.rsi14 ?? 50,
@@ -151,7 +148,7 @@ export function getQuickRecommendation(
   // 5. DB에서 지표 조회 (최적화 경로)
   const lookbackDateStr = "2010-01-01";
   const maxHistoricalDate = allPrices[maxHistoricalIndex].date;
-  const metricsFromDb = getMetricsByDateRange(
+  const metricsFromDb = await getMetricsByDateRange(
     { startDate: lookbackDateStr, endDate: maxHistoricalDate },
     ticker
   );
@@ -176,7 +173,7 @@ export function getQuickRecommendation(
       dateIndex,
       metrics: {
         goldenCross: metricRow.goldenCross ?? 0,
-        isGoldenCross: metricRow.isGoldenCross,
+        isGoldenCross: metricRow.isGoldenCross ?? false,
         maSlope: metricRow.maSlope,
         disparity: metricRow.disparity,
         rsi14: metricRow.rsi14,
@@ -306,7 +303,7 @@ export function getQuickRecommendation(
 
   // DB 캐시에 저장 (persistToDb가 true일 때만)
   if (persistToDb) {
-    saveRecommendationToCache(
+    await saveRecommendationToCache(
       ticker,
       referenceDate,
       result.strategy,

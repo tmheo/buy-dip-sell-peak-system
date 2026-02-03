@@ -5,6 +5,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    env: {
+      // 로컬 Supabase DATABASE_URL (supabase start 필요)
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

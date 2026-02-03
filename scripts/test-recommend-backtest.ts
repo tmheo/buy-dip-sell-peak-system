@@ -6,6 +6,8 @@ import { RecommendBacktestEngine } from "../src/backtest-recommend/engine";
 import type { RecommendBacktestRequest } from "../src/backtest-recommend/types";
 import Decimal from "decimal.js";
 
+import type { DailyPrice } from "../src/types";
+
 async function main() {
   const ticker = "SOXL" as const;
   const startDate = "2025-01-01";
@@ -17,8 +19,8 @@ async function main() {
   console.log(`초기 자본: $${initialCapital}\n`);
 
   // 가격 데이터 로드
-  const priceData = loadPriceData(ticker);
-  const allPrices = priceData.prices;
+  const priceData = await loadPriceData(ticker);
+  const allPrices: DailyPrice[] = priceData.prices;
 
   if (allPrices.length === 0) {
     throw new Error(`No price data for ${ticker}`);
@@ -56,7 +58,7 @@ async function main() {
   };
 
   // 백테스트 실행
-  const result = engine.run(request, backtestStartIndex);
+  const result = await engine.run(request, backtestStartIndex);
 
   // 결과 출력
   const formatPercent = (v: number) => new Decimal(v).mul(100).toDecimalPlaces(2).toNumber() + "%";

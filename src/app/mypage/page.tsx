@@ -5,7 +5,7 @@
 import type React from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getUserById } from "@/lib/auth/queries";
+import { getUserById } from "@/database/users";
 import MyPageClient from "./_client";
 
 export default async function MyPage(): Promise<React.ReactElement> {
@@ -15,7 +15,7 @@ export default async function MyPage(): Promise<React.ReactElement> {
     redirect("/");
   }
 
-  const user = getUserById(session.user.id);
+  const user = await getUserById(session.user.id);
 
   if (!user) {
     redirect("/");
@@ -24,7 +24,7 @@ export default async function MyPage(): Promise<React.ReactElement> {
   return (
     <MyPageClient
       name={user.name}
-      email={user.email}
+      email={user.email ?? ""}
       image={user.image}
       createdAt={(user.createdAt ?? new Date()).toISOString()}
     />

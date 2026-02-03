@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getPricesByDateRange } from "@/database";
+import { getPricesByDateRange } from "@/database/prices";
 import { RecommendBacktestEngine } from "@/backtest-recommend";
 import type { RecommendBacktestRequest } from "@/backtest-recommend";
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
     // 전체 데이터 조회 (추천 lookback + 백테스트 기간)
     // 추천 시스템이 과거 유사 구간을 검색하기 위해 2010년부터 데이터 필요
-    const allPrices = getPricesByDateRange(
+    const allPrices = await getPricesByDateRange(
       {
         startDate: RECOMMEND_LOOKBACK_START,
         endDate: validatedRequest.endDate,

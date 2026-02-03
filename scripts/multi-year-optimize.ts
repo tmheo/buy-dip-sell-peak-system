@@ -84,10 +84,10 @@ function formatScore(score: number): string {
 /**
  * 5개년 백테스트 실행 및 통합 점수 계산
  */
-function runMultiYearBacktest(
+async function runMultiYearBacktest(
   params: SimilarityParams | null,
   priceData: PriceDataResult
-): MultiYearResult {
+): Promise<MultiYearResult> {
   const yearResults: YearResult[] = [];
   let totalStrategyScore = 0;
   let totalReturnRate = 0;
@@ -109,7 +109,7 @@ function runMultiYearBacktest(
       topCandidates: 3,
     };
 
-    const result = runBacktestWithParams(config, params, priceData);
+    const result = await runBacktestWithParams(config, params, priceData);
 
     yearResults.push({
       year: yearInfo.year,
@@ -163,12 +163,12 @@ async function main(): Promise<void> {
 
   // 1. 가격 데이터 로드
   logProgress("SOXL 가격 데이터 로드 중...");
-  const priceData = loadPriceData("SOXL");
+  const priceData = await loadPriceData("SOXL");
   logProgress(`가격 데이터 로드 완료: ${priceData.prices.length}개 일자`);
 
   // 2. 베이스라인 (현재 파라미터)
   logProgress("베이스라인 (현재 파라미터) 측정 중...");
-  const baseline = runMultiYearBacktest(null, priceData);
+  const baseline = await runMultiYearBacktest(null, priceData);
   logProgress(
     `베이스라인: 통합점수=${formatScore(baseline.combinedScore)}, ` +
       `평균수익률=${formatPercent(baseline.avgReturnRate)}, 평균MDD=${formatPercent(baseline.avgMdd)}`
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
 
   const randomResults: MultiYearResult[] = [];
   for (let i = 0; i < randomParams.length; i++) {
-    const result = runMultiYearBacktest(randomParams[i], priceData);
+    const result = await runMultiYearBacktest(randomParams[i], priceData);
     randomResults.push(result);
 
     if ((i + 1) % 10 === 0) {
@@ -205,7 +205,7 @@ async function main(): Promise<void> {
     const variations = generateVariations(candidate.params, VARIATIONS_PER_TOP);
 
     for (let i = 0; i < variations.length; i++) {
-      const result = runMultiYearBacktest(variations[i], priceData);
+      const result = await runMultiYearBacktest(variations[i], priceData);
       variationResults.push(result);
 
       if ((i + 1) % 10 === 0) {

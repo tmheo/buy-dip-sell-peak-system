@@ -5,7 +5,7 @@
 import Decimal from "decimal.js";
 
 import type { DailyPrice } from "@/types";
-import { getAllPricesByTicker } from "@/database";
+import { getAllPricesByTicker } from "@/database/prices";
 import { setGlobalSimilarityParams, resetGlobalSimilarityParams } from "@/recommend/similarity";
 import { RecommendBacktestEngine, clearRecommendationCache } from "@/backtest-recommend";
 
@@ -18,8 +18,8 @@ export interface PriceDataResult {
 }
 
 /** 데이터베이스에서 티커의 전체 가격 데이터 로드 */
-export function loadPriceData(ticker: "SOXL" | "TQQQ"): PriceDataResult {
-  const prices = getAllPricesByTicker(ticker);
+export async function loadPriceData(ticker: "SOXL" | "TQQQ"): Promise<PriceDataResult> {
+  const prices = await getAllPricesByTicker(ticker);
   const dateToIndexMap = new Map<string, number>();
 
   for (let i = 0; i < prices.length; i++) {
@@ -44,14 +44,15 @@ export function calculateStrategyScore(returnRate: number, mdd: number): number 
 /**
  * 커스텀 유사도 파라미터로 백테스트 실행
  * params가 null이면 기본 파라미터(베이스라인)로 실행
+ * 주의: priceData는 필수 파라미터입니다. loadPriceData()로 미리 로드하세요.
  */
-export function runBacktestWithParams(
+export async function runBacktestWithParams(
   config: OptimizationConfig,
   params: SimilarityParams | null,
-  priceData?: PriceDataResult
-): BacktestMetrics {
+  priceData: PriceDataResult
+): Promise<BacktestMetrics> {
   const { ticker, startDate, endDate, initialCapital } = config;
-  const { prices, dateToIndexMap } = priceData ?? loadPriceData(ticker);
+  const { prices, dateToIndexMap } = priceData;
 
   const startIndex = dateToIndexMap.get(startDate);
   if (startIndex === undefined) {
@@ -81,7 +82,7 @@ export function runBacktestWithParams(
       skipDbCache: params !== null,
     });
 
-    const result = engine.run({ ticker, startDate, endDate, initialCapital }, startIndex);
+    const result = await engine.run({ ticker, startDate, endDate, initialCapital }, startIndex);
     const strategyScore = calculateStrategyScore(result.returnRate, result.mdd);
 
     return {

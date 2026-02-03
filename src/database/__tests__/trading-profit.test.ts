@@ -5,6 +5,9 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
+import { db } from "../db-drizzle";
+import { users } from "../schema/auth";
 
 // Test user IDs
 const TEST_USER_ID = randomUUID();
@@ -17,6 +20,15 @@ describe("Profit Records DB Functions", () => {
   let testAccountId: string;
 
   beforeAll(async () => {
+    // 테스트용 사용자 생성 (foreign key 제약조건 충족)
+    await db
+      .insert(users)
+      .values({
+        id: TEST_USER_ID,
+        email: `profit-test-${TEST_USER_ID}@test.com`,
+      })
+      .onConflictDoNothing();
+
     // Import trading module (uses Drizzle ORM)
     tradingModule = await import("../trading");
 
@@ -36,6 +48,9 @@ describe("Profit Records DB Functions", () => {
     if (testAccountId) {
       await tradingModule.deleteTradingAccount(testAccountId, TEST_USER_ID);
     }
+
+    // 테스트용 사용자 삭제
+    await db.delete(users).where(eq(users.id, TEST_USER_ID));
   });
 
   describe("createProfitRecord", () => {

@@ -13,23 +13,26 @@ vi.mock("@/auth", () => ({
 
 vi.mock("@/lib/auth/api-auth", () => ({
   requireAuth: vi.fn().mockResolvedValue({ user: { id: "test-user" } }),
-  isUnauthorized: vi.fn().mockReturnValue(false),
+  // isUnauthorized는 타입 가드 함수이므로 실제 구현 사용
+  isUnauthorized: (result: unknown) => result instanceof Response,
 }));
 
 // Mock 데이터베이스 함수
-vi.mock("@/database", () => ({
+vi.mock("@/database/prices", () => ({
   getPricesByDateRange: vi.fn(),
 }));
 
-import { getPricesByDateRange } from "@/database";
+import { getPricesByDateRange } from "@/database/prices";
 
-// Mock 가격 데이터 생성
+// Mock 가격 데이터 생성 (Drizzle 반환 타입과 호환)
 function createMockPrices(count: number, startPrice: number = 100): DailyPrice[] {
   const prices: DailyPrice[] = [];
   let price = startPrice;
   for (let i = 0; i < count; i++) {
     const day = i + 2;
     prices.push({
+      id: i + 1,
+      ticker: "SOXL",
       date: `2025-01-${day.toString().padStart(2, "0")}`,
       open: price,
       high: price + 1,
@@ -37,6 +40,7 @@ function createMockPrices(count: number, startPrice: number = 100): DailyPrice[]
       close: price,
       adjClose: price,
       volume: 1000000,
+      createdAt: null,
     });
     // 약간의 변동 추가
     price = price * (1 + (Math.random() * 0.02 - 0.01));
@@ -56,7 +60,8 @@ describe("POST /api/backtest", () => {
   describe("유효한 요청", () => {
     it("성공적인 백테스트 결과를 반환해야 한다", async () => {
       const mockPrices = createMockPrices(10, 100);
-      vi.mocked(getPricesByDateRange).mockReturnValue(mockPrices);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(getPricesByDateRange).mockResolvedValue(mockPrices as any);
 
       const request = new Request("http://localhost/api/backtest", {
         method: "POST",
@@ -82,7 +87,8 @@ describe("POST /api/backtest", () => {
 
     it("응답에 필수 필드가 포함되어야 한다", async () => {
       const mockPrices = createMockPrices(10, 100);
-      vi.mocked(getPricesByDateRange).mockReturnValue(mockPrices);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(getPricesByDateRange).mockResolvedValue(mockPrices as any);
 
       const request = new Request("http://localhost/api/backtest", {
         method: "POST",
@@ -221,7 +227,7 @@ describe("POST /api/backtest", () => {
     });
 
     it("가격 데이터가 부족하면 400 에러를 반환해야 한다", async () => {
-      vi.mocked(getPricesByDateRange).mockReturnValue([]);
+      vi.mocked(getPricesByDateRange).mockResolvedValue([]);
 
       const request = new Request("http://localhost/api/backtest", {
         method: "POST",

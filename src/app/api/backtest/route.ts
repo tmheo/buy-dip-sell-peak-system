@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getPricesByDateRange } from "@/database";
+import { getPricesByDateRange } from "@/database/prices";
 import { BacktestEngine } from "@/backtest";
 import type { BacktestRequest, StrategyName } from "@/backtest";
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     const lookbackDateStr = lookbackDate.toISOString().slice(0, 10);
 
     // 전체 데이터 조회 (과거 데이터 + 백테스트 기간)
-    const allPrices = getPricesByDateRange(
+    const allPrices = await getPricesByDateRange(
       {
         startDate: lookbackDateStr,
         endDate: validatedRequest.endDate,

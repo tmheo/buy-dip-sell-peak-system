@@ -17,7 +17,10 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
 import type { CreateTradingAccountRequest } from "@/types/trading";
+import { db } from "../db-drizzle";
+import { users } from "../schema/auth";
 
 // 테스트 유저 ID
 const TEST_USER_ID = randomUUID();
@@ -34,6 +37,15 @@ const createdAccountIds: string[] = [];
 
 describe("트레이딩 계좌 CRUD 테스트", () => {
   beforeAll(async () => {
+    // 테스트용 사용자 생성 (foreign key 제약조건 충족)
+    await db
+      .insert(users)
+      .values([
+        { id: TEST_USER_ID, email: `test-${TEST_USER_ID}@test.com` },
+        { id: OTHER_USER_ID, email: `other-${OTHER_USER_ID}@test.com` },
+      ])
+      .onConflictDoNothing();
+
     // trading 모듈을 동적으로 import
     tradingModule = await import("../trading");
   });
@@ -52,6 +64,10 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         // 이미 삭제된 계좌는 무시
       }
     }
+
+    // 테스트용 사용자 삭제 (CASCADE로 연관 데이터 자동 삭제)
+    await db.delete(users).where(eq(users.id, TEST_USER_ID));
+    await db.delete(users).where(eq(users.id, OTHER_USER_ID));
   });
 
   describe("createTradingAccount()", () => {

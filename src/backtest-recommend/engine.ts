@@ -76,7 +76,10 @@ export class RecommendBacktestEngine {
   /**
    * 추천 전략 백테스트 실행
    */
-  run(request: RecommendBacktestRequest, backtestStartIndex: number): RecommendBacktestResult {
+  async run(
+    request: RecommendBacktestRequest,
+    backtestStartIndex: number
+  ): Promise<RecommendBacktestResult> {
     const { initialCapital, startDate, endDate } = request;
     const prices = this.allPrices;
 
@@ -91,7 +94,7 @@ export class RecommendBacktestEngine {
     const initialRecommendDateIndex = backtestStartIndex - 1;
     const initialRecommend =
       initialRecommendDateIndex >= 0
-        ? getQuickRecommendation(
+        ? await getQuickRecommendation(
             this.ticker,
             prices[initialRecommendDateIndex].date,
             this.allPrices,
@@ -179,7 +182,7 @@ export class RecommendBacktestEngine {
         currentCycleInfo.mdd = cycleMdd;
 
         // 새 전략 추천 받기 (전일 종가 기준)
-        const newRecommend = getQuickRecommendation(
+        const newRecommend = await getQuickRecommendation(
           this.ticker,
           prevPrice.date,
           this.allPrices,
@@ -226,7 +229,7 @@ export class RecommendBacktestEngine {
       // 첫 매수 전까지 매일 전략 재평가 (전일 종가 기준)
       // (사이클이 시작되었지만 아직 첫 매수가 일어나지 않은 경우)
       if (!cycleManager.hasTradedThisCycle()) {
-        const todayRecommend = getQuickRecommendation(
+        const todayRecommend = await getQuickRecommendation(
           this.ticker,
           prevPrice.date,
           this.allPrices,

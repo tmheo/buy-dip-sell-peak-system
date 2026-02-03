@@ -5,11 +5,37 @@
  * TC-06: 커스텀 파라미터가 베이스라인과 다른 결과를 생성하는지 검증
  * TC-07: 전략 점수가 올바르게 계산되는지 검증
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import Decimal from "decimal.js";
 
-import { calculateStrategyScore, loadPriceData, runBacktestWithParams } from "../backtest-runner";
+import {
+  calculateStrategyScore,
+  loadPriceData,
+  runBacktestWithParams,
+  type PriceDataResult,
+} from "../backtest-runner";
 import type { OptimizationConfig, SimilarityParams } from "../types";
+
+// 테스트용 가격 데이터 캐시
+let soxlPriceData: PriceDataResult;
+let tqqqPriceData: PriceDataResult;
+
+// 테스트 설정 (거래일 기준 날짜 사용)
+const testConfig: OptimizationConfig = {
+  ticker: "SOXL",
+  startDate: "2024-01-02",
+  endDate: "2024-03-28", // 2024-03-29는 공휴일 (Good Friday)
+  initialCapital: 10000000,
+  randomCombinations: 50,
+  variationsPerTop: 10,
+  topCandidates: 3,
+};
+
+// 테스트 전 가격 데이터 로드
+beforeAll(async () => {
+  soxlPriceData = await loadPriceData("SOXL");
+  tqqqPriceData = await loadPriceData("TQQQ");
+});
 
 // ============================================================
 // TC-07: 전략 점수 계산 테스트
@@ -95,43 +121,37 @@ describe("calculateStrategyScore", () => {
 
 describe("loadPriceData", () => {
   it("SOXL 가격 데이터를 로드해야 한다", () => {
-    const result = loadPriceData("SOXL");
-
     // prices 배열 존재 확인
-    expect(result.prices).toBeDefined();
-    expect(Array.isArray(result.prices)).toBe(true);
+    expect(soxlPriceData.prices).toBeDefined();
+    expect(Array.isArray(soxlPriceData.prices)).toBe(true);
 
     // dateToIndexMap 존재 확인
-    expect(result.dateToIndexMap).toBeDefined();
-    expect(result.dateToIndexMap instanceof Map).toBe(true);
+    expect(soxlPriceData.dateToIndexMap).toBeDefined();
+    expect(soxlPriceData.dateToIndexMap instanceof Map).toBe(true);
 
     // 데이터가 있으면 매핑 검증
-    if (result.prices.length > 0) {
-      const firstDate = result.prices[0].date;
-      expect(result.dateToIndexMap.get(firstDate)).toBe(0);
+    if (soxlPriceData.prices.length > 0) {
+      const firstDate = soxlPriceData.prices[0].date;
+      expect(soxlPriceData.dateToIndexMap.get(firstDate)).toBe(0);
 
-      const lastIndex = result.prices.length - 1;
-      const lastDate = result.prices[lastIndex].date;
-      expect(result.dateToIndexMap.get(lastDate)).toBe(lastIndex);
+      const lastIndex = soxlPriceData.prices.length - 1;
+      const lastDate = soxlPriceData.prices[lastIndex].date;
+      expect(soxlPriceData.dateToIndexMap.get(lastDate)).toBe(lastIndex);
     }
   });
 
   it("TQQQ 가격 데이터를 로드해야 한다", () => {
-    const result = loadPriceData("TQQQ");
-
-    expect(result.prices).toBeDefined();
-    expect(result.dateToIndexMap).toBeDefined();
+    expect(tqqqPriceData.prices).toBeDefined();
+    expect(tqqqPriceData.dateToIndexMap).toBeDefined();
   });
 
   it("날짜-인덱스 맵이 O(1) 조회를 지원해야 한다", () => {
-    const result = loadPriceData("SOXL");
-
-    if (result.prices.length > 0) {
-      const randomIndex = Math.floor(result.prices.length / 2);
-      const date = result.prices[randomIndex].date;
+    if (soxlPriceData.prices.length > 0) {
+      const randomIndex = Math.floor(soxlPriceData.prices.length / 2);
+      const date = soxlPriceData.prices[randomIndex].date;
 
       // Map.get은 O(1)
-      const index = result.dateToIndexMap.get(date);
+      const index = soxlPriceData.dateToIndexMap.get(date);
       expect(index).toBe(randomIndex);
     }
   });
@@ -143,19 +163,8 @@ describe("loadPriceData", () => {
 // ============================================================
 
 describe("runBacktestWithParams", () => {
-  // 테스트 설정 (거래일 기준 날짜 사용)
-  const testConfig: OptimizationConfig = {
-    ticker: "SOXL",
-    startDate: "2024-01-02",
-    endDate: "2024-03-28", // 2024-03-29는 공휴일 (Good Friday)
-    initialCapital: 10000000,
-    randomCombinations: 50,
-    variationsPerTop: 10,
-    topCandidates: 3,
-  };
-
-  it("베이스라인(null params)으로 백테스트를 실행해야 한다", () => {
-    const result = runBacktestWithParams(testConfig, null);
+  it("베이스라인(null params)으로 백테스트를 실행해야 한다", async () => {
+    const result = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
     // 결과 구조 검증
     expect(result).toHaveProperty("returnRate");
@@ -175,14 +184,14 @@ describe("runBacktestWithParams", () => {
     );
   });
 
-  it("커스텀 파라미터로 백테스트를 실행해야 한다", { timeout: 30000 }, () => {
+  it("커스텀 파라미터로 백테스트를 실행해야 한다", { timeout: 30000 }, async () => {
     // 기본값과 다른 파라미터
     const customParams: SimilarityParams = {
       weights: [0.3, 0.45, 0.08, 0.05, 0.12],
       tolerances: [42, 85, 5.2, 35, 32],
     };
 
-    const result = runBacktestWithParams(testConfig, customParams);
+    const result = await runBacktestWithParams(testConfig, customParams, soxlPriceData);
 
     // 결과 구조 검증
     expect(result).toHaveProperty("returnRate");
@@ -190,48 +199,52 @@ describe("runBacktestWithParams", () => {
     expect(result).toHaveProperty("strategyScore");
   });
 
-  it("TC-06: 커스텀 파라미터가 베이스라인과 다른 결과를 생성해야 한다", { timeout: 30000 }, () => {
-    // 1. 베이스라인 실행
-    const baseline = runBacktestWithParams(testConfig, null);
+  it(
+    "TC-06: 커스텀 파라미터가 베이스라인과 다른 결과를 생성해야 한다",
+    { timeout: 30000 },
+    async () => {
+      // 1. 베이스라인 실행
+      const baseline = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
-    // 2. 크게 다른 커스텀 파라미터
-    // 기본값: weights [0.35, 0.4, 0.05, 0.07, 0.13]
-    // 기본값: tolerances [36, 90, 4.5, 40, 28]
-    const customParams: SimilarityParams = {
-      weights: [0.1, 0.1, 0.3, 0.3, 0.2], // 매우 다른 분배
-      tolerances: [80, 50, 15, 80, 60], // 매우 다른 허용오차
-    };
+      // 2. 크게 다른 커스텀 파라미터
+      // 기본값: weights [0.35, 0.4, 0.05, 0.07, 0.13]
+      // 기본값: tolerances [36, 90, 4.5, 40, 28]
+      const customParams: SimilarityParams = {
+        weights: [0.1, 0.1, 0.3, 0.3, 0.2], // 매우 다른 분배
+        tolerances: [80, 50, 15, 80, 60], // 매우 다른 허용오차
+      };
 
-    const custom = runBacktestWithParams(testConfig, customParams);
+      const custom = await runBacktestWithParams(testConfig, customParams, soxlPriceData);
 
-    // 전략 점수가 다름을 검증
-    // (유사도 파라미터가 다르면 전략 추천이 달라지고 결과도 달라짐)
-    // 참고: 동일한 전략이 추천될 수도 있으나, 파라미터 변경의 영향이 있음
-    console.log("Baseline score:", baseline.strategyScore);
-    console.log("Custom score:", custom.strategyScore);
+      // 전략 점수가 다름을 검증
+      // (유사도 파라미터가 다르면 전략 추천이 달라지고 결과도 달라짐)
+      // 참고: 동일한 전략이 추천될 수도 있으나, 파라미터 변경의 영향이 있음
+      console.log("Baseline score:", baseline.strategyScore);
+      console.log("Custom score:", custom.strategyScore);
 
-    // 두 결과 중 하나라도 값이 다르면 테스트 통과
-    // (수익률, MDD, 전략 점수 중 하나라도 다름)
-    const isDifferent =
-      baseline.returnRate !== custom.returnRate ||
-      baseline.mdd !== custom.mdd ||
-      baseline.strategyScore !== custom.strategyScore;
+      // 두 결과 중 하나라도 값이 다르면 테스트 통과
+      // (수익률, MDD, 전략 점수 중 하나라도 다름)
+      const isDifferent =
+        baseline.returnRate !== custom.returnRate ||
+        baseline.mdd !== custom.mdd ||
+        baseline.strategyScore !== custom.strategyScore;
 
-    // 파라미터가 크게 다르면 결과도 다를 가능성이 높음
-    // 단, 특정 시장 조건에서 동일한 전략이 추천될 수 있으므로 soft check
-    if (!isDifferent) {
-      console.warn(
-        "경고: 베이스라인과 커스텀 결과가 동일함. " +
-          "이는 해당 기간에 동일한 전략이 추천되었기 때문일 수 있음."
-      );
+      // 파라미터가 크게 다르면 결과도 다를 가능성이 높음
+      // 단, 특정 시장 조건에서 동일한 전략이 추천될 수 있으므로 soft check
+      if (!isDifferent) {
+        console.warn(
+          "경고: 베이스라인과 커스텀 결과가 동일함. " +
+            "이는 해당 기간에 동일한 전략이 추천되었기 때문일 수 있음."
+        );
+      }
+
+      // 최소한 결과 구조는 유효해야 함
+      expect(baseline.strategyScore).toBeDefined();
+      expect(custom.strategyScore).toBeDefined();
     }
+  );
 
-    // 최소한 결과 구조는 유효해야 함
-    expect(baseline.strategyScore).toBeDefined();
-    expect(custom.strategyScore).toBeDefined();
-  });
-
-  it("try-finally로 항상 파라미터를 복원해야 한다", { timeout: 60000 }, () => {
+  it("try-finally로 항상 파라미터를 복원해야 한다", { timeout: 60000 }, async () => {
     // 커스텀 파라미터로 실행 후 기본값 복원 확인
     // (내부 구현 상세를 직접 테스트하기 어려우므로, 연속 실행으로 간접 검증)
     const customParams: SimilarityParams = {
@@ -240,16 +253,16 @@ describe("runBacktestWithParams", () => {
     };
 
     // 첫 번째 커스텀 실행
-    runBacktestWithParams(testConfig, customParams);
+    await runBacktestWithParams(testConfig, customParams, soxlPriceData);
 
     // 베이스라인 실행 (기본값 복원 확인)
-    const baseline1 = runBacktestWithParams(testConfig, null);
+    const baseline1 = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
     // 두 번째 커스텀 실행
-    runBacktestWithParams(testConfig, customParams);
+    await runBacktestWithParams(testConfig, customParams, soxlPriceData);
 
     // 다시 베이스라인 실행
-    const baseline2 = runBacktestWithParams(testConfig, null);
+    const baseline2 = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
     // 두 베이스라인 결과가 동일해야 함 (파라미터가 올바르게 복원됨)
     expect(baseline1.returnRate).toBe(baseline2.returnRate);
@@ -257,29 +270,27 @@ describe("runBacktestWithParams", () => {
     expect(baseline1.strategyScore).toBe(baseline2.strategyScore);
   });
 
-  it("priceData를 재사용할 수 있어야 한다", { timeout: 30000 }, () => {
+  it("priceData를 재사용할 수 있어야 한다", { timeout: 30000 }, async () => {
     // 성능 최적화: 미리 로드한 가격 데이터 재사용
-    const priceData = loadPriceData("SOXL");
-
-    const result1 = runBacktestWithParams(testConfig, null, priceData);
-    const result2 = runBacktestWithParams(testConfig, null, priceData);
+    const result1 = await runBacktestWithParams(testConfig, null, soxlPriceData);
+    const result2 = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
     // 동일한 데이터로 동일한 결과
     expect(result1.returnRate).toBe(result2.returnRate);
     expect(result1.mdd).toBe(result2.mdd);
   });
 
-  it("존재하지 않는 날짜에 대해 에러를 던져야 한다", () => {
+  it("존재하지 않는 날짜에 대해 에러를 던져야 한다", async () => {
     const invalidConfig: OptimizationConfig = {
       ...testConfig,
       startDate: "1990-01-01", // 데이터 범위 이전
     };
 
-    expect(() => runBacktestWithParams(invalidConfig, null)).toThrow();
+    await expect(runBacktestWithParams(invalidConfig, null, soxlPriceData)).rejects.toThrow();
   });
 
-  it("BacktestMetrics 인터페이스를 준수해야 한다", () => {
-    const result = runBacktestWithParams(testConfig, null);
+  it("BacktestMetrics 인터페이스를 준수해야 한다", async () => {
+    const result = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
     // 모든 필수 필드 존재
     expect(result.returnRate).toBeDefined();
@@ -308,8 +319,8 @@ describe("runBacktestWithParams", () => {
 // ============================================================
 
 describe("전략 점수 계산 통합 테스트", () => {
-  it("백테스트 결과의 전략 점수가 공식과 일치해야 한다", () => {
-    const testConfig: OptimizationConfig = {
+  it("백테스트 결과의 전략 점수가 공식과 일치해야 한다", async () => {
+    const integrationConfig: OptimizationConfig = {
       ticker: "SOXL",
       startDate: "2024-01-02",
       endDate: "2024-06-28",
@@ -319,7 +330,7 @@ describe("전략 점수 계산 통합 테스트", () => {
       topCandidates: 3,
     };
 
-    const result = runBacktestWithParams(testConfig, null);
+    const result = await runBacktestWithParams(integrationConfig, null, soxlPriceData);
 
     // 수동 계산
     const expectedScore = calculateStrategyScore(result.returnRate, result.mdd);

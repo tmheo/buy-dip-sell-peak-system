@@ -2,6 +2,8 @@
  * 일별 가격 데이터 인터페이스
  * close: 당일 종가 (원시 데이터)
  * adjClose: 수정종가 (주식분할, 배당 등 반영)
+ *
+ * NOTE: Drizzle ORM 마이그레이션 후 createdAt 타입이 Date | null로 변경됨
  */
 export interface DailyPrice {
   id?: number;
@@ -13,7 +15,7 @@ export interface DailyPrice {
   close: number;
   adjClose: number;
   volume: number;
-  createdAt?: string;
+  createdAt?: Date | string | null;
 }
 
 /**
@@ -54,6 +56,8 @@ export type Command =
 /**
  * 일별 기술적 지표 데이터 인터페이스 (SPEC-PERFORMANCE-001)
  * DB에 저장되는 사전 계산된 기술적 지표
+ *
+ * NOTE: Drizzle ORM 마이그레이션 후 createdAt 타입이 Date | null로 변경됨
  */
 export interface DailyMetricRow {
   id?: number;
@@ -67,6 +71,6 @@ export interface DailyMetricRow {
   roc12: number | null;
   volatility20: number | null;
   goldenCross: number | null;
-  isGoldenCross: boolean;
-  createdAt?: string;
+  isGoldenCross: boolean | null;
+  createdAt?: Date | string | null;
 }

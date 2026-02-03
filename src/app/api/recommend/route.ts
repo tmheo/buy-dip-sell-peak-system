@@ -9,7 +9,8 @@ import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 import { BacktestEngine, applySOXLDowngrade, checkDivergenceCondition } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import type { BacktestRequest, StrategyName } from "@/backtest/types";
-import { getPricesByDateRange, getLatestDate, getMetricsByDateRange } from "@/database";
+import { getPricesByDateRange, getLatestDate } from "@/database/prices";
+import { getMetricsByDateRange } from "@/database/metrics";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -154,7 +155,7 @@ export async function POST(request: Request): Promise<Response> {
     // 기준일 결정 (today인 경우 DB의 최신 날짜 사용)
     let referenceDate = validatedRequest.referenceDate;
     if (validatedRequest.baseType === "today") {
-      const latestDate = getLatestDate(ticker);
+      const latestDate = await getLatestDate(ticker);
       if (!latestDate) {
         return NextResponse.json(
           {
@@ -174,10 +175,10 @@ export async function POST(request: Request): Promise<Response> {
     const lookbackDateStr = "2010-01-01";
 
     // DB의 최신 날짜 조회 (기준일 이후 데이터도 포함하기 위해)
-    const latestDateInDb = getLatestDate(ticker);
+    const latestDateInDb = await getLatestDate(ticker);
 
     // 전체 가격 데이터 조회 (기준일 이후 성과 확인 구간 데이터도 포함)
-    const allPrices = getPricesByDateRange(
+    const allPrices = await getPricesByDateRange(
       {
         startDate: lookbackDateStr,
         endDate: latestDateInDb || referenceDate,
@@ -246,7 +247,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // DB에서 기술적 지표 조회 시도
-    const metricsFromDb = getMetricsByDateRange(
+    const metricsFromDb = await getMetricsByDateRange(
       { startDate: lookbackDateStr, endDate: maxHistoricalDate },
       ticker
     );
@@ -273,7 +274,7 @@ export async function POST(request: Request): Promise<Response> {
           dateIndex,
           metrics: {
             goldenCross: metricRow.goldenCross ?? 0,
-            isGoldenCross: metricRow.isGoldenCross,
+            isGoldenCross: metricRow.isGoldenCross ?? false,
             maSlope: metricRow.maSlope,
             disparity: metricRow.disparity,
             rsi14: metricRow.rsi14,
