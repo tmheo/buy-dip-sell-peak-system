@@ -6,7 +6,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  getAuthUserId,
+  unauthorizedResponse,
+  notFoundResponse,
+  validationErrorResponse,
+  serverErrorResponse,
+  type RouteParams,
+} from "@/lib/api-utils";
 import {
   getTradingAccountWithHoldings,
   updateTradingAccount,
@@ -14,26 +21,21 @@ import {
 } from "@/database/trading";
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
 
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
-
 /**
  * GET /api/trading/accounts/[id]
  * 특정 계좌 상세 조회 (holdings 포함)
  */
 export async function GET(_request: Request, { params }: RouteParams): Promise<NextResponse> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
   }
 
   const { id } = await params;
-  const account = await getTradingAccountWithHoldings(id, session.user.id);
+  const account = await getTradingAccountWithHoldings(id, userId);
 
   if (!account) {
-    return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    return notFoundResponse("Account");
   }
 
   return NextResponse.json({ account });
@@ -44,10 +46,9 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
  * 계좌 설정 수정 (사이클 미진행 시만)
  */
 export async function PUT(request: Request, { params }: RouteParams): Promise<NextResponse> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
   }
 
   try {
@@ -61,16 +62,13 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
     const parsed = UpdateTradingAccountSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten() },
-        { status: 400 }
-      );
+      return validationErrorResponse(parsed.error.flatten());
     }
 
-    const account = await updateTradingAccount(id, session.user.id, parsed.data);
+    const account = await updateTradingAccount(id, userId, parsed.data);
 
     if (!account) {
-      return NextResponse.json({ error: "Account not found" }, { status: 404 });
+      return notFoundResponse("Account");
     }
 
     return NextResponse.json({ account });
@@ -83,7 +81,7 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
     }
 
     console.error("Failed to update trading account:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return serverErrorResponse();
   }
 }
 
@@ -92,17 +90,16 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
  * 계좌 삭제
  */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
   }
 
   const { id } = await params;
-  const deleted = await deleteTradingAccount(id, session.user.id);
+  const deleted = await deleteTradingAccount(id, userId);
 
   if (!deleted) {
-    return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    return notFoundResponse("Account");
   }
 
   return NextResponse.json({ success: true });

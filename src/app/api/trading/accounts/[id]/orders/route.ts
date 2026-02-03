@@ -5,7 +5,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  getAuthUserId,
+  unauthorizedResponse,
+  notFoundResponse,
+  type RouteParams,
+} from "@/lib/api-utils";
 import {
   getTradingAccountById,
   getTierHoldings,
@@ -16,10 +21,6 @@ import {
   processHistoricalOrders,
 } from "@/database/trading";
 
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
-
 /**
  * GET /api/trading/accounts/[id]/orders
  * 당일 주문표 조회
@@ -28,18 +29,17 @@ interface RouteParams {
  *   - regenerate: true면 기존 주문 삭제 후 재생성
  */
 export async function GET(request: Request, { params }: RouteParams): Promise<NextResponse> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
   }
 
   const { id } = await params;
 
   // 본인 계좌 확인
-  const account = await getTradingAccountById(id, session.user.id);
+  const account = await getTradingAccountById(id, userId);
   if (!account) {
-    return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    return notFoundResponse("Account");
   }
 
   // 날짜 파라미터 파싱
@@ -116,18 +116,17 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
  *   - date: 체결 처리할 날짜 (YYYY-MM-DD)
  */
 export async function POST(request: Request, { params }: RouteParams): Promise<NextResponse> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
   }
 
   const { id } = await params;
 
   // 본인 계좌 확인
-  const account = await getTradingAccountById(id, session.user.id);
+  const account = await getTradingAccountById(id, userId);
   if (!account) {
-    return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    return notFoundResponse("Account");
   }
 
   // Body 파싱
