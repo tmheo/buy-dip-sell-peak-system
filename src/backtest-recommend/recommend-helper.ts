@@ -5,8 +5,8 @@
 import type { DailyPrice } from "@/types";
 import type { StrategyName, TechnicalMetrics } from "@/backtest/types";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
-import { getMetricsByDateRange } from "@/database/metrics";
-import { getRecommendationFromCache, saveRecommendationToCache } from "@/database/recommend-cache";
+import { getMetricsRange } from "@/database/metrics";
+import { getCachedRecommendation, cacheRecommendation } from "@/database/recommend-cache";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -90,7 +90,7 @@ export async function getQuickRecommendation(
 
   // 0-1. DB 캐시 확인 (skipDbCache가 true면 건너뜀)
   if (!skipDbCache) {
-    const dbCached = await getRecommendationFromCache(ticker, referenceDate);
+    const dbCached = await getCachedRecommendation(ticker, referenceDate);
     if (dbCached) {
       const result: QuickRecommendResult = {
         strategy: dbCached.strategy as StrategyName,
@@ -148,10 +148,7 @@ export async function getQuickRecommendation(
   // 5. DB에서 지표 조회 (최적화 경로)
   const lookbackDateStr = "2010-01-01";
   const maxHistoricalDate = allPrices[maxHistoricalIndex].date;
-  const metricsFromDb = await getMetricsByDateRange(
-    { startDate: lookbackDateStr, endDate: maxHistoricalDate },
-    ticker
-  );
+  const metricsFromDb = await getMetricsRange(ticker, lookbackDateStr, maxHistoricalDate);
 
   // HistoricalMetrics 배열로 변환
   const historicalMetrics: HistoricalMetrics[] = [];
@@ -303,13 +300,19 @@ export async function getQuickRecommendation(
 
   // DB 캐시에 저장 (persistToDb가 true일 때만)
   if (persistToDb) {
-    await saveRecommendationToCache(
+    await cacheRecommendation({
       ticker,
-      referenceDate,
-      result.strategy,
-      result.reason,
-      result.metrics
-    );
+      date: referenceDate,
+      strategy: result.strategy,
+      reason: result.reason,
+      rsi14: result.metrics.rsi14 ?? null,
+      isGoldenCross: result.metrics.isGoldenCross ?? false,
+      maSlope: result.metrics.maSlope ?? null,
+      disparity: result.metrics.disparity ?? null,
+      roc12: result.metrics.roc12 ?? null,
+      volatility20: result.metrics.volatility20 ?? null,
+      goldenCross: result.metrics.goldenCross ?? null,
+    });
   }
 
   return result;

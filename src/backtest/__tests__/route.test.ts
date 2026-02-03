@@ -19,10 +19,10 @@ vi.mock("@/lib/auth/api-auth", () => ({
 
 // Mock 데이터베이스 함수
 vi.mock("@/database/prices", () => ({
-  getPricesByDateRange: vi.fn(),
+  getPriceRange: vi.fn(),
 }));
 
-import { getPricesByDateRange } from "@/database/prices";
+import { getPriceRange } from "@/database/prices";
 
 // Mock 가격 데이터 생성 (Drizzle 반환 타입과 호환)
 function createMockPrices(count: number, startPrice: number = 100): DailyPrice[] {
@@ -61,7 +61,7 @@ describe("POST /api/backtest", () => {
     it("성공적인 백테스트 결과를 반환해야 한다", async () => {
       const mockPrices = createMockPrices(10, 100);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getPricesByDateRange).mockResolvedValue(mockPrices as any);
+      vi.mocked(getPriceRange).mockResolvedValue(mockPrices as any);
 
       const request = new Request("http://localhost/api/backtest", {
         method: "POST",
@@ -88,7 +88,7 @@ describe("POST /api/backtest", () => {
     it("응답에 필수 필드가 포함되어야 한다", async () => {
       const mockPrices = createMockPrices(10, 100);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getPricesByDateRange).mockResolvedValue(mockPrices as any);
+      vi.mocked(getPriceRange).mockResolvedValue(mockPrices as any);
 
       const request = new Request("http://localhost/api/backtest", {
         method: "POST",
@@ -206,7 +206,7 @@ describe("POST /api/backtest", () => {
 
   describe("에러 처리", () => {
     it("데이터베이스 오류 시 500 에러를 반환해야 한다", async () => {
-      vi.mocked(getPricesByDateRange).mockImplementation(() => {
+      vi.mocked(getPriceRange).mockImplementation(() => {
         throw new Error("Database error");
       });
 
@@ -227,7 +227,7 @@ describe("POST /api/backtest", () => {
     });
 
     it("가격 데이터가 부족하면 400 에러를 반환해야 한다", async () => {
-      vi.mocked(getPricesByDateRange).mockResolvedValue([]);
+      vi.mocked(getPriceRange).mockResolvedValue([]);
 
       const request = new Request("http://localhost/api/backtest", {
         method: "POST",

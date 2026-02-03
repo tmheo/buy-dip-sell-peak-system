@@ -2,11 +2,11 @@
  * 추천 전략 사전 계산 스크립트
  * 전체 날짜에 대해 추천 전략을 계산하고 DB에 저장
  */
-import { getPricesByDateRange } from "@/database/prices";
+import { getPriceRange } from "@/database/prices";
 import {
-  bulkSaveRecommendationsLegacy,
+  bulkSaveRecommendations,
   getRecommendationCacheCount,
-  type RecommendationCacheItem,
+  type NewRecommendationCache,
 } from "@/database/recommend-cache";
 import type { DailyPrice } from "@/types";
 import { getQuickRecommendation, clearRecommendationCache } from "@/backtest-recommend";
@@ -34,10 +34,7 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
 
   // 전체 가격 데이터 로드
   const endDate = new Date().toISOString().split("T")[0];
-  const allPrices: DailyPrice[] = await getPricesByDateRange(
-    { startDate: START_DATE, endDate },
-    ticker
-  );
+  const allPrices: DailyPrice[] = await getPriceRange(ticker, START_DATE, endDate);
 
   if (allPrices.length === 0) {
     console.log(`${ticker}: 가격 데이터 없음`);
@@ -61,12 +58,12 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
   let processedCount = 0;
   let cachedCount = 0;
 
-  const cacheItems: RecommendationCacheItem[] = [];
+  const cacheItems: NewRecommendationCache[] = [];
 
   for (let i = startIndex; i < allPrices.length; i++) {
     const referenceDate = allPrices[i].date;
 
-    // 추천 계산 (DB 저장은 bulkSaveRecommendationsLegacy에서 일괄 처리하므로 persistToDb: false)
+    // 추천 계산 (DB 저장은 bulkSaveRecommendations에서 일괄 처리하므로 persistToDb: false)
     const result = await getQuickRecommendation(ticker, referenceDate, allPrices, dateToIndexMap, {
       persistToDb: false,
     });
@@ -77,13 +74,19 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
         date: referenceDate,
         strategy: result.strategy,
         reason: result.reason,
-        metrics: result.metrics,
+        rsi14: result.metrics.rsi14 ?? null,
+        isGoldenCross: result.metrics.isGoldenCross ?? false,
+        maSlope: result.metrics.maSlope ?? null,
+        disparity: result.metrics.disparity ?? null,
+        roc12: result.metrics.roc12 ?? null,
+        volatility20: result.metrics.volatility20 ?? null,
+        goldenCross: result.metrics.goldenCross ?? null,
       });
       cachedCount++;
 
       // 배치 저장
       if (cacheItems.length >= BATCH_SIZE) {
-        await bulkSaveRecommendationsLegacy(cacheItems);
+        await bulkSaveRecommendations(cacheItems);
         cacheItems.length = 0;
       }
     }
@@ -94,7 +97,7 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
 
   // 남은 데이터 저장
   if (cacheItems.length > 0) {
-    await bulkSaveRecommendationsLegacy(cacheItems);
+    await bulkSaveRecommendations(cacheItems);
   }
 
   console.log(`\n${ticker}: ${cachedCount}개 추천 결과 저장 완료`);
