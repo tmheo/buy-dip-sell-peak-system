@@ -4,6 +4,7 @@
  * - cacheRecommendation: 추천 결과 캐시 저장
  * - bulkSaveRecommendations: 추천 결과 일괄 저장
  * - getRecommendationCacheCount: 캐시 카운트 조회
+ * - toRecommendationCacheMetrics: 기술적 지표를 캐시 형식으로 변환
  */
 
 import { eq, and, count } from "drizzle-orm";
@@ -13,6 +14,42 @@ import type { RecommendationCache, NewRecommendationCache } from "./schema/index
 
 // Re-export 타입
 export type { RecommendationCache, NewRecommendationCache };
+
+/** TechnicalMetrics 인터페이스 (backtest/types.ts와 호환) */
+interface TechnicalMetricsLike {
+  rsi14?: number;
+  isGoldenCross?: boolean;
+  maSlope?: number;
+  disparity?: number;
+  roc12?: number;
+  volatility20?: number;
+  goldenCross?: number;
+}
+
+/** 캐시 저장용 지표 필드 타입 */
+export type RecommendationCacheMetrics = Pick<
+  NewRecommendationCache,
+  "rsi14" | "isGoldenCross" | "maSlope" | "disparity" | "roc12" | "volatility20" | "goldenCross"
+>;
+
+/**
+ * TechnicalMetrics를 NewRecommendationCache 형식으로 변환
+ * @param metrics - 기술적 지표 객체
+ * @returns 캐시 저장에 적합한 플랫 구조의 지표
+ */
+export function toRecommendationCacheMetrics(
+  metrics: TechnicalMetricsLike
+): RecommendationCacheMetrics {
+  return {
+    rsi14: metrics.rsi14 ?? null,
+    isGoldenCross: metrics.isGoldenCross ?? false,
+    maSlope: metrics.maSlope ?? null,
+    disparity: metrics.disparity ?? null,
+    roc12: metrics.roc12 ?? null,
+    volatility20: metrics.volatility20 ?? null,
+    goldenCross: metrics.goldenCross ?? null,
+  };
+}
 
 /**
  * 캐시에서 특정 날짜의 추천 조회

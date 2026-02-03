@@ -6,7 +6,11 @@ import type { DailyPrice } from "@/types";
 import type { StrategyName, TechnicalMetrics } from "@/backtest/types";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import { getMetricsRange } from "@/database/metrics";
-import { getCachedRecommendation, cacheRecommendation } from "@/database/recommend-cache";
+import {
+  getCachedRecommendation,
+  cacheRecommendation,
+  toRecommendationCacheMetrics,
+} from "@/database/recommend-cache";
 import {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -305,13 +309,7 @@ export async function getQuickRecommendation(
       date: referenceDate,
       strategy: result.strategy,
       reason: result.reason,
-      rsi14: result.metrics.rsi14 ?? null,
-      isGoldenCross: result.metrics.isGoldenCross ?? false,
-      maSlope: result.metrics.maSlope ?? null,
-      disparity: result.metrics.disparity ?? null,
-      roc12: result.metrics.roc12 ?? null,
-      volatility20: result.metrics.volatility20 ?? null,
-      goldenCross: result.metrics.goldenCross ?? null,
+      ...toRecommendationCacheMetrics(result.metrics),
     });
   }
 

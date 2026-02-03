@@ -6,6 +6,7 @@ import { getPriceRange } from "@/database/prices";
 import {
   bulkSaveRecommendations,
   getRecommendationCacheCount,
+  toRecommendationCacheMetrics,
   type NewRecommendationCache,
 } from "@/database/recommend-cache";
 import type { DailyPrice } from "@/types";
@@ -74,13 +75,7 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
         date: referenceDate,
         strategy: result.strategy,
         reason: result.reason,
-        rsi14: result.metrics.rsi14 ?? null,
-        isGoldenCross: result.metrics.isGoldenCross ?? false,
-        maSlope: result.metrics.maSlope ?? null,
-        disparity: result.metrics.disparity ?? null,
-        roc12: result.metrics.roc12 ?? null,
-        volatility20: result.metrics.volatility20 ?? null,
-        goldenCross: result.metrics.goldenCross ?? null,
+        ...toRecommendationCacheMetrics(result.metrics),
       });
       cachedCount++;
 
