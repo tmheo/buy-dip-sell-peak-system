@@ -19,7 +19,7 @@ export interface DivergenceResult {
 
 /** 다이버전스 탐지 옵션 */
 export interface DivergenceOptions {
-  /** 분석 윈도우 크기 (기본값: 25 거래일) */
+  /** 분석 윈도우 크기 (기본값: 20 거래일) */
   windowSize?: number;
   /** 고점 간 최소 거리 (기본값: 3 거래일) */
   minPeakDistance?: number;

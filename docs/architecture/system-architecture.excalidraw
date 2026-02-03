@@ -1944,7 +1944,7 @@
       "y": 840,
       "width": 280,
       "height": 20,
-      "text": "Data Layer (SQLite + better-sqlite3)",
+      "text": "Data Layer (PostgreSQL + Drizzle ORM)",
       "fontSize": 14,
       "fontFamily": 1,
       "textAlign": "left",

@@ -755,7 +755,7 @@
       "y": 335,
       "width": 220,
       "height": 150,
-      "text": "유사도 계산 (지수 감쇠)\n─────────────────\n공식: Σ(w × 100 × e^(-diff/tol))\n\n가중치:\n  기울기 0.35 (tol: 36)\n  이격도 0.40 (tol: 90)\n  RSI    0.05 (tol: 4.5)\n  ROC    0.07 (tol: 40)\n  변동성 0.13 (tol: 28)",
+      "text": "유사도 계산 (지수 감쇠)\n─────────────────\n공식: Σ(w × 100 × e^(-diff/tol))\n\n가중치 (Fine-tuned):\n  기울기 0.40 (tol: 18)\n  이격도 0.02 (tol: 76)\n  RSI    0.33 (tol: 12)\n  ROC    0.03 (tol: 20)\n  변동성 0.22 (tol: 48)",
       "fontSize": 11,
       "fontFamily": 1,
       "textAlign": "left",
@@ -772,7 +772,7 @@
       "isDeleted": false,
       "boundElements": null,
       "containerId": "note-similarity",
-      "originalText": "유사도 계산 (지수 감쇠)\n─────────────────\n공식: Σ(w × 100 × e^(-diff/tol))\n\n가중치:\n  기울기 0.35 (tol: 36)\n  이격도 0.40 (tol: 90)\n  RSI    0.05 (tol: 4.5)\n  ROC    0.07 (tol: 40)\n  변동성 0.13 (tol: 28)"
+      "originalText": "유사도 계산 (지수 감쇠)\n─────────────────\n공식: Σ(w × 100 × e^(-diff/tol))\n\n가중치 (Fine-tuned):\n  기울기 0.40 (tol: 18)\n  이격도 0.02 (tol: 76)\n  RSI    0.33 (tol: 12)\n  ROC    0.03 (tol: 20)\n  변동성 0.22 (tol: 48)"
     },
     {
       "id": "note-filter",
@@ -967,7 +967,7 @@
       "isDeleted": false,
       "boundElements": null,
       "containerId": "note-divergence",
-      "originalText": "RSI 다이버전스 정의\n─────────────────\n• 분석 윈도우: 25 거래일\n• RSI >= 60인 고점만 비교\n• 가격: 최근 >= 이전 (허용 -1%)\n• RSI: 최근 < 이전 (하락)"
+      "originalText": "RSI 다이버전스 정의\n─────────────────\n• 분석 윈도우: 20 거래일\n• RSI >= 60인 고점만 비교\n• 가격: 최근 >= 이전 (허용 -1%)\n• RSI: 최근 < 이전 (하락)"
     }
   ],
   "appState": {
