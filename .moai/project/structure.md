@@ -34,11 +34,11 @@ buy-dip-sell-peak-system/
 │   │   ├── engine.ts                 # 백테스트 엔진
 │   │   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
 │   │   ├── cycle.ts                  # 사이클 관리자
-│   │   ├── order.ts                  # 주문 계산 로직
 │   │   ├── metrics.ts                # 기술적 지표 계산
 │   │   ├── divergence.ts             # RSI 다이버전스 탐지
 │   │   ├── downgrade.ts              # 전략 하향 규칙
-│   │   └── trading-utils.ts          # 거래 유틸리티
+│   │   ├── trading-utils.ts          # 거래 유틸리티
+│   │   └── index.ts                  # 모듈 엔트리포인트
 │   ├── backtest-recommend/           # 추천 백테스트 엔진
 │   │   ├── engine.ts                 # 추천 백테스트 엔진
 │   │   ├── recommend-helper.ts       # 빠른 추천 조회 헬퍼
@@ -62,23 +62,36 @@ buy-dip-sell-peak-system/
 │   │   │   ├── cache.ts              # 추천 캐시 테이블
 │   │   │   ├── prices.ts             # 가격 데이터 테이블
 │   │   │   └── trading.ts            # 트레이딩 테이블
+│   │   ├── trading/                  # 트레이딩 모듈 (모듈화)
+│   │   │   ├── index.ts              # 모듈 통합 export
+│   │   │   ├── accounts.ts           # 계좌 CRUD
+│   │   │   ├── execution.ts          # 주문 실행 로직
+│   │   │   ├── mappers.ts            # Drizzle 타입 매퍼
+│   │   │   ├── orders.ts             # 주문 CRUD
+│   │   │   ├── profits.ts            # 수익 기록 CRUD
+│   │   │   └── tier-holdings.ts      # 티어 보유현황 CRUD
 │   │   ├── db-drizzle.ts             # Drizzle 클라이언트 (PostgreSQL 연결)
 │   │   ├── prices.ts                 # 가격 데이터 CRUD
 │   │   ├── metrics.ts                # 기술적 지표 CRUD
 │   │   ├── recommend-cache.ts        # 추천 캐시 CRUD
 │   │   ├── users.ts                  # 사용자 데이터 접근
-│   │   └── trading.ts                # 트레이딩 CRUD
+│   │   └── trading.ts                # 트레이딩 통합 (레거시 호환)
 │   ├── services/                     # 외부 서비스 연동
 │   │   ├── dataFetcher.ts            # Yahoo Finance API
 │   │   └── metricsCalculator.ts      # 기술적 지표 계산
 │   ├── lib/                          # 유틸리티 및 공통 모듈
 │   │   ├── auth/                     # 인증 관련 모듈
+│   │   │   └── api-auth.ts           # API 인증 유틸리티
 │   │   ├── validations/              # Zod 스키마
+│   │   │   └── trading.ts            # 트레이딩 입력값 검증 스키마
+│   │   ├── api-utils.ts              # API 라우트 공통 유틸리티
 │   │   └── date.ts                   # 날짜 유틸리티
 │   ├── types/                        # TypeScript 타입 정의
 │   │   ├── index.ts                  # 기본 타입
+│   │   ├── auth.ts                   # Auth.js 인증 타입
 │   │   └── trading.ts                # 트레이딩 타입
 │   ├── utils/                        # 유틸리티 함수
+│   │   ├── index.ts                  # 유틸리티 모듈 인덱스
 │   │   └── trading-core.ts           # 트레이딩 코어 로직
 │   └── styles/
 │       └── globals.css               # 글로벌 스타일
@@ -127,6 +140,20 @@ Next.js 15 App Router 기반의 페이지 및 API 라우트입니다.
 ### `src/database/` - 데이터베이스 레이어
 
 Drizzle ORM을 사용한 데이터베이스 스키마 정의 및 CRUD 작업을 담당합니다.
+
+### `src/database/trading/` - 트레이딩 모듈 (모듈화)
+
+트레이딩 관련 CRUD 및 비즈니스 로직을 담당하는 모듈화된 디렉토리입니다.
+
+| 파일 | 설명 |
+|------|------|
+| `index.ts` | 모듈 통합 export (하위 호환성 유지) |
+| `accounts.ts` | 트레이딩 계좌 CRUD |
+| `execution.ts` | 주문 실행 로직 (체결 처리, 사이클 완료) |
+| `mappers.ts` | Drizzle 결과를 도메인 타입으로 변환 |
+| `orders.ts` | 일일 주문 CRUD 및 주문 생성 로직 |
+| `profits.ts` | 수익 기록 CRUD 및 월별 집계 |
+| `tier-holdings.ts` | 티어별 보유현황 CRUD |
 
 ### `src/backtest/` - 백테스트 엔진
 
@@ -419,11 +446,16 @@ const TICKER_CONFIG = {
 │  ┌──────────────────────┐  ┌──────────────────────┐            │
 │  │ src/database/        │  │ src/database/schema/ │            │
 │  │  - db-drizzle.ts     │  │  - auth.ts           │            │
-│  │  - index.ts          │  │  - prices.ts         │            │
+│  │  - prices.ts         │  │  - prices.ts         │            │
 │  │  - metrics.ts        │  │  - trading.ts        │            │
 │  │  - trading.ts        │  │  - cache.ts          │            │
 │  │  - recommend-cache.ts│  │                      │            │
 │  └──────────────────────┘  └──────────────────────┘            │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ src/database/trading/ (모듈화)                            │  │
+│  │  - accounts.ts, execution.ts, orders.ts                  │  │
+│  │  - profits.ts, tier-holdings.ts, mappers.ts              │  │
+│  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼

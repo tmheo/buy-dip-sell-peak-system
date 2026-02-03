@@ -232,6 +232,7 @@ src/
 ├── auth.ts                          # NextAuth.js 설정 (providers, adapter)
 ├── types/
 │   ├── index.ts                     # TypeScript 인터페이스 (DailyPrice, QueryOptions, Command)
+│   ├── auth.ts                      # Auth.js 인증 타입 정의 (AuthUser, AuthAccount, Session)
 │   └── trading.ts                   # 트레이딩 타입 정의 (계좌, 티어, 주문, 전략 상수)
 ├── database/
 │   ├── db-drizzle.ts                # Drizzle ORM PostgreSQL 클라이언트 (Supabase 연결)
@@ -241,11 +242,19 @@ src/
 │   │   ├── prices.ts                # 가격 테이블 (daily_prices, daily_metrics)
 │   │   ├── trading.ts               # 트레이딩 테이블 (accounts, holdings, orders)
 │   │   └── cache.ts                 # 캐시 테이블 (recommendation_cache)
+│   ├── trading/                     # 트레이딩 모듈 (모듈화)
+│   │   ├── index.ts                 # 모듈 통합 export
+│   │   ├── accounts.ts              # 계좌 CRUD
+│   │   ├── execution.ts             # 주문 실행 로직
+│   │   ├── mappers.ts               # Drizzle 타입 매퍼
+│   │   ├── orders.ts                # 주문 CRUD
+│   │   ├── profits.ts               # 수익 기록 CRUD
+│   │   └── tier-holdings.ts         # 티어 보유현황 CRUD
 │   ├── prices.ts                    # 가격 데이터 CRUD (Drizzle ORM)
 │   ├── metrics.ts                   # 기술지표 CRUD (Drizzle ORM)
 │   ├── recommend-cache.ts           # 추천 캐시 CRUD (Drizzle ORM)
 │   ├── users.ts                     # 사용자 데이터 접근 (Drizzle ORM)
-│   └── trading.ts                   # 트레이딩 CRUD 및 주문 생성/체결 로직
+│   └── trading.ts                   # 트레이딩 통합 (레거시 호환)
 ├── services/
 │   ├── dataFetcher.ts               # Yahoo Finance API 연동 (재시도 로직 포함)
 │   └── metricsCalculator.ts         # 배치 기술적 지표 계산 (슬라이딩 윈도우 최적화)
@@ -254,7 +263,6 @@ src/
 │   ├── trading-utils.ts             # 공유 거래 유틸리티 (매수/매도/손절/스냅샷)
 │   ├── strategy.ts                  # 전략 매개변수 정의 (Pro1/Pro2/Pro3)
 │   ├── cycle.ts                     # 사이클 상태 관리
-│   ├── order.ts                     # LOC/MOC 주문 계산
 │   ├── metrics.ts                   # 성과 지표 계산
 │   ├── divergence.ts                # RSI 다이버전스 탐지 (베어리시 다이버전스)
 │   ├── downgrade.ts                 # SOXL 전략 하향 규칙 (Pro3→Pro2→Pro1)
@@ -278,9 +286,11 @@ src/
 │   ├── cli.ts                       # CLI 진입점
 │   └── index.ts                     # 모듈 엔트리포인트
 ├── utils/
+│   ├── index.ts                     # 유틸리티 모듈 인덱스
 │   └── trading-core.ts              # 공통 트레이딩 유틸리티 (가격 계산, 체결 판정)
 ├── lib/
 │   ├── date.ts                      # 날짜 유틸리티 함수
+│   ├── api-utils.ts                 # API 라우트 공통 유틸리티 (인증, 에러 응답)
 │   ├── auth/
 │   │   └── api-auth.ts              # API 인증 유틸리티 (requireAuth, isUnauthorized)
 │   └── validations/
