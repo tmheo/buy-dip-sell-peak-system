@@ -7,7 +7,7 @@ export default defineConfig({
     environment: "node",
     env: {
       // 로컬 Supabase DATABASE_URL (supabase start 필요)
-      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      DATABASE_URL: process.env.DATABASE_URL ?? "",
     },
     coverage: {
       provider: "v8",
