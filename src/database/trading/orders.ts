@@ -137,6 +137,7 @@ export function getNextBuyTier(holdings: TierHolding[]): number | null {
  * 당일 주문 자동 생성
  * - 티어 고정 방식: 가장 낮은 빈 티어에만 매수 주문 (한 번에 하나의 티어만)
  * - 보유 티어: 매도 주문 생성
+ * - 트랜잭션으로 삭제/생성 원자성 보장
  */
 export async function generateDailyOrders(
   accountId: string,
@@ -157,73 +158,94 @@ export async function generateDailyOrders(
   const buyThreshold = percentToThreshold(BUY_THRESHOLDS[strategy]);
   const sellThreshold = percentToThreshold(SELL_THRESHOLDS[strategy]);
   const tierRatios = TIER_RATIOS[strategy];
-
-  const orders: DailyOrder[] = [];
-
-  // 기존 주문 삭제
-  await deleteDailyOrders(accountId, date);
-
   const stopLossDay = STOP_LOSS_DAYS[strategy];
 
-  // 1. 보유 중인 티어들의 매도 주문 생성 (손절 또는 일반 매도)
-  for (const holding of holdings) {
-    if (holding.shares > 0 && holding.buyPrice && holding.buyDate) {
-      // 보유일 계산 (거래일 기준)
-      const holdingDays = calculateTradingDays(holding.buyDate, date);
+  // 트랜잭션으로 삭제 + 생성 원자성 보장
+  const orders = await db.transaction(async (tx) => {
+    const createdOrders: DailyOrder[] = [];
 
-      if (holdingDays >= stopLossDay) {
-        // 손절일 도달: MOC 주문 (시장가, 무조건 체결)
-        const order = await createDailyOrder(accountId, {
-          date,
-          tier: holding.tier,
-          type: "SELL" as OrderType,
-          orderMethod: "MOC" as OrderMethod,
-          limitPrice: closePrice, // MOC는 시장가이므로 종가로 설정
-          shares: holding.shares,
-        });
-        orders.push(order);
-      } else {
-        // 일반 매도: LOC 주문 (지정가)
-        const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
-        const order = await createDailyOrder(accountId, {
-          date,
-          tier: holding.tier,
-          type: "SELL" as OrderType,
-          orderMethod: "LOC" as OrderMethod,
-          limitPrice: sellPrice,
-          shares: holding.shares,
-        });
-        orders.push(order);
+    // 기존 주문 삭제
+    await tx
+      .delete(dailyOrders)
+      .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));
+
+    // 1. 보유 중인 티어들의 매도 주문 생성 (손절 또는 일반 매도)
+    for (const holding of holdings) {
+      if (holding.shares > 0 && holding.buyPrice && holding.buyDate) {
+        // 보유일 계산 (거래일 기준)
+        const holdingDays = calculateTradingDays(holding.buyDate, date);
+
+        if (holdingDays >= stopLossDay) {
+          // 손절일 도달: MOC 주문 (시장가, 무조건 체결)
+          const result = await tx
+            .insert(dailyOrders)
+            .values({
+              accountId,
+              date,
+              tier: holding.tier,
+              type: "SELL" as OrderType,
+              orderMethod: "MOC" as OrderMethod,
+              limitPrice: closePrice, // MOC는 시장가이므로 종가로 설정
+              shares: holding.shares,
+              executed: false,
+            })
+            .returning();
+          createdOrders.push(mapDrizzleDailyOrder(result[0]));
+        } else {
+          // 일반 매도: LOC 주문 (지정가)
+          const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
+          const result = await tx
+            .insert(dailyOrders)
+            .values({
+              accountId,
+              date,
+              tier: holding.tier,
+              type: "SELL" as OrderType,
+              orderMethod: "LOC" as OrderMethod,
+              limitPrice: sellPrice,
+              shares: holding.shares,
+              executed: false,
+            })
+            .returning();
+          createdOrders.push(mapDrizzleDailyOrder(result[0]));
+        }
       }
     }
-  }
 
-  // 2. 다음 매수할 티어 찾기 (티어 고정 방식: 가장 낮은 빈 티어)
-  const nextBuyTier = getNextBuyTier(holdings);
+    // 2. 다음 매수할 티어 찾기 (티어 고정 방식: 가장 낮은 빈 티어)
+    const nextBuyTier = getNextBuyTier(holdings);
 
-  if (nextBuyTier !== null) {
-    const tierIndex = nextBuyTier - 1;
-    // Decimal로 티어 비율 및 할당 금액 계산
-    const tierRatio = new Decimal(tierRatios[tierIndex]).div(100);
-    const allocatedSeed = new Decimal(seedCapital).mul(tierRatio).toNumber();
+    if (nextBuyTier !== null) {
+      const tierIndex = nextBuyTier - 1;
+      // Decimal로 티어 비율 및 할당 금액 계산
+      const tierRatio = new Decimal(tierRatios[tierIndex]).div(100);
+      const allocatedSeed = new Decimal(seedCapital).mul(tierRatio).toNumber();
 
-    if (allocatedSeed > 0) {
-      const buyPrice = calculateBuyLimitPrice(closePrice, buyThreshold);
-      const shares = calculateBuyQuantity(allocatedSeed, buyPrice);
+      if (allocatedSeed > 0) {
+        const buyPrice = calculateBuyLimitPrice(closePrice, buyThreshold);
+        const shares = calculateBuyQuantity(allocatedSeed, buyPrice);
 
-      if (shares > 0) {
-        const order = await createDailyOrder(accountId, {
-          date,
-          tier: nextBuyTier,
-          type: "BUY" as OrderType,
-          orderMethod: "LOC" as OrderMethod,
-          limitPrice: buyPrice,
-          shares,
-        });
-        orders.push(order);
+        if (shares > 0) {
+          const result = await tx
+            .insert(dailyOrders)
+            .values({
+              accountId,
+              date,
+              tier: nextBuyTier,
+              type: "BUY" as OrderType,
+              orderMethod: "LOC" as OrderMethod,
+              limitPrice: buyPrice,
+              shares,
+              executed: false,
+            })
+            .returning();
+          createdOrders.push(mapDrizzleDailyOrder(result[0]));
+        }
       }
     }
-  }
+
+    return createdOrders;
+  });
 
   return orders;
 }

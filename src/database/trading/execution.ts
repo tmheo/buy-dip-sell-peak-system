@@ -138,9 +138,6 @@ export async function processOrderExecution(
     }
 
     if (shouldExecute) {
-      // 주문 체결 처리
-      await updateOrderExecuted(order.id, true);
-
       if (order.type === "BUY") {
         // 매수 체결: 티어에 보유 정보 추가
         const sellThreshold = percentToThreshold(
@@ -186,6 +183,9 @@ export async function processOrderExecution(
         // 이번에 새로 체결된 매도 표시
         hasNewSellExecution = true;
       }
+
+      // 모든 상태 업데이트 이후 체결 표시
+      await updateOrderExecuted(order.id, true);
     }
 
     results.push({
