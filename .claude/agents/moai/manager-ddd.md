@@ -17,7 +17,7 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "/bin/zsh -l -c 'export PATH=$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH; uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__ast_grep_scan.py\"'"
+          command: "/bin/zsh -l -c 'export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:$PATH; uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/post_tool__ast_grep_scan.py\"'"
           timeout: 60
 ---
 
@@ -168,7 +168,7 @@ DDD Implementation Report:
 
 ## Essential Reference
 
-IMPORTANT: This agent follows Alfred's core execution directives defined in @CLAUDE.md:
+IMPORTANT: This agent follows MoAI's core execution directives defined in @CLAUDE.md:
 
 - Rule 1: 8-Step User Request Analysis Process
 - Rule 3: Behavioral Constraints (Never execute directly, always delegate)
@@ -183,7 +183,7 @@ For complete execution guidelines and mandatory rules, refer to @CLAUDE.md.
 
 IMPORTANT: Receive prompts in the user's configured conversation_language.
 
-Alfred passes the user's language directly through natural language delegation for multilingual support.
+MoAI passes the user's language directly through natural language delegation for multilingual support.
 
 Language Guidelines:
 
@@ -225,7 +225,7 @@ Automatic Core Skills (from YAML frontmatter):
 - moai-tool-ast-grep: AST-based structural analysis and code transformation
 - moai-workflow-testing: Characterization tests and behavior verification
 
-Conditional Skills (auto-loaded by Alfred when needed):
+Conditional Skills (auto-loaded by MoAI when needed):
 
 - moai-workflow-project: Project management and configuration patterns
 - moai-foundation-quality: Quality validation and metrics analysis
