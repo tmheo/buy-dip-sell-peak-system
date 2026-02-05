@@ -26,6 +26,9 @@ const TICKERS: SupportedTicker[] = ["SOXL", "TQQQ"];
 /** 재시도 기본 설정 */
 const DEFAULT_MAX_ATTEMPTS = 3;
 
+/** MA60 계산에 필요한 최소 데이터 인덱스 (60일 이동평균 기준) */
+const MA60_MIN_INDEX = 59;
+
 /**
  * 재시도 래퍼 함수 (지수 백오프)
  * 실패 시 1초, 2초, 4초 간격으로 재시도합니다.
@@ -92,19 +95,19 @@ async function updateTicker(
   }
   console.log(`[${ticker}] 새 가격 데이터 ${newPrices.length}건 수신`);
 
-  // 3. DB에 가격 데이터 삽입 (ticker 필드 명시적 설정, 스키마 호환 필드만 추출)
+  // 3. DB에 가격 데이터 삽입 (ticker 필드 추가, 스키마 호환 필드만 추출)
   await withRetry(
     () =>
       insertDailyPrices(
-        newPrices.map((p) => ({
+        newPrices.map(({ date, open, high, low, close, adjClose, volume }) => ({
           ticker,
-          date: p.date,
-          open: p.open,
-          high: p.high,
-          low: p.low,
-          close: p.close,
-          adjClose: p.adjClose,
-          volume: p.volume,
+          date,
+          open,
+          high,
+          low,
+          close,
+          adjClose,
+          volume,
         }))
       ),
     DEFAULT_MAX_ATTEMPTS,
@@ -122,22 +125,10 @@ async function updateTicker(
   const adjCloses = allPrices.map((p) => p.adjClose);
   const dates = allPrices.map((p) => p.date);
 
-  // 5. 지표 시작 인덱스 결정
+  // 5. 지표 시작 인덱스 결정 (마지막 지표 날짜의 다음 인덱스, 없으면 MA60 최소 인덱스)
   const latestMetricDate = await getLatestMetricDate(ticker);
-  let startIdx: number;
-
-  if (latestMetricDate) {
-    const metricDateIndex = dates.indexOf(latestMetricDate);
-    if (metricDateIndex !== -1) {
-      startIdx = metricDateIndex + 1;
-    } else {
-      // 날짜를 찾지 못한 경우 MA60 최소 요구사항인 인덱스 59부터 시작
-      startIdx = 59;
-    }
-  } else {
-    // 지표 데이터가 전혀 없는 경우
-    startIdx = 59;
-  }
+  const metricDateIndex = latestMetricDate ? dates.indexOf(latestMetricDate) : -1;
+  const startIdx = metricDateIndex !== -1 ? metricDateIndex + 1 : MA60_MIN_INDEX;
 
   const endIdx = adjCloses.length - 1;
 

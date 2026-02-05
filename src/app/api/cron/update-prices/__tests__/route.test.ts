@@ -70,7 +70,7 @@ function createMockAllPrices(count: number, ticker: string = "SOXL") {
     close: 50.5 + i * 0.1,
     adjClose: 50.5 + i * 0.1,
     volume: 1000000,
-    createdAt: null,
+    createdAt: null as Date | null,
   }));
 }
 
@@ -106,6 +106,20 @@ function createMockMetrics(count: number, ticker: string = "SOXL") {
     goldenCross: 3.2,
     isGoldenCross: true,
   }));
+}
+
+/**
+ * 가격 데이터 조회 성공 시나리오 공통 mock 설정
+ * getLatestDate, fetchSince, insertDailyPrices, getAllPricesByTicker를 한 번에 설정합니다.
+ */
+function setupPriceFetchMocks(
+  newPrices: ReturnType<typeof createMockNewPrices>,
+  allPrices: ReturnType<typeof createMockAllPrices>
+): void {
+  vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
+  vi.mocked(fetchSince).mockResolvedValue(newPrices);
+  vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
+  vi.mocked(getAllPricesByTicker).mockResolvedValue(allPrices);
 }
 
 // --- 테스트 ---
@@ -166,11 +180,7 @@ describe("GET /api/cron/update-prices", () => {
       const mockMetrics = createMockMetrics(2);
 
       // SOXL, TQQQ 순서로 호출되므로 각각 설정
-      vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
-      vi.mocked(fetchSince).mockResolvedValue(mockNewPrices);
-      vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices as any);
+      setupPriceFetchMocks(mockNewPrices, mockAllPrices);
       vi.mocked(getLatestMetricDate).mockResolvedValue("2026-02-03");
       vi.mocked(calculateMetricsBatch).mockReturnValue(mockMetrics);
       vi.mocked(insertMetrics).mockResolvedValue(undefined);
@@ -237,11 +247,7 @@ describe("GET /api/cron/update-prices", () => {
       const mockNewPrices = createMockNewPrices(2);
       const mockAllPrices = createMockAllPrices(100);
 
-      vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
-      vi.mocked(fetchSince).mockResolvedValue(mockNewPrices);
-      vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices as any);
+      setupPriceFetchMocks(mockNewPrices, mockAllPrices);
       // latestMetricDate가 마지막 날짜와 같아서 startIdx > endIdx가 됨
       vi.mocked(getLatestMetricDate).mockResolvedValue(
         mockAllPrices[mockAllPrices.length - 1].date
@@ -263,11 +269,7 @@ describe("GET /api/cron/update-prices", () => {
       const mockNewPrices = createMockNewPrices(2);
       const mockAllPrices = createMockAllPrices(100);
 
-      vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
-      vi.mocked(fetchSince).mockResolvedValue(mockNewPrices);
-      vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices as any);
+      setupPriceFetchMocks(mockNewPrices, mockAllPrices);
       vi.mocked(getLatestMetricDate).mockResolvedValue("2026-01-01");
       vi.mocked(calculateMetricsBatch).mockReturnValue([]); // 빈 지표
 
@@ -401,11 +403,7 @@ describe("GET /api/cron/update-prices", () => {
       const mockAllPrices = createMockAllPrices(100);
       const mockMetrics = createMockMetrics(2);
 
-      vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
-      vi.mocked(fetchSince).mockResolvedValue(mockNewPrices);
-      vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices as any);
+      setupPriceFetchMocks(mockNewPrices, mockAllPrices);
       vi.mocked(getLatestMetricDate).mockResolvedValue(null); // 지표 데이터 없음
       vi.mocked(calculateMetricsBatch).mockReturnValue(mockMetrics);
       vi.mocked(insertMetrics).mockResolvedValue(undefined);
@@ -427,11 +425,7 @@ describe("GET /api/cron/update-prices", () => {
       const mockAllPrices = createMockAllPrices(100);
       const mockMetrics = createMockMetrics(2);
 
-      vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
-      vi.mocked(fetchSince).mockResolvedValue(mockNewPrices);
-      vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices as any);
+      setupPriceFetchMocks(mockNewPrices, mockAllPrices);
       // dates 배열에 존재하지 않는 날짜 반환
       vi.mocked(getLatestMetricDate).mockResolvedValue("1999-01-01");
       vi.mocked(calculateMetricsBatch).mockReturnValue(mockMetrics);
@@ -453,11 +447,7 @@ describe("GET /api/cron/update-prices", () => {
       const mockNewPrices = createMockNewPrices(1);
       const mockAllPrices = createMockAllPrices(100);
 
-      vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
-      vi.mocked(fetchSince).mockResolvedValue(mockNewPrices);
-      vi.mocked(insertDailyPrices).mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices as any);
+      setupPriceFetchMocks(mockNewPrices, mockAllPrices);
       vi.mocked(getLatestMetricDate).mockResolvedValue(
         mockAllPrices[mockAllPrices.length - 1].date
       );
