@@ -37,14 +37,16 @@
 | 토큰 없음 | 401 Unauthorized | curl 테스트 |
 | 업데이트 실패 | 500 + 에러 메시지 | 에러 시나리오 |
 
-### AC-005: 데이터 이관
+### AC-005: 프로덕션 데이터 이관 (Local -> Cloud Supabase)
 
 | 조건 | 기대 결과 | 검증 방법 |
 |------|----------|----------|
-| daily_prices | 전체 이관 | row count 비교 |
-| daily_metrics | 전체 이관 | row count 비교 |
-| recommendation_cache | 전체 이관 | row count 비교 |
-| 데이터 무결성 | 샘플 데이터 일치 | 랜덤 샘플 비교 |
+| pg_dump 실행 | Local Supabase 덤프 생성 | 덤프 파일 생성 확인 |
+| pg_restore 실행 | Cloud Supabase 복원 완료 | 복원 로그 확인 |
+| daily_prices | 전체 이관 | Local vs Cloud row count 비교 |
+| daily_metrics | 전체 이관 | Local vs Cloud row count 비교 |
+| recommendation_cache | 전체 이관 | Local vs Cloud row count 비교 |
+| 데이터 무결성 | 샘플 데이터 일치 | Cloud Supabase에서 랜덤 샘플 비교 |
 
 ### AC-006: 자동 업데이트
 
@@ -138,9 +140,9 @@ vercel rollback [deployment-url]
 
 - [ ] `vercel.json` 생성
 - [ ] `src/app/api/cron/update-prices/route.ts` 생성
-- [ ] `scripts/migrate-to-supabase.ts` 생성
+- [ ] pg_dump/pg_restore 이관 가이드 작성
 - [ ] Vercel 환경변수 설정 완료
 - [ ] Google OAuth 프로덕션 설정 완료
-- [ ] 데이터 이관 완료
+- [ ] 프로덕션 데이터 이관 완료 (Local -> Cloud)
 - [ ] Cron 스케줄 활성화
 - [ ] 프로덕션 배포 완료

@@ -186,90 +186,65 @@ async function calculateMetrics(ticker: string) {
 
 ---
 
-### Phase 6: 데이터 이관
+### Phase 6: 프로덕션 데이터 이관 (Local → Cloud Supabase)
 
-#### 6.1 이관 스크립트 생성
+> **참고**: SPEC-DEPLOY-002에서 DB 레이어가 Drizzle ORM + PostgreSQL로 완전 마이그레이션 되었습니다.
+> 데이터는 이미 Local Supabase(PostgreSQL)에 존재하므로, Cloud Supabase로 직접 이관합니다.
 
-**파일**: `scripts/migrate-to-supabase.ts`
-
-```typescript
-import Database from "better-sqlite3";
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import * as schema from "../src/database/schema";
-
-const BATCH_SIZE = 500;
-
-async function migrate() {
-  const directUrl = process.env.SUPABASE_DIRECT_URL;
-  if (!directUrl) {
-    throw new Error("SUPABASE_DIRECT_URL is required");
-  }
-
-  console.log("Connecting to databases...");
-
-  const sqlite = new Database("./data/prices.db", { readonly: true });
-  const pg = postgres(directUrl);
-  const db = drizzle(pg, { schema });
-
-  try {
-    // 1. daily_prices 이관
-    await migrateTable(sqlite, db, "daily_prices", schema.dailyPrices);
-
-    // 2. daily_metrics 이관
-    await migrateTable(sqlite, db, "daily_metrics", schema.dailyMetrics);
-
-    // 3. recommendation_cache 이관
-    await migrateTable(sqlite, db, "recommendation_cache", schema.recommendationCache);
-
-    console.log("\n=== Migration Summary ===");
-    await verifyCounts(sqlite, db);
-
-  } finally {
-    sqlite.close();
-    await pg.end();
-  }
-}
-
-async function migrateTable(
-  sqlite: Database.Database,
-  db: ReturnType<typeof drizzle>,
-  tableName: string,
-  drizzleTable: any
-) {
-  console.log(`\nMigrating ${tableName}...`);
-
-  const rows = sqlite.prepare(`SELECT * FROM ${tableName}`).all();
-  console.log(`  Found ${rows.length} records`);
-
-  let migrated = 0;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    await db.insert(drizzleTable).values(batch).onConflictDoNothing();
-    migrated += batch.length;
-    process.stdout.write(`\r  Migrated: ${migrated}/${rows.length}`);
-  }
-  console.log(`\n  Completed ${tableName}`);
-}
-
-async function verifyCounts(
-  sqlite: Database.Database,
-  db: ReturnType<typeof drizzle>
-) {
-  // 검증 로직
-}
-
-migrate().catch(console.error);
-```
-
-#### 6.2 이관 실행
+#### 6.1 Local Supabase에서 데이터 덤프
 
 ```bash
-# 환경변수 설정
-export SUPABASE_DIRECT_URL="postgresql://..."
+# Local Supabase 컨테이너의 PostgreSQL에서 데이터 덤프
+# (supabase status 명령으로 DB URL 확인 가능)
+pg_dump "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  --data-only \
+  --no-owner \
+  --no-privileges \
+  -t daily_prices \
+  -t daily_metrics \
+  -t recommendation_cache \
+  -f local_data_dump.sql
 
-# 이관 실행
-npx tsx scripts/migrate-to-supabase.ts
+# 또는 Supabase CLI 사용
+# supabase db dump --data-only --local -f local_data_dump.sql
+```
+
+#### 6.2 Cloud Supabase에 데이터 복원
+
+```bash
+# Cloud Supabase Direct URL로 복원
+# (Supabase Dashboard > Settings > Database > Connection string 에서 Direct URL 확인)
+psql "$SUPABASE_DIRECT_URL" -f local_data_dump.sql
+
+# 또는 개별 테이블 단위로 복원
+psql "$SUPABASE_DIRECT_URL" -c "\copy daily_prices FROM 'daily_prices.csv' CSV HEADER"
+```
+
+#### 6.3 데이터 검증
+
+```bash
+# Local Supabase row count 확인
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c "
+  SELECT 'daily_prices' AS table_name, COUNT(*) FROM daily_prices
+  UNION ALL
+  SELECT 'daily_metrics', COUNT(*) FROM daily_metrics
+  UNION ALL
+  SELECT 'recommendation_cache', COUNT(*) FROM recommendation_cache;
+"
+
+# Cloud Supabase row count 확인 (위와 동일 쿼리)
+psql "$SUPABASE_DIRECT_URL" -c "
+  SELECT 'daily_prices' AS table_name, COUNT(*) FROM daily_prices
+  UNION ALL
+  SELECT 'daily_metrics', COUNT(*) FROM daily_metrics
+  UNION ALL
+  SELECT 'recommendation_cache', COUNT(*) FROM recommendation_cache;
+"
+
+# 샘플 데이터 비교 (최근 5건)
+psql "$SUPABASE_DIRECT_URL" -c "
+  SELECT ticker, date, close FROM daily_prices ORDER BY date DESC LIMIT 5;
+"
 ```
 
 ---
@@ -336,7 +311,6 @@ Vercel Dashboard > Analytics 활성화
 ```json
 {
   "scripts": {
-    "migrate:supabase": "tsx scripts/migrate-to-supabase.ts",
     "cron:test": "curl -H 'Authorization: Bearer $CRON_SECRET' http://localhost:3000/api/cron/update-prices"
   }
 }
@@ -362,8 +336,8 @@ Vercel Dashboard > Analytics 활성화
 
 ### 데이터
 
-- [ ] 데이터 이관 완료
-- [ ] 데이터 검증 (row count)
+- [ ] Local Supabase → Cloud Supabase 데이터 이관 완료
+- [ ] Cloud Supabase 데이터 검증 (row count 및 샘플 비교)
 - [ ] API 데이터 조회 정상
 
 ### Cron

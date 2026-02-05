@@ -149,9 +149,11 @@
 - 외부 요청 차단
 - 로깅 및 모니터링
 
-#### REQ-005: 데이터 이관 스크립트
+#### REQ-005: 로컬 Supabase 데이터를 프로덕션 Supabase Cloud로 이관
 
-**[Ubiquitous]** 시스템은 로컬 SQLite 데이터를 프로덕션 PostgreSQL로 이관할 수 있어야 한다.
+**[Ubiquitous]** 시스템은 로컬 Supabase(PostgreSQL) 데이터를 프로덕션 Supabase Cloud(PostgreSQL)로 이관할 수 있어야 한다.
+
+**이관 방법**: `pg_dump` / `pg_restore` 또는 Supabase CLI (`supabase db dump`)
 
 **이관 대상**:
 | 테이블 | 레코드 수 (예상) |
@@ -161,9 +163,10 @@
 | recommendation_cache | ~1,000 |
 
 **인수 조건**:
-- 일회성 마이그레이션 스크립트
+- `pg_dump`으로 로컬 Supabase에서 데이터 export
+- `pg_restore` 또는 `psql`로 프로덕션 Supabase Cloud에 import
 - 데이터 검증 (row count, 샘플 검증)
-- 롤백 가능
+- 롤백 가능 (프로덕션 백업 후 진행)
 
 #### REQ-006: Google OAuth 프로덕션 설정
 
@@ -272,165 +275,100 @@ export async function GET(request: NextRequest) {
 }
 ```
 
-### 4.3 데이터 이관 스크립트
+### 4.3 데이터 이관 스크립트 (Local Supabase -> Cloud Supabase)
 
-**파일**: `scripts/migrate-to-supabase.ts`
+**파일**: `scripts/migrate-to-cloud.sh`
 
-```typescript
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { count, desc } from "drizzle-orm";
-import postgres from "postgres";
-import * as schema from "../src/database/schema";
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-// 환경변수 검증 (REQ-005 요구사항)
-function validateEnv(): string {
-  const url = process.env.SUPABASE_DIRECT_URL || process.env.DIRECT_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DIRECT_URL or DIRECT_URL environment variable is required.\n" +
-      "Usage: SUPABASE_DIRECT_URL=postgresql://... npx tsx scripts/migrate-to-supabase.ts"
-    );
-  }
-  return url;
-}
+# ============================================================
+# Local Supabase -> Cloud Supabase 데이터 이관 스크립트
+# (REQ-005 요구사항)
+#
+# 사전 조건:
+#   - Local Supabase가 실행 중 (supabase start)
+#   - 프로덕션 Supabase Cloud 프로젝트 생성 완료
+#   - psql, pg_dump, pg_restore CLI 설치
+# ============================================================
 
-// SQLite → PostgreSQL 데이터 타입 변환
-function transformPriceRow(row: any) {
-  return {
-    ...row,
-    date: new Date(row.date).toISOString().split('T')[0], // ISO 날짜 형식
-    open: Number(row.open),
-    high: Number(row.high),
-    low: Number(row.low),
-    close: Number(row.close),
-    adjClose: Number(row.adjClose),
-    volume: Number(row.volume),
-  };
-}
+# --- 설정 ---
+LOCAL_DB_URL="${LOCAL_DB_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
+CLOUD_DB_URL="${CLOUD_DB_URL:?CLOUD_DB_URL 환경변수가 필요합니다 (Supabase Cloud Direct URL)}"
+DUMP_FILE="./data/local-supabase-dump.sql"
+TABLES=("daily_prices" "daily_metrics" "recommendation_cache")
 
-function transformMetricRow(row: any) {
-  return {
-    ...row,
-    date: new Date(row.date).toISOString().split('T')[0],
-    ma20: row.ma20 != null ? Number(row.ma20) : null,
-    ma60: row.ma60 != null ? Number(row.ma60) : null,
-    rsi14: row.rsi14 != null ? Number(row.rsi14) : null,
-    // 기타 필드 변환...
-  };
-}
+echo "=== Local Supabase -> Cloud Supabase 데이터 이관 ==="
+echo ""
 
-async function migrate() {
-  // 환경변수 검증
-  const directUrl = validateEnv();
+# --- Step 1: 로컬 데이터 export (pg_dump) ---
+echo "[1/4] 로컬 Supabase에서 데이터 export..."
+pg_dump "$LOCAL_DB_URL" \
+  --data-only \
+  --no-owner \
+  --no-privileges \
+  --table=daily_prices \
+  --table=daily_metrics \
+  --table=recommendation_cache \
+  > "$DUMP_FILE"
 
-  // 로컬 SQLite 연결
-  const sqlite = new Database("./data/prices.db", { readonly: true });
+echo "  -> dump 파일 생성: $DUMP_FILE ($(wc -c < "$DUMP_FILE") bytes)"
 
-  // Supabase PostgreSQL 연결
-  const pg = postgres(directUrl);
-  const db = drizzle(pg, { schema });
+# --- Step 2: 프로덕션에 import (psql) ---
+echo "[2/4] Cloud Supabase에 데이터 import..."
+psql "$CLOUD_DB_URL" < "$DUMP_FILE"
+echo "  -> import 완료"
 
-  try {
-    // 트랜잭션으로 전체 이관 (REQ-005 롤백 가능 요구사항)
-    await db.transaction(async (tx) => {
-      // 1. daily_prices 이관
-      console.log("Migrating daily_prices...");
-      const prices = sqlite.prepare("SELECT * FROM daily_prices").all();
-      const transformedPrices = prices.map(transformPriceRow);
-      let priceConflicts = 0;
-      for (const batch of chunks(transformedPrices, 1000)) {
-        const result = await tx.insert(schema.dailyPrices)
-          .values(batch)
-          .onConflictDoNothing()
-          .returning({ id: schema.dailyPrices.id });
-        priceConflicts += batch.length - result.length;
-      }
-      console.log(`Migrated ${prices.length} price records (${priceConflicts} conflicts skipped)`);
+# --- Step 3: 데이터 검증 (row count 비교) ---
+echo "[3/4] 데이터 검증 (row count)..."
+VERIFY_FAILED=0
 
-      // 2. daily_metrics 이관
-      console.log("Migrating daily_metrics...");
-      const metrics = sqlite.prepare("SELECT * FROM daily_metrics").all();
-      const transformedMetrics = metrics.map(transformMetricRow);
-      let metricConflicts = 0;
-      for (const batch of chunks(transformedMetrics, 1000)) {
-        const result = await tx.insert(schema.dailyMetrics)
-          .values(batch)
-          .onConflictDoNothing()
-          .returning({ id: schema.dailyMetrics.id });
-        metricConflicts += batch.length - result.length;
-      }
-      console.log(`Migrated ${metrics.length} metric records (${metricConflicts} conflicts skipped)`);
+for TABLE in "${TABLES[@]}"; do
+  LOCAL_COUNT=$(psql "$LOCAL_DB_URL" -t -A -c "SELECT COUNT(*) FROM $TABLE;")
+  CLOUD_COUNT=$(psql "$CLOUD_DB_URL" -t -A -c "SELECT COUNT(*) FROM $TABLE;")
 
-      // 3. recommendation_cache 이관
-      console.log("Migrating recommendation_cache...");
-      const cache = sqlite.prepare("SELECT * FROM recommendation_cache").all();
-      let cacheConflicts = 0;
-      for (const batch of chunks(cache, 1000)) {
-        const result = await tx.insert(schema.recommendationCache)
-          .values(batch)
-          .onConflictDoNothing()
-          .returning({ id: schema.recommendationCache.id });
-        cacheConflicts += batch.length - result.length;
-      }
-      console.log(`Migrated ${cache.length} cache records (${cacheConflicts} conflicts skipped)`);
-    });
+  if [ "$LOCAL_COUNT" -eq "$CLOUD_COUNT" ]; then
+    echo "  $TABLE: Local=$LOCAL_COUNT, Cloud=$CLOUD_COUNT [OK]"
+  else
+    echo "  $TABLE: Local=$LOCAL_COUNT, Cloud=$CLOUD_COUNT [MISMATCH]"
+    VERIFY_FAILED=1
+  fi
+done
 
-    // 검증 (REQ-005 데이터 검증 요구사항)
-    console.log("\n=== Verifying migration ===");
+# --- Step 4: 샘플 데이터 검증 ---
+echo "[4/4] 샘플 데이터 검증 (latest daily_prices)..."
+echo "  Local:"
+psql "$LOCAL_DB_URL" -c "SELECT ticker, date, close FROM daily_prices ORDER BY date DESC LIMIT 3;"
+echo "  Cloud:"
+psql "$CLOUD_DB_URL" -c "SELECT ticker, date, close FROM daily_prices ORDER BY date DESC LIMIT 3;"
 
-    // Row count 검증
-    const sqlitePriceCount = (sqlite.prepare("SELECT COUNT(*) as count FROM daily_prices").get() as { count: number }).count;
-    const pgPriceCount = await db.select({ count: count() }).from(schema.dailyPrices);
-    console.log(`Price records: SQLite=${sqlitePriceCount}, PostgreSQL=${pgPriceCount[0].count}`);
+# --- 결과 ---
+echo ""
+if [ "$VERIFY_FAILED" -eq 0 ]; then
+  echo "=== 이관 완료: 모든 테이블 검증 통과 ==="
+else
+  echo "=== 경고: 일부 테이블에서 row count 불일치 발견 ==="
+  exit 1
+fi
+```
 
-    const sqliteMetricCount = (sqlite.prepare("SELECT COUNT(*) as count FROM daily_metrics").get() as { count: number }).count;
-    const pgMetricCount = await db.select({ count: count() }).from(schema.dailyMetrics);
-    console.log(`Metric records: SQLite=${sqliteMetricCount}, PostgreSQL=${pgMetricCount[0].count}`);
+**사용법**:
 
-    const sqliteCacheCount = (sqlite.prepare("SELECT COUNT(*) as count FROM recommendation_cache").get() as { count: number }).count;
-    const pgCacheCount = await db.select({ count: count() }).from(schema.recommendationCache);
-    console.log(`Cache records: SQLite=${sqliteCacheCount}, PostgreSQL=${pgCacheCount[0].count}`);
+```bash
+# Local Supabase가 실행 중인 상태에서
+CLOUD_DB_URL="postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres" \
+  bash scripts/migrate-to-cloud.sh
+```
 
-    // 샘플 데이터 검증
-    const samplePrice = sqlite.prepare("SELECT * FROM daily_prices ORDER BY date DESC LIMIT 1").get();
-    const pgSamplePrice = await db.select().from(schema.dailyPrices).orderBy(desc(schema.dailyPrices.date)).limit(1);
-    console.log("\nSample comparison (latest price):");
-    console.log("  SQLite:", JSON.stringify(samplePrice));
-    console.log("  PostgreSQL:", JSON.stringify(pgSamplePrice[0]));
+**대안: Supabase CLI 방식**:
 
-    // 불일치 검증 (모든 테이블)
-    if (pgPriceCount[0].count < sqlitePriceCount * 0.99) {
-      throw new Error(`Price record count mismatch! SQLite: ${sqlitePriceCount}, PostgreSQL: ${pgPriceCount[0].count}`);
-    }
-    if (pgMetricCount[0].count < sqliteMetricCount * 0.99) {
-      throw new Error(`Metric record count mismatch! SQLite: ${sqliteMetricCount}, PostgreSQL: ${pgMetricCount[0].count}`);
-    }
-    if (pgCacheCount[0].count < sqliteCacheCount * 0.99) {
-      throw new Error(`Cache record count mismatch! SQLite: ${sqliteCacheCount}, PostgreSQL: ${pgCacheCount[0].count}`);
-    }
+```bash
+# 로컬 DB dump (Supabase CLI)
+supabase db dump --data-only --local > data/local-dump.sql
 
-    console.log("\n✅ Migration completed successfully!");
-
-  } catch (error) {
-    console.error("\n❌ Migration failed, transaction rolled back:", error);
-    throw error;
-  } finally {
-    sqlite.close();
-    await pg.end();
-  }
-}
-
-function chunks<T>(arr: T[], size: number): T[][] {
-  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, (i + 1) * size)
-  );
-}
-
-migrate().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+# Cloud에 restore
+psql "$CLOUD_DB_URL" < data/local-dump.sql
 ```
 
 ### 4.4 환경변수 설정
@@ -484,7 +422,7 @@ migrate().catch((error) => {
 |------|------|------|----------|
 | Vercel 빌드 실패 | Medium | High | 로컬 빌드 테스트 |
 | Cron 실패 | Low | Medium | 재시도 로직, 알림 |
-| 데이터 이관 오류 | Low | High | 백업, 검증 스크립트 |
+| 데이터 이관 오류 (Local -> Cloud Supabase) | Low | High | Supabase 백업, pg_dump 검증 |
 | OAuth 설정 오류 | Medium | Medium | 단계별 테스트 |
 
 ---
@@ -498,6 +436,6 @@ migrate().catch((error) => {
 | M3 | 첫 배포 테스트 | 프리뷰 URL |
 | M4 | Google OAuth 설정 | 로그인 테스트 |
 | M5 | Cron 엔드포인트 구현 | API 테스트 |
-| M6 | 데이터 이관 | 프로덕션 데이터 |
+| M6 | 프로덕션 데이터 이관 (Local -> Cloud Supabase) | 프로덕션 데이터 |
 | M7 | Cron 활성화 | 자동 업데이트 확인 |
 | M8 | 모니터링 설정 | 알림 설정 |
