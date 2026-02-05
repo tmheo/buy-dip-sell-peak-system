@@ -195,6 +195,7 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 | GET | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 | 필요 |
 | GET/POST | `/api/trading/accounts/[id]/orders` | 당일 주문 | 필요 |
 | GET | `/api/trading/accounts/[id]/profits` | 수익 현황 (월별) | 필요 |
+| GET | `/api/cron/update-prices` | 일일 가격/지표 자동 업데이트 (Cron) | CRON_SECRET |
 
 ---
 
@@ -221,6 +222,7 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ```
 scripts/
 ├── generate-favicon.mjs             # 파비콘 생성 스크립트
+├── migrate-to-cloud.sh              # Local -> Cloud Supabase 데이터 이관
 ├── multi-year-baseline.ts           # 다년 베이스라인 계산 스크립트
 ├── multi-year-finetune.ts           # 다년 파인튜닝 스크립트
 ├── multi-year-optimize.ts           # 다년 최적화 스크립트
@@ -320,6 +322,8 @@ src/
     ├── mypage/                      # 마이페이지
     └── api/                         # API 라우트
         ├── auth/[...nextauth]/      # NextAuth.js API 라우트
+        ├── cron/
+        │   └── update-prices/       # Cron 자동 업데이트 엔드포인트
         ├── backtest/                # 백테스트 API
         ├── recommend/               # 추천 API
         ├── backtest-recommend/      # 추천 백테스트 API
@@ -341,6 +345,7 @@ src/
 | CSS | Bootstrap 5.3.3 | Bootswatch Solar 테마 |
 | 차트 | Recharts 3.6 | - |
 | 인증 | NextAuth.js 5 (beta) | Google OAuth |
+| 배포 | Vercel | Cron Jobs, Edge Functions |
 | 폰트 | Noto Sans KR | Google Fonts |
 
 ### 데이터 흐름
@@ -357,6 +362,7 @@ Next.js App → Drizzle ORM → Supabase Local (localhost:54322)
 프로덕션 환경:
 ```
 Vercel → Drizzle ORM → Supabase Cloud (Connection Pooler)
+Vercel Cron (06:00 UTC) → Yahoo Finance → Drizzle ORM → Supabase Cloud
 ```
 
 ---
@@ -656,6 +662,22 @@ AUTH_SECRET=your-auth-secret-key  # openssl rand -base64 32로 생성
 AUTH_GOOGLE_ID=your-google-client-id
 AUTH_GOOGLE_SECRET=your-google-client-secret
 ```
+
+### 프로덕션 배포 (Vercel)
+
+Vercel에 자동 배포됩니다.
+
+- **프로덕션 배포**: `main` 브랜치 푸시 시 자동
+- **프리뷰 배포**: PR 생성 시 자동
+- **Cron Job**: 매일 06:00 UTC에 가격/지표 자동 업데이트
+
+#### 데이터 이관 (Local -> Cloud)
+
+```bash
+CLOUD_DB_URL="postgresql://..." ./scripts/migrate-to-cloud.sh
+```
+
+로컬 Supabase의 가격/지표 데이터를 Cloud Supabase로 이관합니다.
 
 ### 프로덕션 빌드 및 실행
 
