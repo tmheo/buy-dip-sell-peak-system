@@ -670,6 +670,7 @@ Vercel에 자동 배포됩니다.
 - **프로덕션 배포**: `main` 브랜치 푸시 시 자동
 - **프리뷰 배포**: PR 생성 시 자동
 - **Cron Job**: 매일 06:00 UTC에 가격/지표 자동 업데이트
+- **CRON_SECRET**: Vercel 환경 변수로 설정 (Cron 인증용 Bearer 토큰)
 
 #### 데이터 이관 (Local -> Cloud)
 

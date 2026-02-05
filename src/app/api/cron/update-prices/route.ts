@@ -89,31 +89,30 @@ async function updateTicker(
     `${ticker} fetchSince`
   );
 
-  if (newPrices.length === 0) {
-    console.log(`[${ticker}] 새 가격 데이터 없음`);
-    return { newPrices: 0, newMetrics: 0 };
+  // 3. 새 가격이 있으면 DB에 삽입
+  if (newPrices.length > 0) {
+    console.log(`[${ticker}] 새 가격 데이터 ${newPrices.length}건 수신`);
+    await withRetry(
+      () =>
+        insertDailyPrices(
+          newPrices.map(({ date, open, high, low, close, adjClose, volume }) => ({
+            ticker,
+            date,
+            open,
+            high,
+            low,
+            close,
+            adjClose,
+            volume,
+          }))
+        ),
+      DEFAULT_MAX_ATTEMPTS,
+      `${ticker} insertDailyPrices`
+    );
+    console.log(`[${ticker}] 가격 데이터 ${newPrices.length}건 저장 완료`);
+  } else {
+    console.log(`[${ticker}] 새 가격 데이터 없음 (지표 갱신 여부 확인)`);
   }
-  console.log(`[${ticker}] 새 가격 데이터 ${newPrices.length}건 수신`);
-
-  // 3. DB에 가격 데이터 삽입 (ticker 필드 추가, 스키마 호환 필드만 추출)
-  await withRetry(
-    () =>
-      insertDailyPrices(
-        newPrices.map(({ date, open, high, low, close, adjClose, volume }) => ({
-          ticker,
-          date,
-          open,
-          high,
-          low,
-          close,
-          adjClose,
-          volume,
-        }))
-      ),
-    DEFAULT_MAX_ATTEMPTS,
-    `${ticker} insertDailyPrices`
-  );
-  console.log(`[${ticker}] 가격 데이터 ${newPrices.length}건 저장 완료`);
 
   // 4. 전체 가격 데이터 로드 (지표 계산용)
   const allPrices = await withRetry(
@@ -175,8 +174,14 @@ async function updateTicker(
 /** GET /api/cron/update-prices */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // 인증 검증 (타이밍 공격 방지를 위한 timingSafeEqual 사용)
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error("CRON_SECRET 환경 변수 미설정");
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
   const authHeader = request.headers.get("authorization");
-  const expectedToken = `Bearer ${process.env.CRON_SECRET}`;
+  const expectedToken = `Bearer ${cronSecret}`;
 
   if (
     !authHeader ||
