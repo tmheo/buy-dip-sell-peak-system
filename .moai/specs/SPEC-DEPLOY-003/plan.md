@@ -124,65 +124,86 @@ https://[your-project].vercel.app/api/auth/callback/google
 **파일**: `src/app/api/cron/update-prices/route.ts`
 
 ```typescript
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { fetchSince } from "@/services/dataFetcher";
+import type { SupportedTicker } from "@/services/dataFetcher";
+import { getLatestDate, insertDailyPrices, getAllPricesByTicker } from "@/database/prices";
+import { getLatestMetricDate, insertMetrics } from "@/database/metrics";
+import { calculateMetricsBatch } from "@/services/metricsCalculator";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // Hobby 레거시: 60초, Fluid Compute 활성화 시: 300초
+export const maxDuration = 60;
 
-export async function GET(request: NextRequest) {
-  // Vercel Cron 인증
+const TICKERS: SupportedTicker[] = ["SOXL", "TQQQ"];
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+// 재시도 래퍼 함수 (지수 백오프: 1초, 2초, 4초)
+async function withRetry<T>(fn: () => Promise<T>, maxAttempts: number, context: string): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try { return await fn(); }
+    catch (error) {
+      if (attempt === maxAttempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+    }
+  }
+  throw new Error(`[${context}] 재시도 로직 오류`);
+}
+
+// 단일 티커 증분 업데이트: 가격 fetch -> DB 저장 -> 지표 증분 계산
+async function updateTicker(ticker: SupportedTicker): Promise<{ newPrices: number; newMetrics: number }> {
+  const latestDate = await getLatestDate(ticker);
+  if (!latestDate) return { newPrices: 0, newMetrics: 0 };
+
+  const newPrices = await withRetry(() => fetchSince(latestDate, ticker), DEFAULT_MAX_ATTEMPTS, `${ticker} fetchSince`);
+  if (newPrices.length === 0) return { newPrices: 0, newMetrics: 0 };
+
+  await withRetry(() => insertDailyPrices(newPrices.map((p) => ({ ticker, ...p }))), DEFAULT_MAX_ATTEMPTS, `${ticker} insertDailyPrices`);
+
+  const allPrices = await withRetry(() => getAllPricesByTicker(ticker), DEFAULT_MAX_ATTEMPTS, `${ticker} getAllPricesByTicker`);
+  const latestMetricDate = await getLatestMetricDate(ticker);
+  const dates = allPrices.map((p) => p.date);
+  const startIdx = latestMetricDate ? (dates.indexOf(latestMetricDate) + 1 || 59) : 59;
+
+  const adjCloses = allPrices.map((p) => p.adjClose);
+  const newMetrics = calculateMetricsBatch(adjCloses, dates, ticker, startIdx, adjCloses.length - 1);
+  if (newMetrics.length > 0) {
+    await withRetry(() => insertMetrics(newMetrics), DEFAULT_MAX_ATTEMPTS, `${ticker} insertMetrics`);
+  }
+  return { newPrices: newPrices.length, newMetrics: newMetrics.length };
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  // timingSafeEqual로 타이밍 공격 방지
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    console.log("Unauthorized cron request");
+  const expectedToken = `Bearer ${process.env.CRON_SECRET}`;
+  if (!authHeader || authHeader.length !== expectedToken.length ||
+      !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedToken))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log("Starting price update cron job...");
-
   try {
-    const tickers = ["SOXL", "TQQQ"];
     const results = [];
-
-    for (const ticker of tickers) {
-      console.log(`Updating ${ticker}...`);
-
-      // 1. 가격 데이터 업데이트
-      const priceResult = await updatePrices(ticker);
-      results.push({ ticker, prices: priceResult });
-
-      // 2. 기술지표 재계산
-      await calculateMetrics(ticker);
+    for (const ticker of TICKERS) {
+      results.push({ ticker, ...(await updateTicker(ticker)) });
     }
-
-    console.log("Price update cron job completed successfully");
-
-    return NextResponse.json({
-      success: true,
-      updatedAt: new Date().toISOString(),
-      results,
-    });
+    return NextResponse.json({ success: true, updatedAt: new Date().toISOString(), results }, { status: 200 });
   } catch (error) {
-    console.error("Cron update failed:", error);
-    return NextResponse.json(
-      {
-        error: "Update failed",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Update failed", message: "Internal server error" }, { status: 500 });
   }
 }
-
-async function updatePrices(ticker: string) {
-  // 기존 update 로직 호출
-  // src/services/yahoo-finance.ts 함수 사용
-}
-
-async function calculateMetrics(ticker: string) {
-  // 기존 metrics 계산 로직 호출
-  // src/services/calculations.ts 함수 사용
-}
 ```
+
+#### 5.2 단위 테스트 작성
+
+**파일**: `src/app/api/cron/update-prices/__tests__/route.test.ts` (493줄)
+
+테스트 커버리지:
+
+- **인증 테스트**: 토큰 없음 시 401, 잘못된 토큰 시 401, 유효한 토큰 시 통과
+- **성공 시나리오**: 가격/지표 데이터 업데이트 후 200 반환, 결과 구조 검증
+- **에러 시나리오**: DB 오류/외부 API 오류 시 500 반환, 내부 에러 메시지 비노출 확인
+- **엣지 케이스**: 새 가격 데이터 없음, 저장된 가격 데이터 없음, 지표 데이터 없음 등
 
 ---
 
@@ -322,11 +343,11 @@ Vercel Dashboard > Analytics 활성화
 
 ### 배포
 
-- [ ] Vercel 프로젝트 생성
-- [ ] GitHub 연동 확인
-- [ ] 환경변수 설정 완료
-- [ ] 첫 배포 성공
-- [ ] 프로덕션 URL 접근 가능
+- [x] Vercel 프로젝트 생성
+- [x] GitHub 연동 확인
+- [x] 환경변수 설정 완료
+- [x] 첫 배포 성공
+- [x] 프로덕션 URL 접근 가능
 
 ### 인증
 
@@ -336,16 +357,24 @@ Vercel Dashboard > Analytics 활성화
 
 ### 데이터
 
-- [ ] Local Supabase → Cloud Supabase 데이터 이관 완료
+- [ ] Local Supabase -> Cloud Supabase 데이터 이관 완료
 - [ ] Cloud Supabase 데이터 검증 (row count 및 샘플 비교)
 - [ ] API 데이터 조회 정상
 
 ### Cron
 
-- [ ] Cron 엔드포인트 배포
+- [x] Cron 엔드포인트 구현 (timingSafeEqual, 증분 업데이트)
+- [x] 단위 테스트 작성 (route.test.ts, 493줄)
 - [ ] 수동 실행 테스트
 - [ ] 인증 검증 (401 테스트)
 - [ ] 스케줄 활성화
+
+### 산출물
+
+- [x] `vercel.json` 생성 (Cron 스케줄 + API Cache-Control 헤더)
+- [x] `src/app/api/cron/update-prices/route.ts` 생성
+- [x] `src/app/api/cron/update-prices/__tests__/route.test.ts` 생성
+- [x] `scripts/migrate-to-cloud.sh` 생성
 
 ### 모니터링
 

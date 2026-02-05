@@ -56,6 +56,16 @@
 | 가격 업데이트 | 최신 데이터 | DB 조회 |
 | 지표 재계산 | 최신 지표 | DB 조회 |
 
+### AC-007: 단위 테스트
+
+| 조건 | 기대 결과 | 검증 방법 |
+|------|----------|----------|
+| route.test.ts 실행 | 전체 테스트 통과 | `npm test` |
+| 인증 테스트 | 토큰 없음/잘못된 토큰 시 401 반환 | 테스트 코드 |
+| 성공 시나리오 | 가격/지표 업데이트 후 200 반환 | 테스트 코드 |
+| 에러 시나리오 | DB/API 오류 시 500 반환, 내부 메시지 비노출 | 테스트 코드 |
+| 엣지 케이스 | 새 데이터 없음, 저장 데이터 없음 처리 | 테스트 코드 |
+
 ---
 
 ## 비기능 테스트
@@ -138,9 +148,10 @@ vercel rollback [deployment-url]
 
 ## 산출물 체크리스트
 
-- [ ] `vercel.json` 생성
-- [ ] `src/app/api/cron/update-prices/route.ts` 생성
-- [ ] pg_dump/pg_restore 이관 가이드 작성
+- [x] `vercel.json` 생성 (API Cache-Control 헤더 포함)
+- [x] `src/app/api/cron/update-prices/route.ts` 생성 (timingSafeEqual, 증분 업데이트)
+- [x] `src/app/api/cron/update-prices/__tests__/route.test.ts` 생성 (493줄, 종합 테스트)
+- [x] `scripts/migrate-to-cloud.sh` 이관 스크립트 작성
 - [ ] Vercel 환경변수 설정 완료
 - [ ] Google OAuth 프로덕션 설정 완료
 - [ ] 프로덕션 데이터 이관 완료 (Local -> Cloud)

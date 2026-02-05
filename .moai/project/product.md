@@ -112,6 +112,19 @@
 - **빠른 조회**: 백테스트 및 추천 시 실시간 계산 없이 즉시 조회
 - **데이터 동기화**: 가격 데이터 업데이트 시 지표 자동 재계산
 
+### 11. Cron 기반 자동 데이터 업데이트
+
+- **Vercel Cron Jobs**: 매일 미국 장 마감 후 자동으로 가격 데이터 및 기술적 지표 업데이트
+- **전체 티커 자동 처리**: SOXL, TQQQ 등 지원 티커 전체를 순차적으로 업데이트
+- **보안 인증**: `CRON_SECRET` 기반 Bearer 토큰 인증으로 무단 호출 방지
+- **에러 리포팅**: 티커별 업데이트 결과(성공/실패/신규 레코드 수)를 JSON 응답으로 반환
+
+### 12. 데이터 이관 (Local Supabase -> Cloud Supabase)
+
+- **pg_dump/pg_restore 기반 이관**: 로컬 개발 환경의 Supabase 데이터를 클라우드로 안전하게 이관
+- **셸 스크립트 자동화**: `scripts/migrate-to-cloud.sh` 실행으로 원클릭 데이터 이관
+- **테이블 선택적 이관**: 가격 데이터, 기술적 지표, 추천 캐시 등 필요한 테이블만 선택 가능
+
 ---
 
 ## 사용 사례
@@ -202,6 +215,8 @@ npm run dev init-all
 - [x] 추천 캐시 (recommendation_cache 테이블)
 - [x] Drizzle ORM + Supabase 마이그레이션
 - [x] Vitest 테스트 프레임워크 도입
+- [x] Vercel 배포 및 Cron 기반 자동 데이터 업데이트 (SPEC-DEPLOY-003)
+- [x] Local Supabase -> Cloud Supabase 데이터 이관 스크립트
 
 ### 진행 예정 항목
 

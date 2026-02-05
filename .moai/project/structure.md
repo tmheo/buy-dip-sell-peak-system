@@ -6,6 +6,7 @@
 buy-dip-sell-peak-system/
 ├── scripts/                          # 유틸리티 스크립트
 │   ├── generate-favicon.mjs          # 파비콘 생성 스크립트
+│   ├── migrate-to-cloud.sh           # Local Supabase → Cloud Supabase 데이터 이관
 │   ├── multi-year-baseline.ts        # 다년 베이스라인 계산
 │   ├── multi-year-finetune.ts        # 다년 파인튜닝 최적화
 │   ├── multi-year-optimize.ts        # 다년 파라미터 최적화
@@ -20,6 +21,11 @@ buy-dip-sell-peak-system/
 │   │   │   ├── auth/[...nextauth]/   # NextAuth.js 인증 핸들러
 │   │   │   ├── backtest/             # 백테스트 API
 │   │   │   ├── backtest-recommend/   # 추천 백테스트 API
+│   │   │   ├── cron/                 # Cron 자동화 API
+│   │   │   │   └── update-prices/    # 일일 가격/지표 자동 업데이트
+│   │   │   │       ├── route.ts      # Cron 엔드포인트 핸들러
+│   │   │   │       └── __tests__/    # Cron 엔드포인트 테스트
+│   │   │   │           └── route.test.ts
 │   │   │   ├── recommend/            # 전략 추천 API
 │   │   │   ├── trading/              # 트레이딩 계좌 API
 │   │   │   └── user/                 # 사용자 관리 API
@@ -102,6 +108,7 @@ buy-dip-sell-peak-system/
 ├── .moai/                            # MoAI 프로젝트 설정
 │   ├── config/                       # 프로젝트 구성 파일
 │   └── project/                      # 프로젝트 문서
+├── vercel.json                       # Vercel 배포 설정 (Cron 스케줄, API 헤더)
 ├── drizzle.config.ts                 # Drizzle Kit 설정
 ├── auth.ts                           # Auth.js v5 설정
 ├── package.json                      # npm 프로젝트 설정
@@ -123,6 +130,7 @@ buy-dip-sell-peak-system/
 | 스크립트 | 설명 |
 |----------|------|
 | `generate-favicon.mjs` | sharp 및 png-to-ico를 사용한 파비콘 생성 |
+| `migrate-to-cloud.sh` | pg_dump/pg_restore를 사용한 Local → Cloud Supabase 데이터 이관 |
 | `multi-year-baseline.ts` | 유사도 파라미터의 다년 베이스라인 성과 계산 |
 | `multi-year-finetune.ts` | 다년 데이터 기반 파라미터 파인튜닝 |
 | `multi-year-optimize.ts` | 유사도 가중치/허용오차 최적화 |
@@ -410,6 +418,7 @@ const TICKER_CONFIG = {
 │  │  - /api/backtest-recommend: 추천 백테스트                │    │
 │  │  - /api/trading/accounts: 계좌 CRUD                      │    │
 │  │  - /api/auth/[...nextauth]: 인증                         │    │
+│  │  - /api/cron/update-prices: 일일 자동 업데이트            │    │
 │  │  - /api/user/delete: 회원 탈퇴                           │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
@@ -651,6 +660,12 @@ src/components/
 | GET | `/api/trading/accounts/[id]/orders` | 당일 주문 조회 |
 | POST | `/api/trading/accounts/[id]/orders` | 주문 생성 |
 | GET | `/api/trading/accounts/[id]/profits` | 수익 현황 조회 (월별 그룹화) |
+
+### Cron API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/cron/update-prices` | 일일 가격/지표 자동 업데이트 (Vercel Cron) |
 
 ### 사용자 API
 

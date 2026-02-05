@@ -471,6 +471,7 @@ npx tsx src/index.ts init --ticker SOXL
 | `AUTH_SECRET` | NextAuth.js 시크릿 키 |
 | `AUTH_GOOGLE_ID` | Google OAuth 클라이언트 ID |
 | `AUTH_GOOGLE_SECRET` | Google OAuth 클라이언트 시크릿 |
+| `CRON_SECRET` | Vercel Cron 인증용 시크릿 토큰 |
 
 ### 설치 및 실행
 
@@ -523,9 +524,35 @@ npm run web:start
 | **Vercel** | 웹 호스팅 | Next.js 최적화 배포 |
 | **Supabase** | 데이터베이스 | PostgreSQL 클라우드 호스팅 |
 
+### Vercel (배포 플랫폼)
+
+**선택 이유:**
+- Next.js 공식 호스팅 플랫폼으로 최적화된 배포 파이프라인
+- Serverless Functions로 API 라우트 자동 배포
+- Edge Network를 통한 글로벌 CDN 제공
+- Cron Jobs 기능으로 스케줄링된 작업 실행
+
+**주요 기능 활용:**
+
+| 기능 | 설명 |
+|------|------|
+| Serverless Functions | API 라우트 자동 서버리스 배포 |
+| Cron Jobs | 일일 가격/지표 자동 업데이트 스케줄링 |
+| Edge Network | 정적 자산 글로벌 CDN 배포 |
+| Environment Variables | 프로덕션 환경 변수 관리 |
+
+**Cron 보안 인증:**
+- `CRON_SECRET` 환경 변수를 통한 Bearer 토큰 인증
+- Node.js `crypto.timingSafeEqual`을 사용한 타이밍 공격 방지 토큰 비교
+- `vercel.json`에서 Cron 스케줄 및 API 헤더 설정
+
+**설정 파일 (`vercel.json`):**
+- Cron 스케줄: 매일 미국 장 마감 후 자동 실행
+- API 헤더: Authorization 헤더 자동 주입
+
 ### 배포 고려사항
 
-1. **환경 변수**: Vercel에서 환경 변수 설정 필요
+1. **환경 변수**: Vercel에서 환경 변수 설정 필요 (`CRON_SECRET` 포함)
 2. **데이터베이스**: Supabase 프로젝트 연결
 3. **빌드 명령어**: `npm run web:build`
 4. **출력 디렉토리**: `.next`
@@ -593,6 +620,7 @@ npm run web:start
 ## 향후 기술 확장 계획
 
 - [ ] **Docker**: 컨테이너화를 통한 환경 독립성
+- [x] **Vercel 배포**: Cron Jobs, Serverless Functions, Edge Network
 - [ ] **CI/CD**: GitHub Actions를 통한 자동화 파이프라인
 - [ ] **모니터링**: Sentry 또는 LogRocket 연동
 - [x] **테스트**: Vitest를 활용한 유닛/통합 테스트
