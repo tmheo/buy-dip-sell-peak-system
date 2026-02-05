@@ -217,8 +217,15 @@ describe("GET /api/cron/update-prices", () => {
     });
 
     it("새 가격 데이터가 없으면 newPrices: 0, newMetrics: 0을 반환해야 한다", async () => {
+      const mockAllPrices = createMockAllPrices(100);
+
       vi.mocked(getLatestDate).mockResolvedValue("2026-02-03");
       vi.mocked(fetchSince).mockResolvedValue([]); // 새 데이터 없음
+      vi.mocked(getAllPricesByTicker).mockResolvedValue(mockAllPrices);
+      // 지표도 최신 상태 → startIdx > endIdx → 지표 계산 건너뜀
+      vi.mocked(getLatestMetricDate).mockResolvedValue(
+        mockAllPrices[mockAllPrices.length - 1].date
+      );
 
       const request = createCronRequest("Bearer test-secret-token");
       const response = await GET(request);
@@ -238,9 +245,11 @@ describe("GET /api/cron/update-prices", () => {
         newMetrics: 0,
       });
 
-      // 새 데이터가 없으므로 삽입/계산 함수는 호출되지 않아야 함
+      // 새 데이터가 없으므로 가격 삽입은 호출되지 않아야 함
       expect(insertDailyPrices).not.toHaveBeenCalled();
+      // 지표도 최신이므로 계산/삽입이 호출되지 않아야 함
       expect(calculateMetricsBatch).not.toHaveBeenCalled();
+      expect(insertMetrics).not.toHaveBeenCalled();
     });
 
     it("가격은 있지만 계산할 새 지표가 없을 때 newMetrics: 0을 반환해야 한다", async () => {
