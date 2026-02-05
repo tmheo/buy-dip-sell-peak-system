@@ -3,7 +3,7 @@
  */
 
 import Decimal from "decimal.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 
 import { db } from "../db-drizzle";
 import { profitRecords } from "../schema/index";
@@ -95,7 +95,7 @@ export async function getProfitRecords(accountId: string): Promise<ProfitRecord[
     .select()
     .from(profitRecords)
     .where(eq(profitRecords.accountId, accountId))
-    .orderBy(desc(profitRecords.sellDate));
+    .orderBy(asc(profitRecords.sellDate), asc(profitRecords.buyDate));
 
   return rows.map(mapDrizzleProfitRecord);
 }
