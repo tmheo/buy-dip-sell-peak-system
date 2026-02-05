@@ -1,5 +1,9 @@
 # 로컬 Claude Code 설정
 
+## Environment Setup
+
+When running git commands or pre-commit hooks, always source ~/.zshrc first (or run `eval "$(fnm env)"`) to ensure node/npm/npx are available in the shell environment.
+
 ## PR 코드 리뷰 자동화
 
 PR에 대해 CodeRabbit 리뷰를 확인하거나 처리해달라는 요청이 오면, 반드시 `review-coderabbit` 스킬을 사용해야 합니다.
