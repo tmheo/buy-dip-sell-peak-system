@@ -98,7 +98,7 @@ https://[your-project].vercel.app/api/auth/callback/google
   "crons": [
     {
       "path": "/api/cron/update-prices",
-      "schedule": "0 6 * * *"
+      "schedule": "30 0 * * *"
     }
   ],
   "headers": [

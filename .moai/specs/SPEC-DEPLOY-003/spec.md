@@ -131,7 +131,7 @@
 **[Event-Driven]** **WHEN** 매일 지정된 시간이 되면 **THEN** 시스템은 가격 데이터를 자동으로 업데이트해야 한다.
 
 **Cron 스케줄**:
-- 시간: 매일 06:00 UTC (미국 장 마감 후, 한국 15:00)
+- 시간: 매일 00:30 UTC (미국 장 마감 후 데이터 가용 시점, 한국 09:30)
 - 엔드포인트: `GET /api/cron/update-prices`
 - 인증: `CRON_SECRET` 헤더 검증
 
@@ -192,7 +192,7 @@
   "crons": [
     {
       "path": "/api/cron/update-prices",
-      "schedule": "0 6 * * *"
+      "schedule": "30 0 * * *"
     }
   ],
   "headers": [

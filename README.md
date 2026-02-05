@@ -362,7 +362,7 @@ Next.js App → Drizzle ORM → Supabase Local (localhost:54322)
 프로덕션 환경:
 ```
 Vercel → Drizzle ORM → Supabase Cloud (Connection Pooler)
-Vercel Cron (06:00 UTC) → Yahoo Finance → Drizzle ORM → Supabase Cloud
+Vercel Cron (00:30 UTC) → Yahoo Finance → Drizzle ORM → Supabase Cloud
 ```
 
 ---
@@ -669,7 +669,7 @@ Vercel에 자동 배포됩니다.
 
 - **프로덕션 배포**: `main` 브랜치 푸시 시 자동
 - **프리뷰 배포**: PR 생성 시 자동
-- **Cron Job**: 매일 06:00 UTC에 가격/지표 자동 업데이트
+- **Cron Job**: 매일 00:30 UTC (KST 09:30)에 가격/지표 자동 업데이트
 - **CRON_SECRET**: Vercel 환경 변수로 설정 (Cron 인증용 Bearer 토큰)
 
 #### 데이터 이관 (Local -> Cloud)
