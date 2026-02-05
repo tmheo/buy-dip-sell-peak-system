@@ -86,10 +86,21 @@ export default function TradingDetailClient({
     setError(null);
 
     try {
-      const [accountRes, ordersRes] = await Promise.all([
-        fetch(`/api/trading/accounts/${accountId}`),
-        fetch(`/api/trading/accounts/${accountId}/orders`),
-      ]);
+      // 주문 API를 먼저 호출 (processHistoricalOrders가 보유현황을 DB에 업데이트)
+      const ordersRes = await fetch(`/api/trading/accounts/${accountId}/orders`);
+
+      setOrdersError(null);
+      if (ordersRes.ok) {
+        const ordersData: OrdersResponse = await ordersRes.json();
+        setOrders(ordersData.orders);
+        setOrderDate(ordersData.date);
+      } else {
+        setOrdersError("주문 정보를 불러오는데 실패했습니다.");
+        setOrders([]);
+      }
+
+      // 주문 처리 완료 후 계좌 조회 (업데이트된 보유현황 포함)
+      const accountRes = await fetch(`/api/trading/accounts/${accountId}`);
 
       if (!accountRes.ok) {
         if (accountRes.status === 404) {
@@ -101,16 +112,6 @@ export default function TradingDetailClient({
 
       const accountData: AccountResponse = await accountRes.json();
       setAccount(accountData.account);
-
-      setOrdersError(null);
-      if (ordersRes.ok) {
-        const ordersData: OrdersResponse = await ordersRes.json();
-        setOrders(ordersData.orders);
-        setOrderDate(ordersData.date);
-      } else {
-        setOrdersError("주문 정보를 불러오는데 실패했습니다.");
-        setOrders([]);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
