@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/update-prices",
-      "schedule": "30 0 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",

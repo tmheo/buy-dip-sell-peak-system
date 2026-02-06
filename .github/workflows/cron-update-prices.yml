@@ -1,0 +1,28 @@
+name: Daily Price Update
+
+on:
+  schedule:
+    # KST 09:30 = UTC 00:30
+    - cron: "30 0 * * *"
+  workflow_dispatch: # 수동 실행 지원
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call update-prices API
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://buy-dip-sell-peak-system.vercel.app/api/cron/update-prices")
+
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::API call failed with status $http_code"
+            exit 1
+          fi
