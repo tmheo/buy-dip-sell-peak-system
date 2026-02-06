@@ -142,25 +142,25 @@ function GrandTotalCard({ grandTotal }: GrandTotalCardProps): React.ReactElement
     <div className="card bg-secondary bg-opacity-25 border-secondary mt-4">
       <div className="card-body py-3">
         <div className="row text-center">
-          <div className="col">
+          <div className="col-4 col-md">
             <div className="text-secondary small">총 거래</div>
             <div className="fw-bold text-light">{grandTotal.totalTrades}건</div>
           </div>
-          <div className="col">
+          <div className="col-4 col-md">
             <div className="text-secondary small">총 매수금액</div>
             <div className="fw-bold text-light">{formatCurrency(grandTotal.totalBuyAmount)}</div>
           </div>
-          <div className="col">
+          <div className="col-4 col-md">
             <div className="text-secondary small">총 매도금액</div>
             <div className="fw-bold text-light">{formatCurrency(grandTotal.totalSellAmount)}</div>
           </div>
-          <div className="col">
+          <div className="col-4 col-md">
             <div className="text-secondary small">총 수익</div>
             <div className={`fw-bold ${getProfitColorClass(grandTotal.totalProfit)}`}>
               {formatCurrency(grandTotal.totalProfit)}
             </div>
           </div>
-          <div className="col">
+          <div className="col-4 col-md">
             <div className="text-secondary small">평균 수익률</div>
             <div className={`fw-bold ${getProfitColorClass(grandTotal.averageProfitRate)}`}>
               {formatPercent(grandTotal.averageProfitRate)}

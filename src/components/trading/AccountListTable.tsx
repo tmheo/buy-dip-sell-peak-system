@@ -63,77 +63,134 @@ export default function AccountListTable({
   }
 
   return (
-    <div className="card bg-dark border-secondary">
-      <div className="card-body p-0">
-        <div className="table-responsive">
-          <table className="table table-dark table-striped table-hover mb-0">
-            <thead>
-              <tr>
-                <th className="text-center">#</th>
-                <th>계좌 이름</th>
-                <th className="text-center">종목</th>
-                <th className="text-end">시드</th>
-                <th className="text-center">전략</th>
-                <th className="text-center">보유</th>
-                <th className="text-center">시작일</th>
-                <th className="text-center">회차</th>
-                <th className="text-center">작업</th>
-                <th className="text-center">삭제</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((account, index) => {
-                const heldTiers = countHeldTiers(account.holdings);
-                const totalTiers = getTotalTiers(account.holdings);
+    <>
+      {/* 모바일 카드 뷰 (768px 이하) */}
+      <div className="trading-mobile-card">
+        {accounts.map((account) => {
+          const heldTiers = countHeldTiers(account.holdings);
+          const totalTiers = getTotalTiers(account.holdings);
 
-                return (
-                  <tr key={account.id}>
-                    <td className="text-center">{index + 1}</td>
-                    <td>
-                      <span className="text-light">{account.name}</span>
-                    </td>
-                    <td className="text-center">
-                      <span className="badge bg-info">{account.ticker}</span>
-                    </td>
-                    <td className="text-end">{formatCurrency(account.seedCapital)}</td>
-                    <td className="text-center">
-                      <span className="badge bg-secondary">{account.strategy}</span>
-                    </td>
-                    <td className="text-center">
-                      <span className={heldTiers > 0 ? "text-success" : "text-secondary"}>
-                        {heldTiers}/{totalTiers}
-                      </span>
-                    </td>
-                    <td className="text-center">{formatDate(account.cycleStartDate)}</td>
-                    <td className="text-center">
-                      <span className="badge bg-primary">{account.cycleNumber}</span>
-                    </td>
-                    <td className="text-center">
-                      <Link
-                        href={`/trading/${account.id}`}
-                        className="btn btn-sm btn-outline-primary"
-                      >
-                        자세히
-                      </Link>
-                    </td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => onDeleteClick(account)}
-                        data-bs-toggle="modal"
-                        data-bs-target="#deleteAccountModal"
-                      >
-                        삭제
-                      </button>
-                    </td>
+          return (
+            <div key={account.id} className="card bg-dark border-secondary mb-2">
+              <div className="card-body py-2">
+                <div className="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h6 className="card-title mb-1">{account.name}</h6>
+                    <div>
+                      <span className="badge bg-info">{account.ticker}</span>{" "}
+                      <span className="badge bg-secondary">{account.strategy}</span>{" "}
+                      <span className="badge bg-primary">{account.cycleNumber}회차</span>
+                    </div>
+                  </div>
+                  <div className="d-flex gap-1">
+                    <Link
+                      href={`/trading/${account.id}`}
+                      className="btn btn-sm btn-outline-primary"
+                    >
+                      자세히
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() => onDeleteClick(account)}
+                      data-bs-toggle="modal"
+                      data-bs-target="#deleteAccountModal"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+                <div className="d-flex justify-content-between mt-2 small text-secondary">
+                  <span>시드: {formatCurrency(account.seedCapital)}</span>
+                  <span>
+                    보유:{" "}
+                    <span className={heldTiers > 0 ? "text-success" : "text-secondary"}>
+                      {heldTiers}/{totalTiers}
+                    </span>
+                  </span>
+                  <span>시작: {formatDate(account.cycleStartDate)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 데스크톱 테이블 뷰 (769px 이상) */}
+      <div className="trading-desktop-table">
+        <div className="card bg-dark border-secondary">
+          <div className="card-body p-0">
+            <div className="table-responsive">
+              <table className="table table-dark table-striped table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th className="text-center">#</th>
+                    <th>계좌 이름</th>
+                    <th className="text-center">종목</th>
+                    <th className="text-end">시드</th>
+                    <th className="text-center">전략</th>
+                    <th className="text-center">보유</th>
+                    <th className="text-center">시작일</th>
+                    <th className="text-center">회차</th>
+                    <th className="text-center">작업</th>
+                    <th className="text-center">삭제</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {accounts.map((account, index) => {
+                    const heldTiers = countHeldTiers(account.holdings);
+                    const totalTiers = getTotalTiers(account.holdings);
+
+                    return (
+                      <tr key={account.id}>
+                        <td className="text-center">{index + 1}</td>
+                        <td>
+                          <span className="text-light">{account.name}</span>
+                        </td>
+                        <td className="text-center">
+                          <span className="badge bg-info">{account.ticker}</span>
+                        </td>
+                        <td className="text-end">{formatCurrency(account.seedCapital)}</td>
+                        <td className="text-center">
+                          <span className="badge bg-secondary">{account.strategy}</span>
+                        </td>
+                        <td className="text-center">
+                          <span className={heldTiers > 0 ? "text-success" : "text-secondary"}>
+                            {heldTiers}/{totalTiers}
+                          </span>
+                        </td>
+                        <td className="text-center">{formatDate(account.cycleStartDate)}</td>
+                        <td className="text-center">
+                          <span className="badge bg-primary">{account.cycleNumber}</span>
+                        </td>
+                        <td className="text-center">
+                          <Link
+                            href={`/trading/${account.id}`}
+                            className="btn btn-sm btn-outline-primary"
+                          >
+                            자세히
+                          </Link>
+                        </td>
+                        <td className="text-center">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => onDeleteClick(account)}
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteAccountModal"
+                          >
+                            삭제
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
