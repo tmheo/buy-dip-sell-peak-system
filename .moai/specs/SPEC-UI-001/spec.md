@@ -117,7 +117,7 @@ lifecycle_level: spec-first
 
 ### 3.2 제외 범위
 
-- 태블릿(768px~1024px) 전용 레이아웃
+- 태블릿(769px~1024px) 전용 레이아웃
 - 기존 Desktop 레이아웃 변경
 - 새로운 CSS 프레임워크 도입
 - PWA 또는 모바일 앱 전환
