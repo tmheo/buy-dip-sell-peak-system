@@ -1,5 +1,14 @@
 # 로컬 Claude Code 설정
 
+## Deployment
+
+- **Vercel Domain**: https://buy-dip-sell-peak-system.vercel.app
+- **Vercel Plan**: Hobby
+- **GitHub Repo**: tmheo/buy-dip-sell-peak-system
+- **Cron**: GitHub Actions (`30 0 * * *` UTC = KST 09:30)
+
+---
+
 ## Environment Setup
 
 When running git commands or pre-commit hooks, always source ~/.zshrc first (or run `eval "$(fnm env)"`) to ensure node/npm/npx are available in the shell environment.
