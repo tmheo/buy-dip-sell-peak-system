@@ -71,6 +71,7 @@
 - **전략 추천 페이지**: 기준일 기반 최적 전략 추천 (유사 구간 분석)
 - **백테스트 추천 페이지**: 사이클별 추천 전략을 적용한 동적 백테스트
 - **반응형 디자인**: 데스크톱, 태블릿, 모바일 화면 최적화
+- **모바일 반응형 개선**: CSS 미디어 쿼리 기반 모바일 최적화, 트레이딩 테이블 카드 뷰, 네비게이션/폼/카드 반응형 레이아웃
 - **다크 테마**: Bootswatch Solar 테마 기반의 눈 편한 UI
 
 ### 6. 사용자 인증 및 계정 관리
@@ -114,9 +115,11 @@
 
 ### 11. Cron 기반 자동 데이터 업데이트
 
-- **Vercel Cron Jobs**: 매일 미국 장 마감 후 자동으로 가격 데이터 및 기술적 지표 업데이트
+- **GitHub Actions Cron**: 매일 UTC 00:30 (KST 09:30) 스케줄 워크플로우(`.github/workflows/cron-update-prices.yml`)로 가격 데이터 및 기술적 지표 자동 업데이트
+- **Vercel API 호출**: GitHub Actions에서 Vercel에 호스팅된 API 엔드포인트를 호출하여 데이터 업데이트 수행
 - **전체 티커 자동 처리**: SOXL, TQQQ 등 지원 티커 전체를 순차적으로 업데이트
 - **보안 인증**: `CRON_SECRET` 기반 Bearer 토큰 인증으로 무단 호출 방지
+- **수동 실행 지원**: `workflow_dispatch` 이벤트를 통한 수동 트리거 지원
 - **에러 리포팅**: 티커별 업데이트 결과(성공/실패/신규 레코드 수)를 JSON 응답으로 반환
 
 ### 12. 데이터 이관 (Local Supabase -> Cloud Supabase)
@@ -217,6 +220,8 @@ npm run dev init-all
 - [x] Vitest 테스트 프레임워크 도입
 - [x] Vercel 배포 및 Cron 기반 자동 데이터 업데이트 (SPEC-DEPLOY-003)
 - [x] Local Supabase -> Cloud Supabase 데이터 이관 스크립트
+- [x] 모바일 반응형 개선 (SPEC-UI-001)
+- [x] GitHub Actions Cron 기반 자동 데이터 업데이트
 
 ### 진행 예정 항목
 

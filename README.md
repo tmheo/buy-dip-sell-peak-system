@@ -195,7 +195,7 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 | GET | `/api/trading/accounts/[id]/holdings` | 티어 보유현황 | 필요 |
 | GET/POST | `/api/trading/accounts/[id]/orders` | 당일 주문 | 필요 |
 | GET | `/api/trading/accounts/[id]/profits` | 수익 현황 (월별) | 필요 |
-| GET | `/api/cron/update-prices` | 일일 가격/지표 자동 업데이트 (Cron) | CRON_SECRET |
+| GET | `/api/cron/update-prices` | 일일 가격/지표 자동 업데이트 (GitHub Actions) | CRON_SECRET |
 
 ---
 
@@ -220,6 +220,10 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 ### 프로젝트 구조
 
 ```
+.github/
+└── workflows/
+    └── cron-update-prices.yml       # 일일 자동 업데이트 (GitHub Actions)
+
 scripts/
 ├── generate-favicon.mjs             # 파비콘 생성 스크립트
 ├── migrate-to-cloud.sh              # Local -> Cloud Supabase 데이터 이관
@@ -345,7 +349,7 @@ src/
 | CSS | Bootstrap 5.3.3 | Bootswatch Solar 테마 |
 | 차트 | Recharts 3.6 | - |
 | 인증 | NextAuth.js 5 (beta) | Google OAuth |
-| 배포 | Vercel | Cron Jobs, Edge Functions |
+| 배포 | Vercel + GitHub Actions | 자동 업데이트 Cron, Edge Functions |
 | 폰트 | Noto Sans KR | Google Fonts |
 
 ### 데이터 흐름
@@ -362,7 +366,7 @@ Next.js App → Drizzle ORM → Supabase Local (localhost:54322)
 프로덕션 환경:
 ```
 Vercel → Drizzle ORM → Supabase Cloud (Connection Pooler)
-Vercel Cron (00:30 UTC) → Yahoo Finance → Drizzle ORM → Supabase Cloud
+GitHub Actions (00:30 UTC) → Vercel API → Yahoo Finance → Drizzle ORM → Supabase Cloud
 ```
 
 ---
@@ -669,8 +673,8 @@ Vercel에 자동 배포됩니다.
 
 - **프로덕션 배포**: `main` 브랜치 푸시 시 자동
 - **프리뷰 배포**: PR 생성 시 자동
-- **Cron Job**: 매일 00:30 UTC (KST 09:30)에 가격/지표 자동 업데이트
-- **CRON_SECRET**: Vercel 환경 변수로 설정 (Cron 인증용 Bearer 토큰)
+- **Cron**: GitHub Actions (`30 0 * * *` UTC = KST 09:30)
+- **CRON_SECRET**: GitHub Actions Cron 인증용 Bearer 토큰 (Vercel 환경 변수로 설정)
 
 #### 데이터 이관 (Local -> Cloud)
 

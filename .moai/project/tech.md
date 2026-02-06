@@ -438,7 +438,7 @@ npx tsx src/index.ts init --ticker SOXL
 | `prepare` | `husky` | Husky 설치 |
 | `test` | `vitest` | 테스트 실행 |
 | `test:coverage` | `vitest run --coverage` | 커버리지 리포트 |
-| `web:dev` | `next dev --turbopack` | Next.js 개발 서버 (Turbopack) |
+| `web:dev` | `next dev` | Next.js 개발 서버 |
 | `web:build` | `next build` | Next.js 프로덕션 빌드 |
 | `web:start` | `next start` | Next.js 프로덕션 서버 |
 | `db:generate` | `drizzle-kit generate` | Drizzle 마이그레이션 파일 생성 |
@@ -522,6 +522,7 @@ npm run web:start
 | 플랫폼 | 용도 | 설명 |
 |--------|------|------|
 | **Vercel** | 웹 호스팅 | Next.js 최적화 배포 |
+| **GitHub Actions** | CI/CD | Cron 기반 자동 데이터 업데이트 |
 | **Supabase** | 데이터베이스 | PostgreSQL 클라우드 호스팅 |
 
 ### Vercel (배포 플랫폼)
@@ -530,25 +531,43 @@ npm run web:start
 - Next.js 공식 호스팅 플랫폼으로 최적화된 배포 파이프라인
 - Serverless Functions로 API 라우트 자동 배포
 - Edge Network를 통한 글로벌 CDN 제공
-- Cron Jobs 기능으로 스케줄링된 작업 실행
 
 **주요 기능 활용:**
 
 | 기능 | 설명 |
 |------|------|
 | Serverless Functions | API 라우트 자동 서버리스 배포 |
-| Cron Jobs | 일일 가격/지표 자동 업데이트 스케줄링 |
 | Edge Network | 정적 자산 글로벌 CDN 배포 |
 | Environment Variables | 프로덕션 환경 변수 관리 |
 
 **Cron 보안 인증:**
+- GitHub Actions에서 Vercel API 엔드포인트(`/api/cron/update-prices`)를 호출하여 Cron 실행
 - `CRON_SECRET` 환경 변수를 통한 Bearer 토큰 인증
 - Node.js `crypto.timingSafeEqual`을 사용한 타이밍 공격 방지 토큰 비교
-- `vercel.json`에서 Cron 스케줄 및 API 헤더 설정
 
 **설정 파일 (`vercel.json`):**
-- Cron 스케줄: 매일 미국 장 마감 후 자동 실행
-- API 헤더: Authorization 헤더 자동 주입
+- API 헤더: Cache-Control 헤더 설정
+
+### GitHub Actions (자동화)
+
+**선택 이유:**
+- Vercel Hobby 플랜의 Cron 제한 해소
+- `workflow_dispatch`를 통한 수동 실행 지원
+- GitHub 네이티브 통합으로 모니터링 용이
+
+**주요 기능 활용:**
+
+| 기능 | 설명 |
+|------|------|
+| Scheduled Workflow | 매일 KST 09:30에 가격/지표 자동 업데이트 |
+| Manual Dispatch | 필요 시 수동 실행 가능 |
+| Secret Management | `CRON_SECRET` 시크릿 관리 |
+
+**워크플로우 (`cron-update-prices.yml`):**
+- 스케줄: `30 0 * * *` (UTC 00:30 = KST 09:30)
+- 동작: Vercel 배포된 `/api/cron/update-prices` 엔드포인트 호출
+- 인증: `CRON_SECRET` Bearer 토큰
+- 실패 감지: HTTP 상태 코드 기반 에러 리포팅
 
 ### 배포 고려사항
 
@@ -621,7 +640,7 @@ npm run web:start
 
 - [ ] **Docker**: 컨테이너화를 통한 환경 독립성
 - [x] **Vercel 배포**: Cron Jobs, Serverless Functions, Edge Network
-- [ ] **CI/CD**: GitHub Actions를 통한 자동화 파이프라인
+- [x] **CI/CD**: GitHub Actions를 통한 자동 데이터 업데이트 파이프라인
 - [ ] **모니터링**: Sentry 또는 LogRocket 연동
 - [x] **테스트**: Vitest를 활용한 유닛/통합 테스트
 - [x] **웹 UI**: React/Next.js 기반 대시보드

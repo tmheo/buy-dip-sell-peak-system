@@ -4,6 +4,9 @@
 
 ```
 buy-dip-sell-peak-system/
+├── .github/                          # GitHub Actions 설정
+│   └── workflows/                    # CI/CD 워크플로우
+│       └── cron-update-prices.yml    # 일일 가격/지표 자동 업데이트 (KST 09:30)
 ├── scripts/                          # 유틸리티 스크립트
 │   ├── generate-favicon.mjs          # 파비콘 생성 스크립트
 │   ├── migrate-to-cloud.sh           # Local Supabase → Cloud Supabase 데이터 이관
@@ -36,6 +39,7 @@ buy-dip-sell-peak-system/
 │   │   ├── recommend/                # 전략 추천 페이지
 │   │   └── trading/                  # 트레이딩 페이지
 │   ├── backtest/                     # 백테스트 엔진 모듈
+│   │   ├── __tests__/               # 백테스트 단위 테스트
 │   │   ├── types.ts                  # 백테스트 타입 정의
 │   │   ├── engine.ts                 # 백테스트 엔진
 │   │   ├── strategy.ts               # Pro1/Pro2/Pro3 전략 정의
@@ -54,6 +58,7 @@ buy-dip-sell-peak-system/
 │   │   ├── score.ts                  # 전략 점수 계산
 │   │   └── types.ts                  # 추천 타입 정의
 │   ├── optimize/                     # 최적화 엔진 (유전 알고리즘)
+│   │   ├── __tests__/               # 최적화 단위 테스트
 │   ├── components/                   # React 공통 컴포넌트
 │   │   ├── auth/                     # 인증 컴포넌트
 │   │   ├── backtest/                 # 백테스트 컴포넌트
@@ -62,6 +67,7 @@ buy-dip-sell-peak-system/
 │   │   ├── recommend/                # 전략 추천 컴포넌트
 │   │   └── trading/                  # 트레이딩 컴포넌트
 │   ├── database/                     # 데이터베이스 모듈
+│   │   ├── __tests__/               # 데이터베이스 단위 테스트
 │   │   ├── schema/                   # Drizzle ORM 스키마
 │   │   │   ├── index.ts              # 스키마 통합 export
 │   │   │   ├── auth.ts               # 인증 테이블 (users, accounts, sessions)
@@ -83,12 +89,14 @@ buy-dip-sell-peak-system/
 │   │   ├── users.ts                  # 사용자 데이터 접근
 │   │   └── trading.ts                # 트레이딩 통합 (레거시 호환)
 │   ├── services/                     # 외부 서비스 연동
+│   │   ├── __tests__/               # 서비스 단위 테스트
 │   │   ├── dataFetcher.ts            # Yahoo Finance API
 │   │   └── metricsCalculator.ts      # 기술적 지표 계산
 │   ├── lib/                          # 유틸리티 및 공통 모듈
 │   │   ├── auth/                     # 인증 관련 모듈
 │   │   │   └── api-auth.ts           # API 인증 유틸리티
 │   │   ├── validations/              # Zod 스키마
+│   │   │   ├── __tests__/           # 검증 스키마 단위 테스트
 │   │   │   └── trading.ts            # 트레이딩 입력값 검증 스키마
 │   │   ├── api-utils.ts              # API 라우트 공통 유틸리티
 │   │   └── date.ts                   # 날짜 유틸리티
@@ -108,7 +116,7 @@ buy-dip-sell-peak-system/
 ├── .moai/                            # MoAI 프로젝트 설정
 │   ├── config/                       # 프로젝트 구성 파일
 │   └── project/                      # 프로젝트 문서
-├── vercel.json                       # Vercel 배포 설정 (Cron 스케줄, API 헤더)
+├── vercel.json                       # Vercel 배포 설정 (API 헤더)
 ├── drizzle.config.ts                 # Drizzle Kit 설정
 ├── auth.ts                           # Auth.js v5 설정
 ├── package.json                      # npm 프로젝트 설정
@@ -136,6 +144,14 @@ buy-dip-sell-peak-system/
 | `multi-year-optimize.ts` | 유사도 가중치/허용오차 최적화 |
 | `precompute-recommendations.ts` | 모든 날짜의 추천 전략 사전 계산 |
 | `test-recommend-backtest.ts` | 추천 백테스트 엔진 검증 테스트 |
+
+### `.github/workflows/` - CI/CD 워크플로우
+
+GitHub Actions 기반의 자동화 워크플로우입니다.
+
+| 워크플로우 | 설명 |
+|-----------|------|
+| `cron-update-prices.yml` | 매일 KST 09:30에 가격/지표 자동 업데이트 (Vercel API 호출) |
 
 ### `src/` - 소스 코드
 
