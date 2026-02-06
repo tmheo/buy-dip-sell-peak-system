@@ -2,7 +2,7 @@
 
 ## 시나리오 1: TopControlBar 모바일 레이아웃
 
-**Given** 사용자가 375px 너비의 모바일 기기에서 접속하고
+**Given** 사용자가 375px~768px 너비의 모바일 기기에서 접속하고
 **When** 로그인 상태에서 어떤 페이지든 방문하면
 **Then** TopControlBar의 모든 버튼이 화면 내에 표시되고 overflow가 발생하지 않아야 한다
 
