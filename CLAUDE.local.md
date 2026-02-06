@@ -1,5 +1,7 @@
 # 로컬 Claude Code 설정
 
+**주의: 이 파일은 .gitignore에 포함되어 있지 않으며, git으로 추적/관리됩니다. 커밋 시 반드시 포함할 것.**
+
 ## Deployment
 
 - **Vercel Domain**: https://buy-dip-sell-peak-system.vercel.app
