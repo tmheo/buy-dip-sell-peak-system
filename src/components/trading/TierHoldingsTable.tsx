@@ -67,6 +67,19 @@ export default function TierHoldingsTable({
     return holding && holding.shares > 0;
   });
 
+  // 티어별 데이터 사전 계산 (데스크톱/모바일 공통)
+  const tierData = Array.from({ length: TIER_COUNT }, (_, i) => {
+    const tier = i + 1;
+    const holding = holdingsByTier.get(tier);
+    const ratio = ratios[tier - 1];
+    const isReserveTier = tier === 7;
+    const allocatedSeed = isReserveTier
+      ? (allMainTiersFilled ? cashBalance : 0)
+      : (seedCapital * ratio) / 100;
+    const hasShares = holding && holding.shares > 0;
+    return { tier, holding, ratio, isReserveTier, allocatedSeed, hasShares };
+  });
+
   return (
     <div className="card bg-dark border-secondary mb-4">
       <div className="card-header border-secondary">
@@ -91,17 +104,7 @@ export default function TierHoldingsTable({
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: TIER_COUNT }, (_, i) => i + 1).map((tier) => {
-                  const holding = holdingsByTier.get(tier);
-                  const ratio = ratios[tier - 1];
-                  const isReserveTier = tier === 7;
-                  // 예비 티어는 티어 1~6이 모두 매수된 경우에만 남은 예수금 표시
-                  const allocatedSeed = isReserveTier
-                    ? (allMainTiersFilled ? cashBalance : 0)
-                    : (seedCapital * ratio) / 100;
-                  const hasShares = holding && holding.shares > 0;
-
-                  return (
+                {tierData.map(({ tier, holding, ratio, isReserveTier, allocatedSeed, hasShares }) => (
                     <tr key={tier} className={hasShares ? "table-active" : ""}>
                       <td className="text-center">
                         <span className={hasShares ? "badge bg-success" : "badge bg-secondary"}>
@@ -119,7 +122,7 @@ export default function TierHoldingsTable({
                       <td className="text-end">{formatCurrency(holding?.buyPrice ?? null)}</td>
                       <td className="text-end">
                         {hasShares ? (
-                          <span className="text-success">{holding.shares.toLocaleString()}</span>
+                          <span className="text-success">{holding?.shares.toLocaleString()}</span>
                         ) : (
                           "-"
                         )}
@@ -127,8 +130,7 @@ export default function TierHoldingsTable({
                       <td className="text-end">{formatCurrency(holding?.sellTargetPrice ?? null)}</td>
                       <td className="text-center">{calculateHoldingDays(holding?.buyDate ?? null)}</td>
                     </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           </div>
@@ -136,16 +138,7 @@ export default function TierHoldingsTable({
 
         {/* 모바일: 티어 카드 뷰 (768px 이하) */}
         <div className="trading-mobile-card p-2">
-          {Array.from({ length: TIER_COUNT }, (_, i) => i + 1).map((tier) => {
-            const holding = holdingsByTier.get(tier);
-            const ratio = ratios[tier - 1];
-            const isReserveTier = tier === 7;
-            const allocatedSeed = isReserveTier
-              ? (allMainTiersFilled ? cashBalance : 0)
-              : (seedCapital * ratio) / 100;
-            const hasShares = holding && holding.shares > 0;
-
-            return (
+          {tierData.map(({ tier, holding, ratio, isReserveTier, allocatedSeed, hasShares }) => (
               <div
                 key={tier}
                 className={`card mb-2 bg-dark ${hasShares ? "border-success" : "border-secondary"}`}
@@ -166,7 +159,7 @@ export default function TierHoldingsTable({
                     <div className="col-6 text-end text-secondary">
                       수량:{" "}
                       {hasShares ? (
-                        <span className="text-success">{holding.shares.toLocaleString()}</span>
+                        <span className="text-success">{holding?.shares.toLocaleString()}</span>
                       ) : (
                         "-"
                       )}
@@ -180,8 +173,7 @@ export default function TierHoldingsTable({
                   </div>
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       </div>
     </div>
