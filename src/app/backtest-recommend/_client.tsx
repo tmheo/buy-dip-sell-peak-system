@@ -110,40 +110,37 @@ export default function BacktestRecommendPageClient() {
               <label htmlFor="startDate" className="form-label small mb-1">시작일</label>
               <input
                 type="date"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-date"
                 id="startDate"
                 name="startDate"
                 value={form.startDate}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 required
-                style={{ width: "140px" }}
               />
             </div>
             <div>
               <label htmlFor="endDate" className="form-label small mb-1">종료일</label>
               <input
                 type="date"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-date"
                 id="endDate"
                 name="endDate"
                 value={form.endDate}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 required
-                style={{ width: "140px" }}
               />
             </div>
             <div>
               <label htmlFor="symbol" className="form-label small mb-1">종목 선택</label>
               <select
-                className="form-select form-select-sm"
+                className="form-select form-select-sm form-input-select"
                 id="symbol"
                 name="symbol"
                 value={form.symbol}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                style={{ width: "100px" }}
               >
                 <option value="SOXL">SOXL</option>
                 <option value="TQQQ">TQQQ</option>
@@ -153,7 +150,7 @@ export default function BacktestRecommendPageClient() {
               <label htmlFor="initialCapital" className="form-label small mb-1">초기자본</label>
               <input
                 type="number"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
                 value={form.initialCapital}
@@ -161,15 +158,13 @@ export default function BacktestRecommendPageClient() {
                 disabled={isLoading}
                 min={1000}
                 step={1000}
-                style={{ width: "100px" }}
               />
             </div>
             <div>
               <button
                 type="submit"
-                className="btn btn-success btn-sm"
+                className="btn btn-success btn-sm form-input-btn"
                 disabled={isLoading}
-                style={{ height: "31px" }}
               >
                 {isLoading ? (
                   <>

@@ -33,10 +33,10 @@ export default async function TopControlBar() {
         </div>
 
         {/* 오른쪽: 사용자 정보 및 버튼들 */}
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2 flex-wrap">
           {session?.user ? (
             <>
-              <span className="text-light me-2">
+              <span className="text-light me-2 d-none d-md-inline">
                 {session.user.name ?? session.user.email}
               </span>
               <LogoutButton />
