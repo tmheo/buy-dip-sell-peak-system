@@ -146,14 +146,13 @@ export default function RecommendPageClient() {
               </label>
               <input
                 type="date"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-date"
                 id="referenceDate"
                 name="referenceDate"
                 value={form.referenceDate}
                 onChange={handleInputChange}
                 disabled={isLoading || form.baseType === "today"}
                 required
-                style={{ width: "140px" }}
               />
             </div>
 
@@ -163,13 +162,12 @@ export default function RecommendPageClient() {
                 종목 선택
               </label>
               <select
-                className="form-select form-select-sm"
+                className="form-select form-select-sm form-input-select"
                 id="ticker"
                 name="ticker"
                 value={form.ticker}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                style={{ width: "100px" }}
               >
                 <option value="SOXL">SOXL</option>
                 <option value="TQQQ">TQQQ</option>
@@ -180,9 +178,8 @@ export default function RecommendPageClient() {
             <div>
               <button
                 type="submit"
-                className="btn btn-success btn-sm"
+                className="btn btn-success btn-sm form-input-btn"
                 disabled={isLoading}
-                style={{ height: "31px" }}
               >
                 {isLoading ? (
                   <>

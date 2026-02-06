@@ -1,9 +1,10 @@
 ---
 id: SPEC-UI-001
 version: "1.0.0"
-status: approved
+status: completed
 created: "2026-02-06"
 updated: "2026-02-06"
+completed: "2026-02-06"
 author: MoAI
 priority: high
 lifecycle_level: spec-first
@@ -148,3 +149,37 @@ lifecycle_level: spec-first
 | 7 | `src/components/trading/TierHoldingsTable.tsx` | 모바일 카드 뷰 추가 | REQ-04 |
 | 8 | `src/components/trading/ProfitStatusTable.tsx` | 모바일 최적화 | REQ-05 |
 | 9 | `src/components/recommend/SimilarPeriodCard.tsx` | 날짜 overflow 처리 | REQ-07 |
+
+---
+
+## 6. 구현 노트 (Implementation Notes)
+
+### 구현 일자: 2026-02-06
+
+### 구현 결과
+
+| 항목 | 결과 |
+|------|------|
+| 변경 파일 수 | 9개 (계획 대비 100% 일치) |
+| 코드 변경량 | +411 / -154 |
+| CSS 추가량 | 125줄 (기존 383줄의 32.6%, 50% 제한 내) |
+| TypeScript 에러 | 0 |
+| ESLint 에러 | 0 |
+| 새 의존성 | 없음 |
+
+### REQ별 구현 상태
+
+| REQ | 구현 방법 | 상태 |
+|-----|----------|------|
+| REQ-01 | Bootstrap `d-none d-md-inline`, `flex-wrap` 클래스 적용 | 완료 |
+| REQ-02 | 인라인 스타일 제거, CSS 클래스(form-input-*) + 미디어 쿼리 flex-column | 완료 |
+| REQ-03 | `trading-mobile-card` 패턴으로 계좌 카드 뷰 추가 | 완료 |
+| REQ-04 | 티어별 카드 뷰 추가, 보유 중 티어 `border-success` 강조 | 완료 |
+| REQ-05 | GrandTotalCard `col` → `col-4 col-md` (모바일 3+2 레이아웃) | 완료 |
+| REQ-06 | `btn-sm`, `form-control-sm` 최소 44px 높이, 터치 패딩 확대 | 완료 |
+| REQ-07 | `text-break` 클래스 + CSS word-break, 폰트 축소 | 완료 |
+
+### 계획 대비 차이점
+
+- 계획과 100% 일치. 추가 기능, 범위 변경, 미구현 항목 없음.
+- CSS 추가량은 예상(~150줄)보다 적은 125줄로 효율적 구현.

@@ -150,11 +150,11 @@ export default function SimilarPeriodCard({ period, rank }: SimilarPeriodCardPro
           <div className="row mb-3" style={{ fontSize: "0.85rem" }}>
             <div className="col-6">
               <small className="text-muted d-block">분석 구간</small>
-              <span>{period.startDate} ~ {period.endDate}</span>
+              <span className="text-break">{period.startDate} ~ {period.endDate}</span>
             </div>
             <div className="col-6">
               <small className="text-muted d-block">성과 확인 구간</small>
-              <span>{period.performanceStartDate} ~ {period.performanceEndDate}</span>
+              <span className="text-break">{period.performanceStartDate} ~ {period.performanceEndDate}</span>
             </div>
           </div>
 

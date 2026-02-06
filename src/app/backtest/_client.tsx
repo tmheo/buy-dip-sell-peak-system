@@ -171,14 +171,13 @@ export default function BacktestPageClient() {
               </label>
               <input
                 type="date"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-date"
                 id="startDate"
                 name="startDate"
                 value={form.startDate}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 required
-                style={{ width: "140px" }}
               />
             </div>
 
@@ -189,14 +188,13 @@ export default function BacktestPageClient() {
               </label>
               <input
                 type="date"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-date"
                 id="endDate"
                 name="endDate"
                 value={form.endDate}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 required
-                style={{ width: "140px" }}
               />
             </div>
 
@@ -206,13 +204,12 @@ export default function BacktestPageClient() {
                 종목 선택
               </label>
               <select
-                className="form-select form-select-sm"
+                className="form-select form-select-sm form-input-select"
                 id="symbol"
                 name="symbol"
                 value={form.symbol}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                style={{ width: "100px" }}
               >
                 <option value="SOXL">SOXL</option>
                 <option value="TQQQ">TQQQ</option>
@@ -226,7 +223,7 @@ export default function BacktestPageClient() {
               </label>
               <input
                 type="number"
-                className="form-control form-control-sm"
+                className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
                 value={form.initialCapital}
@@ -234,7 +231,6 @@ export default function BacktestPageClient() {
                 disabled={isLoading}
                 min={1000}
                 step={1000}
-                style={{ width: "100px" }}
               />
             </div>
 
@@ -242,9 +238,8 @@ export default function BacktestPageClient() {
             <div>
               <button
                 type="submit"
-                className="btn btn-success btn-sm"
+                className="btn btn-success btn-sm form-input-btn"
                 disabled={isLoading}
-                style={{ height: "31px" }}
               >
                 {isLoading ? (
                   <>

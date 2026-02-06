@@ -380,3 +380,128 @@ body {
     display: block !important;
   }
 }
+
+/* Mobile Responsive Styles (SPEC-UI-001 / TASK-001) */
+@media (max-width: 768px) {
+  /* --- 1. TopControlBar 모바일 레이아웃 --- */
+  .navbar .navbar-nav {
+    flex-wrap: wrap;
+  }
+  .navbar > .container-fluid > .d-flex {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.25rem !important;
+  }
+  .navbar .d-flex > .text-light.me-2 {
+    display: none;
+  }
+  .navbar .btn-outline-info,
+  .navbar .btn-outline-secondary {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* --- 2. 인라인 폼 모바일 스택 레이아웃 --- */
+  .info-section > .d-flex.justify-content-between {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .info-section form.d-flex {
+    flex-direction: column;
+    align-items: stretch !important;
+    width: 100%;
+    gap: 0.5rem !important;
+  }
+  .info-section form.d-flex > div {
+    width: 100%;
+  }
+  .info-section form .form-control,
+  .info-section form .form-select {
+    width: 100% !important;
+  }
+  .info-section form .btn {
+    width: 100%;
+    height: auto !important;
+  }
+  .info-section form .d-flex.gap-3 {
+    flex-direction: row;
+  }
+  .info-section h1 {
+    font-size: 1.25rem;
+  }
+  .info-section .lead {
+    font-size: 0.85rem;
+  }
+
+  /* --- 3. 터치 타겟 크기 (REQ-06: 최소 44px) --- */
+  .btn-sm {
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+  .form-control-sm,
+  .form-select-sm {
+    min-height: 44px;
+  }
+  .form-check-input {
+    width: 1.25em;
+    height: 1.25em;
+  }
+  .nav-link {
+    padding: 0.75rem 1rem;
+  }
+
+  /* --- 4. 테이블 스크롤 가이드 --- */
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-responsive::after {
+    content: "";
+    position: sticky;
+    right: 0;
+    display: block;
+    width: 30px;
+    height: 0;
+    margin-top: -100%;
+    box-shadow: -15px 0 15px -5px rgba(0, 43, 54, 0.9);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .table-responsive::-webkit-scrollbar {
+    height: 4px;
+  }
+  .table-responsive::-webkit-scrollbar-thumb {
+    background-color: #2aa198;
+    border-radius: 2px;
+  }
+
+  /* --- 5. GrandTotalCard 모바일 그리드 --- */
+  .card.bg-secondary .row.text-center > .col {
+    flex: 0 0 50%;
+    max-width: 50%;
+    margin-bottom: 0.5rem;
+  }
+  .card.bg-secondary .row.text-center > .col .small {
+    font-size: 0.7rem;
+  }
+  .card.bg-secondary .row.text-center > .col .fw-bold {
+    font-size: 0.85rem;
+  }
+
+  /* --- 6. SimilarPeriodCard 날짜 오버플로우 --- */
+  .card.bg-dark .card-body .col-6 span {
+    word-break: break-all;
+    font-size: 0.75rem;
+  }
+  .card.bg-dark .card-body .col-6 {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .card.bg-dark .table-sm {
+    font-size: 0.75rem;
+  }
+  .card.bg-dark .row.g-1 .col-4 .p-1 {
+    padding: 0.25rem !important;
+    font-size: 0.65rem;
+  }
+}
