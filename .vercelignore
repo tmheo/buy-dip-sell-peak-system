@@ -1,0 +1,21 @@
+# MoAI backups and cache
+.moai-backups/
+.moai/cache/
+.moai/memory/
+.moai/logs/
+
+# Claude Code
+.claude/plans/
+.claude/local/
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Experiments
+experiment-results/
+
+# Handoff
+HANDOFF.md
