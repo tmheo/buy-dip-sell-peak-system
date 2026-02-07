@@ -172,10 +172,10 @@ export async function generateDailyOrders(
     // 1. 보유 중인 티어들의 매도 주문 생성 (손절 또는 일반 매도)
     for (const holding of holdings) {
       if (holding.shares > 0 && holding.buyPrice && holding.buyDate) {
-        // 보유일 계산 (거래일 기준)
+        // 보유일 계산 (거래일 기준, 매수일 포함)
         const holdingDays = calculateTradingDays(holding.buyDate, date);
 
-        if (holdingDays >= stopLossDay) {
+        if (holdingDays > stopLossDay) {
           // 손절일 도달: MOC 주문 (시장가, 무조건 체결)
           const result = await tx
             .insert(dailyOrders)

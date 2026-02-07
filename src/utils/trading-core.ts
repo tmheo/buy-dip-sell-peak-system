@@ -133,9 +133,9 @@ export function getPreviousTradingDate(date: string): string {
 
 /**
  * 두 날짜 사이의 거래일 수 계산 (주말 제외)
- * 시작일 다음날부터 종료일까지의 거래일 수
+ * 시작일부터 종료일까지의 거래일 수 (시작일 포함)
  * UTC 기준으로 계산하여 타임존 문제 방지
- * 예: 월요일 시작 → 다음 월요일 종료 = 5 거래일 (화~금 + 월)
+ * 예: 월요일 시작 → 다음 월요일 종료 = 6 거래일 (월~금 + 월)
  *
  * @param startDate - 시작 날짜 (YYYY-MM-DD)
  * @param endDate - 종료 날짜 (YYYY-MM-DD)
@@ -149,7 +149,6 @@ export function calculateTradingDays(startDate: string, endDate: string): number
 
   let tradingDays = 0;
   const current = new Date(start);
-  current.setUTCDate(current.getUTCDate() + 1); // 시작일 다음날부터 계산
 
   while (current <= end) {
     const day = current.getUTCDay();

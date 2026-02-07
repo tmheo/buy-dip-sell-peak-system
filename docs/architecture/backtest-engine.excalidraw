@@ -457,7 +457,7 @@
       "y": 770,
       "width": 170,
       "height": 30,
-      "text": "② 손절 조건 확인\n(보유일 ≥ 손절일?)",
+      "text": "② 손절 조건 확인\n(보유일 > 손절일?)",
       "fontSize": 11,
       "fontFamily": 1,
       "textAlign": "center",
@@ -474,7 +474,7 @@
       "isDeleted": false,
       "boundElements": null,
       "containerId": "step2-stoploss-check",
-      "originalText": "② 손절 조건 확인\n(보유일 ≥ 손절일?)"
+      "originalText": "② 손절 조건 확인\n(보유일 > 손절일?)"
     },
     {
       "id": "step3-sell-order",
