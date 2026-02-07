@@ -58,6 +58,7 @@ env/
 # Test Coverage
 # ===========================================
 .coverage
+coverage/
 coverage.json
 htmlcov/
 
@@ -193,3 +194,15 @@ dist-ssr/
 .vercel/
 .netlify/
 .firebase/
+
+# ===========================================
+# MoAI Runtime Data
+# ===========================================
+.moai/cache/
+.moai/memory/
+
+# ===========================================
+# Project Runtime Data
+# ===========================================
+data/
+HANDOFF.md
