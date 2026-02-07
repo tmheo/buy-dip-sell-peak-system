@@ -434,7 +434,7 @@ body {
   }
 
   /* --- 3. 터치 타겟 크기 (REQ-06: 최소 44px) --- */
-  .btn-sm {
+  .btn.btn-sm {
     min-height: 44px;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
@@ -442,7 +442,7 @@ body {
     align-items: center;
     justify-content: center;
   }
-  .navbar .btn-sm {
+  .navbar .btn.btn-sm {
     min-height: auto;
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
