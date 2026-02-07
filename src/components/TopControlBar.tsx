@@ -45,20 +45,20 @@ export default async function TopControlBar() {
             <LoginButton />
           )}
           {session?.user ? (
-            <Link href="/trading" className="btn btn-outline-info">
+            <Link href="/trading" className="btn btn-outline-info btn-sm">
               Trading
             </Link>
           ) : (
-            <button className="btn btn-outline-info" type="button" disabled>
+            <button className="btn btn-outline-info btn-sm" type="button" disabled>
               Trading
             </button>
           )}
           {session?.user ? (
-            <Link href="/mypage" className="btn btn-outline-secondary">
+            <Link href="/mypage" className="btn btn-outline-secondary btn-sm">
               My Page
             </Link>
           ) : (
-            <button className="btn btn-outline-secondary" type="button" disabled>
+            <button className="btn btn-outline-secondary btn-sm" type="button" disabled>
               My Page
             </button>
           )}
