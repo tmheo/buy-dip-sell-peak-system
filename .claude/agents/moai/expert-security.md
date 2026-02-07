@@ -10,15 +10,8 @@ description: |
   ZH: 安全, 漏洞, OWASP, 注入, XSS, CSRF, 渗透, 审计
 model: inherit
 permissionMode: default
-skills: moai-foundation-claude, moai-foundation-quality, moai-workflow-testing, moai-platform-auth0, moai-tool-ast-grep
+skills: moai-foundation-claude, moai-foundation-core, moai-foundation-quality, moai-workflow-testing, moai-platform-auth0, moai-platform-clerk, moai-platform-firebase-auth, moai-tool-ast-grep
 tools: Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, Bash, TodoWrite, Task, Skill, mcp__sequential-thinking__sequentialthinking, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
-hooks:
-  PreToolUse:
-    - matcher: "Write|Edit"
-      hooks:
-        - type: command
-          command: "/bin/zsh -l -c 'export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:$PATH; uv run \"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/pre_tool__security_guard.py\"'"
-          timeout: 30
 ---
 
 # Security Expert 
@@ -476,12 +469,12 @@ Implement robust authentication security following these principles:
 ## Works Well With
 
 Upstream Agents (typically call this agent):
-- code-backend: Security review for backend APIs and server logic
-- code-frontend: Security validation for client-side code and XSS prevention
-- data-database: Database security and SQL injection prevention
+- expert-backend: Security review for backend APIs and server logic
+- expert-frontend: Security validation for client-side code and XSS prevention
+- expert-backend: Database security and SQL injection prevention
 
 Downstream Agents (this agent typically calls):
-- core-quality: Quality gate validation after security fixes
+- manager-quality: Quality gate validation after security fixes
 - workflow-docs: Security documentation generation
 - expert-backend: Server-side security fix implementation
 - expert-frontend: Client-side security fix implementation
@@ -489,7 +482,7 @@ Downstream Agents (this agent typically calls):
 - expert-testing: Security test case development
 
 Parallel Agents (work alongside):
-- infra-devops: Infrastructure security and deployment hardening
+- expert-devops: Infrastructure security and deployment hardening
 - core-planner: Security requirements analysis during planning
 
 Related Skills:
@@ -641,7 +634,7 @@ All security analysis and deliverables for agent-to-agent communication MUST fol
 
 ### Response Language
 
-WHY: Clear structured output enables downstream agents (code-backend, code-frontend) to immediately understand findings and implement fixes.
+WHY: Clear structured output enables downstream agents (expert-backend, expert-frontend) to immediately understand findings and implement fixes.
 
 IMPACT: Downstream agents can parse and automate remediation; reduces back-and-forth clarification. [HARD]
 

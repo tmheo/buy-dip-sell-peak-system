@@ -1,3 +1,33 @@
+---
+name: moai-workflow-fix
+description: >
+  One-shot autonomous fix workflow with parallel scanning and classification.
+  Finds LSP errors, linting issues, and type errors, classifies by severity,
+  applies safe fixes via agent delegation, and reports results.
+  Use when fixing errors, linting issues, or running diagnostics.
+license: Apache-2.0
+compatibility: Designed for Claude Code
+user-invocable: false
+metadata:
+  version: "2.0.0"
+  category: "workflow"
+  status: "active"
+  updated: "2026-02-07"
+  tags: "fix, auto-fix, lsp, linting, diagnostics, errors, type-check"
+
+# MoAI Extension: Progressive Disclosure
+progressive_disclosure:
+  enabled: true
+  level1_tokens: 100
+  level2_tokens: 5000
+
+# MoAI Extension: Triggers
+triggers:
+  keywords: ["fix", "auto-fix", "error", "lint", "diagnostic", "lsp", "type error"]
+  agents: ["expert-debug", "expert-backend", "expert-frontend", "expert-refactoring"]
+  phases: ["fix"]
+---
+
 # Workflow: Fix - One-Shot Auto-Fix
 
 Purpose: One-shot autonomous fix with parallel scanning and classification. AI finds issues, classifies by severity, applies safe fixes, and reports results.
@@ -13,15 +43,7 @@ Flow: Parallel Scan -> Classify -> Fix -> Verify -> Report
 - --security (alias --include-security): Include security issues in scan
 - --no-fmt (alias --no-format): Skip formatting fixes
 - --resume [ID] (alias --resume-from): Resume from snapshot (latest if no ID)
-
-## Context Loading
-
-Before execution, load these essential files:
-
-- .moai/config/sections/quality.yaml (LSP thresholds, coverage targets)
-- .moai/config/sections/language.yaml (conversation_language, code_comments)
-
-Pre-execution commands: git status, git diff.
+- --team: Enable team-based debugging (see team-debug.md for competing hypothesis investigation)
 
 ## Phase 1: Parallel Scan
 
@@ -51,6 +73,8 @@ After all scanners complete:
 - Group by file path for efficient fixing
 
 Language auto-detection uses indicator files: pyproject.toml (Python), package.json (TypeScript/JavaScript), go.mod (Go), Cargo.toml (Rust). Supports 16 languages.
+
+Error handling: If any scanner fails, continue with results from successful scanners. Note the failed scanner in the report.
 
 If --sequential flag: Run LSP, then AST-grep, then Linter sequentially.
 
@@ -85,20 +109,6 @@ If --dry flag: Display preview of all classified issues and exit without changes
 - Re-run affected diagnostics on modified files
 - Confirm fixes resolved the targeted issues
 - Detect any regressions introduced by fixes
-- Verify against LSP quality gate thresholds from quality.yaml (max_errors, max_type_errors, max_lint_errors)
-
-## Phase 5: Next Steps
-
-Tool: AskUserQuestion (at orchestrator level)
-
-Display fix summary: issues found, fixed, remaining, regressions detected.
-
-Options:
-
-- Commit Changes (recommended): Stage and commit fixed files via manager-git subagent
-- Review Changes: Examine modified files before committing
-- Continue Fixing: Apply remaining Level 3-4 fixes
-- Finish: Session complete, no commit
 
 ## Task Tracking
 
@@ -107,9 +117,16 @@ Options:
 - Before each fix: change to in_progress via TaskUpdate
 - After each fix: change to completed via TaskUpdate
 
+## Safe Development Protocol
+
+All fixes follow CLAUDE.md Section 7 Safe Development Protocol:
+- Reproduction-first: Write a failing test that reproduces the bug before fixing
+- Approach-first: For Level 3+ fixes, explain approach before applying
+- Post-fix review: List potential side effects after each fix
+
 ## Snapshot Save/Resume
 
-Snapshot location: .moai/cache/fix-snapshots/
+Snapshot location: $CLAUDE_PROJECT_DIR/.moai/cache/fix-snapshots/
 
 Snapshot contents:
 - Timestamp
@@ -120,56 +137,36 @@ Snapshot contents:
 - Scan results
 
 Resume commands:
-- /moai fix --resume (uses latest snapshot)
-- /moai fix --resume fix-20260119-143052 (uses specific snapshot)
+- /moai:fix --resume (uses latest snapshot)
+- /moai:fix --resume fix-20260119-143052 (uses specific snapshot)
 
-## Graceful Exit
+## Team Mode
 
-When user aborts at any decision point:
+When --team flag is provided, fix delegates to a team-based debugging workflow using competing hypotheses.
 
-- No changes made to files or Git history
-- Snapshot saved to .moai/cache/fix-snapshots/ for later resume
-- Display retry command: /moai fix --resume
-- Exit with code 0
+Team composition: 3 hypothesis agents (haiku) exploring different root causes in parallel.
+
+For detailed team orchestration steps, see workflows/team-debug.md.
+
+Fallback: If team mode is unavailable, standard single-agent fix workflow continues.
 
 ## Execution Summary
 
 1. Parse arguments (extract flags: --dry, --sequential, --level, --errors, --security, --resume)
 2. If --resume: Load snapshot and continue from saved state
-3. Load context (quality.yaml, language.yaml)
-4. Detect project language from indicator files
-5. Execute parallel scan (LSP + AST-grep + Linter)
-6. Aggregate results and remove duplicates
-7. Classify into Levels 1-4
-8. TaskCreate for all discovered issues
-9. If --dry: Display preview and exit
-10. Apply Level 1-2 fixes via agent delegation
-11. Request approval for Level 3 fixes via AskUserQuestion
-12. Verify fixes against LSP quality gate thresholds
-13. Save snapshot to .moai/cache/fix-snapshots/
-14. Present next steps via AskUserQuestion (commit, review, continue, finish)
-
-## Completion Criteria
-
-All of the following must be verified:
-
-- Context loaded: quality.yaml and language.yaml read
-- Phase 1: All scanners executed (LSP, AST-grep, Linter)
-- Phase 2: Issues classified into Levels 1-4
-- Task tracking: All issues tracked via TaskCreate/TaskUpdate
-- Phase 3: Level 1-2 fixes applied via agent delegation
-- Phase 3: Level 3 fixes applied only after user approval
-- Phase 4: Verification confirms no regressions
-- Phase 5: Next steps presented to user
-- Snapshot saved for potential resume
-
-## Agent Chain Summary
-
-- Phase 1: Bash (parallel diagnostic scans)
-- Phase 3: expert-backend, expert-frontend, expert-refactoring, expert-debug subagents (fix execution)
-- Phase 5: manager-git subagent (optional commit)
+3. Detect project language from indicator files
+4. Execute parallel scan (LSP + AST-grep + Linter)
+5. Aggregate results and remove duplicates
+6. Classify into Levels 1-4
+7. TaskCreate for all discovered issues
+8. If --dry: Display preview and exit
+9. Apply Level 1-2 fixes via agent delegation
+10. Request approval for Level 3 fixes via AskUserQuestion
+11. Verify fixes by re-running diagnostics
+12. Save snapshot to $CLAUDE_PROJECT_DIR/.moai/cache/fix-snapshots/
+13. Report with evidence (file:line changes)
 
 ---
 
-Version: 1.1.0
-Source: fix.md command v2.2.0. Added context loading, LSP quality gate verification, next steps, graceful exit, completion criteria.
+Version: 2.0.0
+Source: fix.md command v2.2.0

@@ -11,7 +11,7 @@ description: |
 tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash, TodoWrite, Task, Skill, mcp__sequential-thinking__sequentialthinking, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
 model: inherit
 permissionMode: default
-skills: moai-foundation-claude, moai-workflow-project, moai-workflow-templates, moai-workflow-worktree
+skills: moai-foundation-claude, moai-foundation-core, moai-foundation-philosopher, moai-workflow-project, moai-workflow-templates, moai-workflow-worktree, moai-workflow-spec, moai-foundation-context
 ---
 
 # Project Manager - Project Manager Agent
@@ -680,7 +680,7 @@ IF user selects "Start Over" or Context7 research unavailable:
 - Enter short-term (3 months), medium-term (6-12 months), and long-term (12 months+).
 - Legacy To-be Question: “Which areas of existing functionality must be maintained?”/ “Which modules are subject to disposal?”.
 - MoAI ADK adoption priority
-- Question: “What areas would you like to apply MoAI workflows to immediately?”
+- Question: "What areas would you like to apply MoAI workflows to immediately?"
   Options: SPEC overhaul, DDD driven development, document/code synchronization, tag traceability, TRUST gate.
 - Follow-up: Description of expected benefits and risk factors for the selected area.
 
@@ -962,7 +962,7 @@ Upstream Agents (typically call this agent):
 
 Downstream Agents (this agent typically calls):
 
-- workflow-spec: Create SPEC documents based on project initialization
+- manager-spec: Create SPEC documents based on project initialization
 - mcp-context7: Research project-specific best practices and technology versions
 - mcp-sequential-thinking: Complex project analysis requiring multi-step reasoning
 

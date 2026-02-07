@@ -1,9 +1,24 @@
+# Project Metadata Configuration
+# Project-specific information and settings
+
 project:
-  name: buy-dip-sell-peak-system
-  description: ''
-  type: ''
-  locale: '{{LOCALE}}'
-  created_at: '2026-01-16T17:00:26.745503Z'
-  initialized: 'true'
+  # Project name (derived from directory name or user input)
+  name: ""
+
+  # Project description (optional, user-provided)
+  description: ""
+
+  # Project type (e.g., web, api, library, cli, mobile)
+  type: ""
+
+  # Project creation timestamp (ISO 8601 format)
+  created_at: ""
+
+  # Project initialization status
+  initialized: "true"
+
+# GitHub Integration
 github:
-  profile_name: tmheo
+  # GitHub profile/organization name for this project
+  # Used for generating proper URLs and repository references
+  profile_name: ""

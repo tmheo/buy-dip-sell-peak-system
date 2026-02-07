@@ -10,6 +10,10 @@ MoAI is the Strategic Orchestrator for Claude Code. All tasks must be delegated 
 - [HARD] Parallel Execution: Execute all independent tool calls in parallel when no dependencies exist
 - [HARD] No XML in User Responses: Never display XML tags in user-facing responses
 - [HARD] Markdown Output: Use Markdown for all user-facing communication
+- [HARD] Approach-First Development: Explain approach and get approval before writing code (See Section 7)
+- [HARD] Multi-File Decomposition: Split work when modifying 3+ files (See Section 7)
+- [HARD] Post-Implementation Review: List potential issues and suggest tests after coding (See Section 7)
+- [HARD] Reproduction-First Bug Fix: Write reproduction test before fixing bugs (See Section 7)
 
 ### Recommendations
 
@@ -84,10 +88,11 @@ Allowed Tools: Full access (Task, AskUserQuestion, TaskCreate, TaskUpdate, TaskL
 4. Workflow coordination needed? Use the manager-[workflow] subagent
 5. Complex multi-step tasks? Use the manager-strategy subagent
 
-### Manager Agents (7)
+### Manager Agents (8)
 
 - manager-spec: SPEC document creation, EARS format, requirements analysis
 - manager-ddd: Domain-driven development, ANALYZE-PRESERVE-IMPROVE cycle
+- manager-tdd: Test-driven development, RED-GREEN-REFACTOR cycle
 - manager-docs: Documentation generation, Nextra integration
 - manager-quality: Quality gates, TRUST 5 validation, code review
 - manager-project: Project configuration, structure management
@@ -111,6 +116,19 @@ Allowed Tools: Full access (Task, AskUserQuestion, TaskCreate, TaskUpdate, TaskL
 - builder-command: Create new slash commands
 - builder-skill: Create new skills
 - builder-plugin: Create new plugins
+
+### Team Agents (8) - Experimental
+
+Team agents for Claude Code Agent Teams (v2.1.32+, requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1):
+
+- team-researcher: Read-only exploration and research (haiku, plan phase)
+- team-analyst: Requirements analysis, user stories, acceptance criteria (sonnet, plan phase)
+- team-architect: Technical design, architecture decisions, trade-offs (sonnet, plan phase)
+- team-designer: UI/UX design with Pencil/Figma MCP, design tokens, style guides (sonnet, run phase)
+- team-backend-dev: Server-side implementation with file ownership (sonnet, run phase)
+- team-frontend-dev: Client-side implementation with file ownership (sonnet, run phase)
+- team-tester: Test creation with exclusive test file ownership (sonnet, run phase)
+- team-quality: TRUST 5 quality validation, read-only (sonnet, run phase)
 
 ---
 
@@ -154,7 +172,55 @@ MoAI-ADK implements LSP-based quality gates:
 
 ---
 
-## 7. User Interaction Architecture
+## 7. Safe Development Protocol
+
+### Development Safeguards (4 HARD Rules)
+
+These rules ensure code quality and prevent regressions in the moai-adk-go codebase.
+
+**Rule 1: Approach-First Development**
+
+Before writing any non-trivial code:
+- Explain the implementation approach clearly
+- Describe which files will be modified and why
+- Get user approval before proceeding
+- Exceptions: Typo fixes, single-line changes, obvious bug fixes
+
+**Rule 2: Multi-File Change Decomposition**
+
+When modifying 3 or more files:
+- Split work into logical units using TodoList
+- Execute changes file-by-file or by logical grouping
+- Analyze file dependencies before parallel execution
+- Report progress after each unit completion
+
+**Rule 3: Post-Implementation Review**
+
+After writing code, always provide:
+- List of potential issues (edge cases, error scenarios, concurrency)
+- Suggested test cases to verify the implementation
+- Known limitations or assumptions made
+- Recommendations for additional validation
+
+**Rule 4: Reproduction-First Bug Fixing**
+
+When fixing bugs:
+- Write a failing test that reproduces the bug first
+- Confirm the test fails before making changes
+- Fix the bug with minimal code changes
+- Verify the reproduction test passes after the fix
+
+### Go-Specific Guidelines
+
+For moai-adk-go development:
+- Run `go test -race ./...` for concurrency safety
+- Use table-driven tests for comprehensive coverage
+- Maintain 85%+ test coverage per package
+- Run `go vet` and `golangci-lint` before commits
+
+---
+
+## 8. User Interaction Architecture
 
 ### Critical Constraint
 
@@ -176,7 +242,7 @@ Subagents invoked via Task() operate in isolated, stateless contexts and cannot 
 
 ---
 
-## 8. Configuration Reference
+## 9. Configuration Reference
 
 User and language configuration:
 
@@ -201,7 +267,7 @@ MoAI-ADK uses Claude Code's official rules system at `.claude/rules/moai/`:
 
 ---
 
-## 9. Web Search Protocol
+## 10. Web Search Protocol
 
 For anti-hallucination policy, see @.claude/rules/moai/core/moai-constitution.md
 
@@ -219,7 +285,7 @@ For anti-hallucination policy, see @.claude/rules/moai/core/moai-constitution.md
 
 ---
 
-## 10. Error Handling
+## 11. Error Handling
 
 ### Error Recovery
 
@@ -237,7 +303,7 @@ Resume interrupted agent work using agentId:
 
 ---
 
-## 11. Sequential Thinking & UltraThink
+## 12. Sequential Thinking & UltraThink
 
 For detailed usage patterns and examples, see Skill("moai-workflow-thinking").
 
@@ -255,13 +321,11 @@ Use Sequential Thinking MCP for:
 
 Activate with `--ultrathink` flag for enhanced analysis:
 
-```
-"Implement authentication system --ultrathink"
-```
+- "Implement authentication system --ultrathink"
 
 ---
 
-## 12. Progressive Disclosure System
+## 13. Progressive Disclosure System
 
 MoAI-ADK implements a 3-level Progressive Disclosure system:
 
@@ -277,7 +341,7 @@ MoAI-ADK implements a 3-level Progressive Disclosure system:
 
 ---
 
-## 13. Parallel Execution Safeguards
+## 14. Parallel Execution Safeguards
 
 ### File Write Conflict Prevention
 
@@ -302,8 +366,84 @@ Always prefer Edit tool over sed/awk for cross-platform compatibility.
 
 ---
 
-Version: 11.0.0 (MoAI unified command structure)
-Last Updated: 2026-01-28
+## 15. Agent Teams (Experimental)
+
+MoAI supports dual-mode execution: sub-agent mode (default) and Agent Teams mode (experimental).
+
+### Activation
+
+Requirements:
+- Claude Code v2.1.32 or later
+- Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json env
+- Set `workflow.team.enabled: true` in `.moai/config/sections/workflow.yaml`
+
+### Team API
+
+| API | Purpose |
+|-----|---------|
+| TeamCreate | Create a team with named teammates, models, and tools |
+| SendMessage | Direct message, broadcast, shutdown_request/response, plan_approval_response |
+| TaskCreate / TaskUpdate / TaskList / TaskGet | Shared task board for teammate coordination |
+| TeamDelete | Graceful team shutdown after phase completion |
+
+### Team Hook Events
+
+| Event | Blocking | Purpose |
+|-------|----------|---------|
+| TeammateIdle | Yes (exit 2 keeps working) | Quality gate enforcement before idle |
+| TaskCompleted | Yes (exit 2 rejects) | Verify deliverables meet standards |
+
+### Team Agent Roster (8)
+
+| Agent | Model | Phase | Role |
+|-------|-------|-------|------|
+| team-researcher | haiku | plan | Read-only codebase exploration |
+| team-analyst | sonnet | plan | Requirements and domain analysis |
+| team-architect | sonnet | plan | System design and architecture |
+| team-designer | sonnet | run | UI/UX design with Pencil/Figma MCP |
+| team-backend-dev | sonnet | run | Server-side implementation |
+| team-frontend-dev | sonnet | run | Client-side implementation |
+| team-tester | sonnet | run | Test creation (exclusive test file ownership) |
+| team-quality | sonnet | run | TRUST 5 validation (read-only) |
+
+### Mode Selection
+
+- `--team`: Force Agent Teams mode for plan and run phases
+- `--solo`: Force sub-agent mode (single agent per phase)
+- `--auto` (default): Intelligent mode selection based on complexity scoring
+
+Auto-selection thresholds (configurable in workflow.yaml):
+- Domain count >= 3, affected files >= 10, or complexity score >= 7
+
+### Team Workflows
+
+| Workflow | File | Phases |
+|----------|------|--------|
+| Team Plan | workflows/team-plan.md | researcher + analyst + architect (parallel) |
+| Team Run | workflows/team-run.md | backend-dev + frontend-dev + tester (parallel) |
+| Team Sync | workflows/team-sync.md | Documentation generation (sub-agent) |
+| Team Debug | workflows/team-debug.md | Competing hypothesis investigation |
+| Team Review | workflows/team-review.md | Multi-perspective code review |
+
+### File Ownership Strategy
+
+File ownership is project-structure-aware, derived from actual project layout rather than hardcoded paths:
+- backend-dev: Server-side source directories (detected from project structure)
+- frontend-dev: Client-side source directories (detected from project structure)
+- tester: Test files (*_test.go, *.test.*, tests/**)
+- quality: Read-only (no file ownership)
+
+### Configuration
+
+Workflow settings: @.moai/config/sections/workflow.yaml
+Team workflow skill: Skill("moai-workflow-team")
+
+For detailed team orchestration: See workflows/team-plan.md through team-review.md
+
+---
+
+Version: 12.0.0 (Agent Teams + Safe Development Protocol)
+Last Updated: 2026-02-07
 Language: English
 Core Rule: MoAI is an orchestrator; direct implementation is prohibited
 

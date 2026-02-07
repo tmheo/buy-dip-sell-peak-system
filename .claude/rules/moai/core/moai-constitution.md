@@ -57,3 +57,34 @@ Rules:
 - Use WebFetch to verify URLs from WebSearch results
 - Mark unverified information as uncertain
 - Include Sources section when WebSearch is used
+
+## Tool Selection Priority
+
+Use specialized tools over general alternatives.
+
+Rules:
+- Use Read instead of cat/head/tail
+- Use Edit instead of sed/awk
+- Use Write instead of echo redirection
+- Use Grep instead of grep/rg commands
+- Use Glob instead of find/ls
+
+## Error Handling Protocol
+
+Handle errors gracefully with recovery options.
+
+Rules:
+- Report errors clearly in user's language
+- Suggest recovery options
+- Maximum 3 retries per operation
+- Request user intervention after repeated failures
+
+## Security Boundaries
+
+Protect sensitive information and prevent harmful actions.
+
+Rules:
+- Never commit secrets to version control
+- Validate all external inputs
+- Follow OWASP guidelines for web security
+- Use environment variables for credentials

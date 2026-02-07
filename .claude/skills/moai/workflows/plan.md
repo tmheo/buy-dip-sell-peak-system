@@ -1,3 +1,33 @@
+---
+name: moai-workflow-plan
+description: >
+  Creates comprehensive SPEC documents using EARS format as the first step
+  of the Plan-Run-Sync workflow. Handles project exploration, SPEC file
+  generation, validation, and optional Git environment setup with worktree
+  or branch creation. Use when planning features or creating specifications.
+license: Apache-2.0
+compatibility: Designed for Claude Code
+user-invocable: false
+metadata:
+  version: "1.0.0"
+  category: "workflow"
+  status: "active"
+  updated: "2026-02-03"
+  tags: "plan, spec, ears, requirements, specification, design"
+
+# MoAI Extension: Progressive Disclosure
+progressive_disclosure:
+  enabled: true
+  level1_tokens: 100
+  level2_tokens: 5000
+
+# MoAI Extension: Triggers
+triggers:
+  keywords: ["plan", "spec", "design", "architect", "requirements", "feature request"]
+  agents: ["manager-spec", "Explore", "manager-git"]
+  phases: ["plan"]
+---
+
 # Plan Workflow Orchestration
 
 ## Purpose
@@ -21,6 +51,7 @@ Create comprehensive SPEC documents using EARS format as the first step of the P
 - --worktree: Create isolated Git worktree environment (highest priority)
 - --branch: Create traditional feature branch (second priority)
 - No flag: SPEC only by default; user may be prompted based on config
+- --team: Enable team-based exploration (see team-plan.md for parallel research team)
 - resume SPEC-XXX: Continue from last saved draft state
 
 Flag priority: --worktree takes precedence over --branch, which takes precedence over default.
@@ -30,7 +61,6 @@ Flag priority: --worktree takes precedence over --branch, which takes precedence
 Before execution, load these essential files:
 
 - .moai/config/config.yaml (git strategy, language settings)
-- .moai/config/sections/quality.yaml (LSP quality gates, coverage targets)
 - .moai/config/sections/git-strategy.yaml (auto_branch, branch creation policy)
 - .moai/config/sections/language.yaml (git_commit_messages setting)
 - .moai/project/product.md (product context)
@@ -128,8 +158,7 @@ Input: Approved plan from Phase 1B, validated SPEC ID from Phase 1.5.
 File generation (all three files created simultaneously):
 
 - .moai/specs/SPEC-{ID}/spec.md
-  - YAML frontmatter with 8 required fields (id, version, status, created, updated, author, priority, lifecycle_level)
-  - lifecycle_level values: spec-first (default), spec-anchored, spec-as-source
+  - YAML frontmatter with 7 required fields (id, version, status, created, updated, author, priority)
   - HISTORY section immediately after frontmatter
   - Complete EARS structure with all 5 requirement types
   - Content written in conversation_language
@@ -149,21 +178,6 @@ Quality constraints:
 - Requirement modules limited to 5 or fewer per SPEC
 - Acceptance criteria minimum 2 Given/When/Then scenarios
 - Technical terms and function names remain in English
-
-### Phase 2.5: LSP Baseline Capture
-
-Purpose: Capture the current LSP diagnostic state as a baseline for the run phase to compare against.
-
-Condition: Execute when quality.yaml `lsp_quality_gates.plan.require_baseline` is true.
-
-Steps:
-
-- Run language-specific type checker (mypy, tsc --noEmit, go vet)
-- Run linter (ruff check, eslint, golangci-lint)
-- Record baseline metrics: error_count, warning_count, type_error_count, lint_error_count
-- Store baseline in SPEC directory: .moai/specs/SPEC-{ID}/lsp-baseline.json
-
-This baseline is consumed by /moai run Phase 2.5 for regression detection.
 
 ### Phase 3: Git Environment Setup (Conditional)
 
@@ -220,33 +234,15 @@ Options:
 
 ---
 
-## Task Tracking
+## Team Mode
 
-[HARD] Task management tools mandatory for all task tracking:
-- SPEC creation task: TaskCreate with pending status at workflow start
-- Before SPEC generation: TaskUpdate with in_progress status
-- After SPEC files created: TaskUpdate with completed status
+When --team flag is provided or auto-selected, the plan phase uses a parallel research team instead of sequential sub-agent execution.
 
-## Completion Markers
+Team composition: researcher (haiku) + analyst (sonnet) + architect (sonnet)
 
-AI must add a marker when SPEC creation is complete:
-- `<moai>DONE</moai>` - SPEC creation complete
-- `<moai>COMPLETE</moai>` - Full plan phase completion
+For detailed team orchestration steps, see workflows/team-plan.md.
 
-## Graceful Exit
-
-When user aborts at any decision point:
-
-- No SPEC files created or modified
-- No branch or worktree created
-- Project remains in current state
-- Display retry command: /moai plan "description"
-- Exit with code 0
-
-When user selects "Save as Draft":
-
-- plan.md saved with status: draft
-- Resume command displayed: /moai plan resume SPEC-{ID}
+Fallback: If team mode is unavailable, the workflow continues with standard sub-agent mode (manager-spec).
 
 ---
 
@@ -256,27 +252,16 @@ All of the following must be verified:
 
 - Phase 1: manager-spec analyzed project and proposed SPEC candidates
 - User approval obtained via AskUserQuestion before SPEC creation
-- Phase 1.5: SPEC ID validated (format, uniqueness, domain)
 - Phase 2: All 3 SPEC files created (spec.md, plan.md, acceptance.md)
 - Directory naming follows .moai/specs/SPEC-{ID}/ format
-- YAML frontmatter contains all 8 required fields (including lifecycle_level)
+- YAML frontmatter contains all 7 required fields
 - EARS structure is complete
-- Phase 2.5: LSP baseline captured (when quality.yaml requires it)
 - Phase 3: Appropriate git action taken based on flags and user choice
 - If --worktree: SPEC committed before worktree creation
-- Task tracking: SPEC creation task created and completed
 - Next steps presented to user
 
 ---
 
-## Agent Chain Summary
-
-- Phase 1A: Explore subagent (codebase analysis)
-- Phase 1B: manager-spec subagent (SPEC planning)
-- Phase 2: manager-spec subagent (SPEC file creation)
-- Phase 3: manager-git subagent (branch/worktree setup, conditional)
-
----
-
-Version: 1.1.0
-Source: Extracted from .claude/commands/moai/1-plan.md v5.1.0. Added LSP baseline capture, lifecycle_level field, task tracking, graceful exit.
+Version: 2.0.0
+Updated: 2026-02-07
+Source: Extracted from .claude/commands/moai/1-plan.md v5.1.0. Added team mode support and --team flag.

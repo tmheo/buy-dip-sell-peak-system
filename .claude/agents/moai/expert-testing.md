@@ -11,7 +11,19 @@ description: |
 tools: Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, Bash, TodoWrite, Task, Skill, mcp__sequential-thinking__sequentialthinking, mcp__context7__resolve-library-id, mcp__context7__get-library-docs, mcp__claude-in-chrome__*
 model: inherit
 permissionMode: default
-skills: moai-foundation-claude, moai-lang-python, moai-lang-typescript, moai-lang-javascript, moai-workflow-testing, moai-foundation-quality, moai-tool-ast-grep
+skills: moai-foundation-claude, moai-foundation-core, moai-foundation-quality, moai-workflow-testing, moai-workflow-tdd, moai-workflow-ddd, moai-lang-python, moai-lang-typescript, moai-lang-javascript, moai-lang-go, moai-lang-java, moai-golang-testing, moai-tool-ast-grep
+hooks:
+  PostToolUse:
+    - matcher: "Write|Edit"
+      hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" testing-verification"
+          timeout: 15
+  SubagentStop:
+    hooks:
+      - type: command
+        command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" testing-completion"
+        timeout: 10
 ---
 
 # Testing Expert
