@@ -57,8 +57,8 @@ env/
 # ===========================================
 # Test Coverage
 # ===========================================
-.coverage
 coverage/
+.coverage
 coverage.json
 htmlcov/
 
@@ -115,6 +115,8 @@ logs/
 # Backups
 # ===========================================
 .moai-backups/
+.moai/cache/
+.moai/memory/
 *.backup/
 *-backup/
 *_backup_*/
@@ -194,12 +196,6 @@ dist-ssr/
 .vercel/
 .netlify/
 .firebase/
-
-# ===========================================
-# MoAI Runtime Data
-# ===========================================
-.moai/cache/
-.moai/memory/
 
 # ===========================================
 # Project Runtime Data

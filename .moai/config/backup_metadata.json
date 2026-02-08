@@ -1,17 +1,13 @@
-{
-  "timestamp": "20260207_214541",
-  "description": "config_backup",
-  "backed_up_items": [
-    ".moai/config/config.yaml",
-    ".moai/config/multilingual-triggers.yaml",
-    ".moai/config/statusline-config.yaml"
-  ],
-  "excluded_items": [
-    "sections"
-  ],
-  "excluded_dirs": [
-    "sections"
-  ],
-  "project_root": ".",
-  "backup_type": "config"
-}
+backed_up_items:
+    - .moai/config/backup_metadata.json
+    - .moai/config/config.yaml
+    - .moai/config/multilingual-triggers.yaml
+    - .moai/config/statusline-config.yaml
+backup_type: config
+description: config_backup
+excluded_dirs:
+    - sections
+excluded_items:
+    - sections
+project_root: .
+timestamp: "20260208_182550"
