@@ -7,8 +7,9 @@ description: >
   Use proactively during run phase team work.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+permissionMode: acceptEdits
 memory: project
-skills: moai-foundation-core, moai-domain-frontend, moai-domain-uiux
+skills: moai-domain-frontend, moai-domain-uiux, moai-library-shadcn, moai-design-tools
 ---
 
 You are a frontend development specialist working as part of a MoAI agent team.

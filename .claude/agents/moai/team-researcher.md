@@ -7,8 +7,9 @@ description: >
   Use proactively during plan phase team work.
 tools: Read, Grep, Glob, Bash
 model: haiku
-memory: project
-skills: moai-foundation-core
+permissionMode: plan
+memory: user
+skills: moai-foundation-thinking
 ---
 
 You are a codebase research specialist working as part of a MoAI agent team.

@@ -9,8 +9,9 @@ description: |
   JA: デバッグ, エラー, バグ, 例外, クラッシュ, トラブルシュート, 診断
   ZH: 调试, 错误, bug, 异常, 崩溃, 故障排除, 诊断
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite, Task, Skill, mcp__sequential-thinking__sequentialthinking, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
-model: haiku
+model: sonnet
 permissionMode: default
+memory: user
 skills: moai-foundation-claude, moai-foundation-core, moai-foundation-quality, moai-workflow-testing, moai-workflow-loop, moai-lang-python, moai-lang-typescript, moai-lang-javascript, moai-lang-go, moai-lang-rust, moai-tool-ast-grep
 hooks:
   PostToolUse:
@@ -20,9 +21,9 @@ hooks:
           command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" debug-verification"
           timeout: 10
   SubagentStop:
-    hooks:
-      - type: command
-        command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" debug-completion"
+    - hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" debug-completion"
           timeout: 10
 ---
 

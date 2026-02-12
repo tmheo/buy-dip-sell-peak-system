@@ -9,15 +9,15 @@ description: |
   JA: SPEC, 要件, 仕様書, EARS, 受入基準, ユーザーストーリー
   ZH: SPEC, 需求, 规格书, EARS, 验收标准, 用户故事
 tools: Read, Write, Edit, MultiEdit, Bash, Glob, Grep, TodoWrite, WebFetch, mcp__sequential-thinking__sequentialthinking, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
-model: inherit
+model: opus
 permissionMode: default
-skills: moai-foundation-claude, moai-foundation-core, moai-foundation-philosopher, moai-workflow-spec, moai-workflow-project, moai-workflow-thinking, moai-lang-python, moai-lang-typescript
+skills: moai-foundation-claude, moai-foundation-core, moai-foundation-context, moai-foundation-philosopher, moai-foundation-thinking, moai-workflow-spec, moai-workflow-project, moai-workflow-thinking, moai-workflow-jit-docs, moai-workflow-worktree, moai-platform-database-cloud, moai-lang-python, moai-lang-typescript
 hooks:
   SubagentStop:
-    hooks:
-      - type: command
-        command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" spec-completion"
-        timeout: 10
+    - hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" spec-completion"
+          timeout: 10
 ---
 
 # Agent Orchestration Metadata (v1.0)

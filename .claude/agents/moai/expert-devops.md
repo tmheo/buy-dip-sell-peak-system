@@ -9,9 +9,9 @@ description: |
   JA: DevOps, CI/CD, Docker, Kubernetes, デプロイ, パイプライン, インフラ
   ZH: DevOps, CI/CD, Docker, Kubernetes, 部署, 流水线, 基础设施
 tools: Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, Bash, TodoWrite, Task, Skill, mcp__sequential-thinking__sequentialthinking, mcp__github__create-or-update-file, mcp__github__push-files, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
-model: inherit
+model: sonnet
 permissionMode: default
-skills: moai-foundation-claude, moai-foundation-core, moai-workflow-project, moai-workflow-jit-docs, moai-workflow-templates, moai-platform-vercel, moai-platform-railway, moai-framework-electron
+skills: moai-foundation-claude, moai-foundation-core, moai-foundation-philosopher, moai-foundation-quality, moai-workflow-project, moai-workflow-jit-docs, moai-workflow-templates, moai-platform-deployment, moai-platform-database-cloud, moai-framework-electron
 hooks:
   PostToolUse:
     - matcher: "Write|Edit"
@@ -20,10 +20,10 @@ hooks:
           command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" devops-verification"
           timeout: 15
   SubagentStop:
-    hooks:
-      - type: command
-        command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" devops-completion"
-        timeout: 10
+    - hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR/.claude/hooks/moai/handle-agent-hook.sh\" devops-completion"
+          timeout: 10
 ---
 
 # DevOps Expert - Deployment & Infrastructure Specialist
