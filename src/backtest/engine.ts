@@ -9,10 +9,10 @@ import type {
   BacktestResult,
   DailySnapshot,
   StrategyConfig,
-  StrategyName,
   TradeAction,
   OrderAction,
 } from "./types";
+import type { Strategy } from "@/types/trading";
 import { getStrategy } from "./strategy";
 import { CycleManager } from "./cycle";
 import {
@@ -43,7 +43,7 @@ export class BacktestEngine {
    *
    * @param strategyName - 전략 이름
    */
-  constructor(strategyName: StrategyName) {
+  constructor(strategyName: Strategy) {
     this.strategy = getStrategy(strategyName);
   }
 

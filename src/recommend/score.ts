@@ -3,7 +3,7 @@
  */
 import Decimal from "decimal.js";
 
-import type { StrategyName } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 import { getStrategy } from "@/backtest/strategy";
 
 import type { SimilarPeriod, StrategyScore, PeriodStrategyScore } from "./types";
@@ -39,7 +39,7 @@ export function calculateStrategyScore(
 /** 특정 전략의 유사도 가중 평균 점수 계산 */
 export function calculateAverageScore(
   periods: SimilarPeriod[],
-  strategy: StrategyName
+  strategy: Strategy
 ): Omit<StrategyScore, "excluded" | "excludeReason"> {
   const periodScores: PeriodStrategyScore[] = [];
 
@@ -94,7 +94,7 @@ export function calculateAllStrategyScores(
   isGoldenCross: boolean,
   options?: { skipPro1Exclusion?: boolean }
 ): StrategyScore[] {
-  const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+  const strategies: Strategy[] = ["Pro1", "Pro2", "Pro3"];
   const strategyScores: StrategyScore[] = [];
   const skipExclusion = options?.skipPro1Exclusion ?? false;
 
@@ -116,7 +116,7 @@ export function calculateAllStrategyScores(
 }
 
 /** 추천 전략 결정 (제외되지 않은 전략 중 최고 점수) */
-export function getRecommendedStrategy(scores: StrategyScore[]): StrategyName {
+export function getRecommendedStrategy(scores: StrategyScore[]): Strategy {
   const validScores = scores.filter((s) => !s.excluded);
 
   if (validScores.length === 0) {
@@ -130,13 +130,13 @@ export function getRecommendedStrategy(scores: StrategyScore[]): StrategyName {
 
 /** 추천 전략의 티어 비율 조회 */
 export function getStrategyTierRatios(
-  strategy: StrategyName
+  strategy: Strategy
 ): [number, number, number, number, number, number] {
   return getStrategy(strategy).tierRatios;
 }
 
 /** 추천 사유 생성 */
-export function generateRecommendReason(strategy: StrategyName, scores: StrategyScore[]): string {
+export function generateRecommendReason(strategy: Strategy, scores: StrategyScore[]): string {
   const strategyScore = scores.find((s) => s.strategy === strategy);
   if (!strategyScore) {
     return `${strategy} 전략 추천`;

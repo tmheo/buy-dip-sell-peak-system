@@ -8,7 +8,8 @@ import { z } from "zod";
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 import { BacktestEngine, applySOXLDowngrade, checkDivergenceCondition } from "@/backtest";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
-import type { BacktestRequest, StrategyName } from "@/backtest/types";
+import type { BacktestRequest } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 import { getPriceRange, getLatestDate } from "@/database/prices";
 import { getMetricsRange } from "@/database/metrics";
 import {
@@ -313,14 +314,14 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     // 유사 구간별 성과 확인 구간 백테스트 실행 (SPEC-PERFORMANCE-001: 병렬화)
-    const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+    const strategies: Strategy[] = ["Pro1", "Pro2", "Pro3"];
     const initialCapital = 10000000; // 1000만원
 
     // 1단계: 유효한 유사 구간 필터링 및 백테스트 태스크 준비
     type BacktestTask = {
       periodIndex: number;
       period: (typeof similarPeriodsRaw)[0];
-      strategy: StrategyName;
+      strategy: Strategy;
       performanceStartIndex: number;
       performanceEndIndex: number;
       performanceStartDate: string;
@@ -416,7 +417,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // 3단계: 결과 그룹화 및 유사 구간 생성
     type PeriodResultGroup = {
-      results: Record<StrategyName, PeriodBacktestResult>;
+      results: Record<Strategy, PeriodBacktestResult>;
       failed: boolean;
       task: BacktestTask;
     };
@@ -497,7 +498,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     // 추천 전략 결정
-    let recommendedStrategyName = getRecommendedStrategy(strategyScores);
+    let recommendedStrategy = getRecommendedStrategy(strategyScores);
 
     // SOXL 전용 하향 규칙 적용
     let downgradeInfo: DowngradeInfo = {
@@ -507,12 +508,12 @@ export async function POST(request: Request): Promise<Response> {
     };
     if (ticker === "SOXL") {
       const result = applySOXLDowngrade(
-        recommendedStrategyName,
+        recommendedStrategy,
         referenceMetrics,
         adjClosePrices,
         referenceDateIndex
       );
-      recommendedStrategyName = result.strategy;
+      recommendedStrategy = result.strategy;
       downgradeInfo = {
         applied: result.applied,
         originalStrategy: result.originalStrategy,
@@ -522,8 +523,8 @@ export async function POST(request: Request): Promise<Response> {
       };
     }
 
-    const tierRatios = getStrategyTierRatios(recommendedStrategyName);
-    const reason = generateRecommendReason(recommendedStrategyName, strategyScores);
+    const tierRatios = getStrategyTierRatios(recommendedStrategy);
+    const reason = generateRecommendReason(recommendedStrategy, strategyScores);
 
     // 기준일 차트 데이터 생성 (분석 구간만, 기준일 이후는 항상 placeholder)
     // 원본 사이트와 동일하게 기준일 이후 실제 데이터가 있어도 표시하지 않음
@@ -549,7 +550,7 @@ export async function POST(request: Request): Promise<Response> {
       similarPeriods,
       strategyScores,
       recommendedStrategy: {
-        strategy: recommendedStrategyName,
+        strategy: recommendedStrategy,
         tierRatios,
         reason,
       },

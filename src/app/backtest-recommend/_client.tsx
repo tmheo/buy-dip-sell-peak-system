@@ -9,7 +9,7 @@ import dynamic from "next/dynamic";
 
 import type { ChangeEvent, FormEvent } from "react";
 import type { RecommendBacktestResult } from "@/backtest-recommend";
-import type { StrategyName } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 
 import { STRATEGY_COLORS } from "@/backtest";
 import { getTodayDate, getYearStartDate } from "@/lib/date";
@@ -153,7 +153,7 @@ export default function BacktestRecommendPageClient() {
                 className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
-                value={form.initialCapital}
+                value={form.initialCapital || ""}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 min={1000}
@@ -252,7 +252,7 @@ export default function BacktestRecommendPageClient() {
                       <div className="text-muted small mb-2">📊 전략 사용 빈도</div>
                       {(() => {
                         const totalCycles = result.strategyStats.Pro1.cycles + result.strategyStats.Pro2.cycles + result.strategyStats.Pro3.cycles;
-                        const strategyNames: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+                        const strategyNames: Strategy[] = ["Pro1", "Pro2", "Pro3"];
 
                         return strategyNames.map((name) => {
                           const stats = result.strategyStats[name];

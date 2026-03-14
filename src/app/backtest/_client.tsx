@@ -6,7 +6,8 @@
  */
 import { useState, FormEvent } from "react";
 import dynamic from "next/dynamic";
-import type { BacktestResult, StrategyName } from "@/backtest/types";
+import type { BacktestResult } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 import { getTodayDate, getYearStartDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화 - Recharts는 클라이언트에서만 동작)
@@ -40,7 +41,7 @@ export default function BacktestPageClient() {
   const [error, setError] = useState<string | null>(null);
 
   // 단일 전략 백테스트 실행
-  const runSingleBacktest = async (strategy: StrategyName): Promise<BacktestResult | null> => {
+  const runSingleBacktest = async (strategy: Strategy): Promise<BacktestResult | null> => {
     try {
       const response = await fetch("/api/backtest", {
         method: "POST",
@@ -226,7 +227,7 @@ export default function BacktestPageClient() {
                 className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
-                value={form.initialCapital}
+                value={form.initialCapital || ""}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 min={1000}

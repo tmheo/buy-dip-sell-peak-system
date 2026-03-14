@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { PRO_STRATEGIES, getStrategy } from "../strategy";
-import type { StrategyName } from "../types";
+import type { Strategy } from "@/types/trading";
 
 describe("PRO_STRATEGIES", () => {
   describe("Pro1 전략", () => {
@@ -130,7 +130,7 @@ describe("getStrategy", () => {
   });
 
   it("모든 전략 이름으로 호출 시 올바른 전략을 반환해야 한다", () => {
-    const strategyNames: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+    const strategyNames: Strategy[] = ["Pro1", "Pro2", "Pro3"];
     strategyNames.forEach((name) => {
       const strategy = getStrategy(name);
       expect(strategy.name).toBe(name);

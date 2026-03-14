@@ -4,11 +4,11 @@
  */
 import type {
   DailySnapshot,
-  StrategyName,
   TechnicalMetrics,
   DailyTechnicalMetrics,
   RemainingTier,
 } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 
 // ============================================================
 // 사이클 전략 정보
@@ -22,7 +22,7 @@ export interface CycleStrategyInfo {
   /** 사이클 번호 */
   cycleNumber: number;
   /** 해당 사이클에서 사용한 전략 */
-  strategy: StrategyName;
+  strategy: Strategy;
   /** 사이클 시작일 */
   startDate: string;
   /** 사이클 종료일 (진행 중이면 null) */
@@ -53,7 +53,7 @@ export interface CycleStrategyInfo {
  */
 export interface DailySnapshotWithStrategy extends DailySnapshot {
   /** 해당 일자에 사용 중인 전략 */
-  strategy: StrategyName;
+  strategy: Strategy;
 }
 
 // ============================================================
@@ -113,7 +113,7 @@ export interface RecommendBacktestResult {
   /** 잔여 티어 (백테스트 종료 시 미매도 보유 주식) */
   remainingTiers: RemainingTier[];
   /** 완료된 사이클별 수익 */
-  completedCycles: { profit: number; strategy: StrategyName }[];
+  completedCycles: { profit: number; strategy: Strategy }[];
   /** 종료 시점 기술적 지표 */
   technicalMetrics: TechnicalMetrics | null;
   /** 일별 기술적 지표 배열 (차트용) */
@@ -136,7 +136,7 @@ export interface RecommendBacktestResult {
  */
 export interface QuickRecommendResult {
   /** 추천 전략 */
-  strategy: StrategyName;
+  strategy: Strategy;
   /** 추천 이유 */
   reason: string;
   /** 기준일 기술적 지표 */

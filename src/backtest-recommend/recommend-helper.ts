@@ -3,7 +3,8 @@
  * 백테스트 중 사이클 경계에서 빠르게 추천 전략을 조회
  */
 import type { DailyPrice } from "@/types";
-import type { StrategyName, TechnicalMetrics } from "@/backtest/types";
+import type { TechnicalMetrics } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 import { calculateTechnicalMetrics } from "@/backtest/metrics";
 import { getMetricsRange } from "@/database/metrics";
 import {
@@ -97,7 +98,7 @@ export async function getQuickRecommendation(
     const dbCached = await getCachedRecommendation(ticker, referenceDate);
     if (dbCached) {
       const result: QuickRecommendResult = {
-        strategy: dbCached.strategy as StrategyName,
+        strategy: dbCached.strategy as Strategy,
         reason: dbCached.reason ?? "캐시된 추천",
         metrics: {
           goldenCross: dbCached.goldenCross ?? 0,
@@ -198,7 +199,7 @@ export async function getQuickRecommendation(
   });
 
   // 7. 유사 구간별 백테스트 (성능 최적화)
-  const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+  const strategies: Strategy[] = ["Pro1", "Pro2", "Pro3"];
   const initialCapital = 10000000;
 
   const similarPeriods: SimilarPeriod[] = [];
@@ -219,7 +220,7 @@ export async function getQuickRecommendation(
     const backtestPrices = allPrices.slice(backtestLookbackIndex, performanceEndIndex + 1);
     const backtestStartIdx = performanceStartIndex - backtestLookbackIndex;
 
-    const backtestResults: Record<StrategyName, PeriodBacktestResult> = {
+    const backtestResults: Record<Strategy, PeriodBacktestResult> = {
       Pro1: { returnRate: 0, mdd: 0 },
       Pro2: { returnRate: 0, mdd: 0 },
       Pro3: { returnRate: 0, mdd: 0 },

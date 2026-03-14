@@ -5,12 +5,12 @@
 import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
 import type {
-  StrategyName,
   StrategyConfig,
   TradeAction,
   OrderAction,
   DailyTechnicalMetrics,
 } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 import { getStrategy } from "@/backtest/strategy";
 import { CycleManager } from "@/backtest/cycle";
 import {
@@ -48,7 +48,7 @@ export interface RecommendBacktestEngineOptions {
  */
 export class RecommendBacktestEngine {
   private currentStrategy: StrategyConfig;
-  private currentStrategyName: StrategyName;
+  private currentStrategyName: Strategy;
   private ticker: "SOXL" | "TQQQ";
   private allPrices: DailyPrice[];
   private dateToIndexMap: Map<string, number>;
@@ -115,7 +115,7 @@ export class RecommendBacktestEngine {
 
     const dailyHistory: DailySnapshotWithStrategy[] = [];
     const cycleStrategies: CycleStrategyInfo[] = [];
-    const completedCycles: { profit: number; strategy: StrategyName }[] = [];
+    const completedCycles: { profit: number; strategy: Strategy }[] = [];
     const adjClosePrices = prices.map((p) => p.adjClose);
 
     // 전략 통계
