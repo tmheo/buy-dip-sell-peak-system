@@ -31,7 +31,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { BacktestEngine } from "../engine";
 import { getPriceRange } from "@/database/prices";
-import type { BacktestRequest, BacktestResult, StrategyName } from "../types";
+import type { BacktestRequest, BacktestResult } from "../types";
+import type { Strategy } from "@/types/trading";
 import type { DailyPrice } from "@/types";
 
 // 테스트 상수
@@ -51,7 +52,7 @@ interface ValidationCriteria {
   };
 }
 
-const VALIDATION_CRITERIA: Record<StrategyName, ValidationCriteria> = {
+const VALIDATION_CRITERIA: Record<Strategy, ValidationCriteria> = {
   Pro1: {
     finalAsset: 13376,
     returnRate: 0.3375,
@@ -102,7 +103,7 @@ describe("기준값 검증 테스트", () => {
     }
   });
 
-  const runBacktest = (strategyName: StrategyName): BacktestResult | null => {
+  const runBacktest = (strategyName: Strategy): BacktestResult | null => {
     if (!hasData) return null;
 
     const engine = new BacktestEngine(strategyName);

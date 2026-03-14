@@ -14,7 +14,6 @@ export {
 
 // 타입 내보내기
 export type {
-  StrategyName,
   StrategyConfig,
   TierState,
   CycleState,

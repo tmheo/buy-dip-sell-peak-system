@@ -5,7 +5,8 @@
  * 전략 상수는 types/trading.ts에서 중앙 관리되며,
  * 이 파일에서는 백테스트용 형식으로 변환하여 제공합니다.
  */
-import type { StrategyConfig, StrategyName } from "./types";
+import type { StrategyConfig } from "./types";
+import type { Strategy } from "@/types/trading";
 import { TIER_RATIOS, BUY_THRESHOLDS, SELL_THRESHOLDS, STOP_LOSS_DAYS } from "@/types/trading";
 import { percentToThreshold } from "@/utils/trading-core";
 
@@ -28,7 +29,7 @@ function convertTierRatios(ratios: number[]): [number, number, number, number, n
  * | sellThreshold | +0.01%                      | +1.50%                      | +2.00%       |
  * | stopLossDay   | 10                          | 10                          | 12           |
  */
-export const PRO_STRATEGIES: Record<StrategyName, StrategyConfig> = {
+export const PRO_STRATEGIES: Record<Strategy, StrategyConfig> = {
   Pro1: {
     name: "Pro1",
     tierRatios: convertTierRatios(TIER_RATIOS.Pro1),
@@ -58,6 +59,6 @@ export const PRO_STRATEGIES: Record<StrategyName, StrategyConfig> = {
  * @param name - 전략 이름 (Pro1, Pro2, Pro3)
  * @returns 해당 전략의 설정
  */
-export function getStrategy(name: StrategyName): StrategyConfig {
+export function getStrategy(name: Strategy): StrategyConfig {
   return PRO_STRATEGIES[name];
 }

@@ -15,17 +15,18 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { BacktestResult, RemainingTier, StrategyName } from "@/backtest/types";
+import type { BacktestResult, RemainingTier } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 
 // 전략별 분할 비율 표시
-const STRATEGY_RATIOS: Record<StrategyName, string> = {
+const STRATEGY_RATIOS: Record<Strategy, string> = {
   Pro1: "5.0% / 10.0% / 15.0% / 20.0% / 25.0% / 25%",
   Pro2: "10.0% / 15.0% / 20.0% / 25.0% / 20.0% / 10.0%",
   Pro3: "16.7% / 16.7% / 16.7% / 16.7% / 16.7% / 16.7%",
 };
 
 // 전략별 매수/매도 조건
-const STRATEGY_CONDITIONS: Record<StrategyName, { buyThreshold: string; sellThreshold: string }> = {
+const STRATEGY_CONDITIONS: Record<Strategy, { buyThreshold: string; sellThreshold: string }> = {
   Pro1: { buyThreshold: "-0.01%", sellThreshold: "+0.01%" },
   Pro2: { buyThreshold: "-0.01%", sellThreshold: "+1.50%" },
   Pro3: { buyThreshold: "-0.10%", sellThreshold: "+2.00%" },

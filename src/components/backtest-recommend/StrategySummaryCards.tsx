@@ -5,7 +5,7 @@
  * 각 전략이 몇 사이클, 몇 일 사용되었는지 표시
  */
 import type { StrategyUsageStats } from "@/backtest-recommend";
-import type { StrategyName } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 import { STRATEGY_COLORS } from "@/backtest";
 
 interface StrategySummaryCardsProps {
@@ -20,7 +20,7 @@ interface StrategySummaryCardsProps {
 
 // 전략별 설정 (색상은 공유 상수 사용)
 const STRATEGY_CONFIG: Record<
-  StrategyName,
+  Strategy,
   { bgColor: string; description: string }
 > = {
   Pro1: {
@@ -42,7 +42,7 @@ export default function StrategySummaryCards({
   totalCycles,
   totalDays,
 }: StrategySummaryCardsProps) {
-  const strategies: StrategyName[] = ["Pro1", "Pro2", "Pro3"];
+  const strategies: Strategy[] = ["Pro1", "Pro2", "Pro3"];
 
   return (
     <section className="info-section">

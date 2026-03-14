@@ -1,7 +1,8 @@
 /**
  * 전략 추천 시스템 타입 정의
  */
-import type { TechnicalMetrics, StrategyName } from "@/backtest/types";
+import type { TechnicalMetrics } from "@/backtest/types";
+import type { Strategy } from "@/types/trading";
 
 /** 추천 요청 인터페이스 */
 export interface RecommendRequest {
@@ -58,7 +59,7 @@ export interface PeriodStrategyScore {
 /** 전략별 종합 점수 인터페이스 */
 export interface StrategyScore {
   /** 전략 이름 */
-  strategy: StrategyName;
+  strategy: Strategy;
   /** 3개 유사 구간의 개별 점수 */
   periodScores: PeriodStrategyScore[];
   /** 평균 점수 (3개 구간 점수의 유사도 가중 평균) */
@@ -72,7 +73,7 @@ export interface StrategyScore {
 /** 전략 추천 상세 정보 인터페이스 */
 export interface RecommendationDetail {
   /** 추천 전략 */
-  strategy: StrategyName;
+  strategy: Strategy;
   /** 티어별 투자 비율 (6개 티어) */
   tierRatios: [number, number, number, number, number, number];
   /** 추천 이유 */
@@ -84,9 +85,9 @@ export interface DowngradeInfo {
   /** 하향 적용 여부 */
   applied: boolean;
   /** 원래 전략 (하향 적용 전) */
-  originalStrategy?: StrategyName;
+  originalStrategy?: Strategy;
   /** 하향 적용된 전략 */
-  downgradedStrategy?: StrategyName;
+  downgradedStrategy?: Strategy;
   /** 하향 사유 목록 */
   reasons: string[];
   /** 다이버전스 조건 발동으로 정배열 Pro1 제외 규칙 무시 여부 */
@@ -142,4 +143,4 @@ export interface HistoricalMetrics {
 }
 
 // 재내보내기
-export type { TechnicalMetrics, StrategyName };
+export type { TechnicalMetrics, Strategy };

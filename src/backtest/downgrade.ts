@@ -2,17 +2,18 @@
  * SOXL 전략 하향 규칙
  * 특정 조건에서 전략을 한 단계 보수적으로 하향
  */
-import type { StrategyName, TechnicalMetrics } from "./types";
+import type { TechnicalMetrics } from "./types";
+import type { Strategy } from "@/types/trading";
 import { detectBearishDivergence } from "./divergence";
 
 /** 하향 적용 결과 */
 export interface DowngradeResult {
   /** 하향된 전략 (하향 없으면 원본 그대로) */
-  strategy: StrategyName;
+  strategy: Strategy;
   /** 하향이 적용되었는지 여부 */
   applied: boolean;
   /** 원본 전략 (하향 시에만 설정) */
-  originalStrategy?: StrategyName;
+  originalStrategy?: Strategy;
   /** 하향 사유 목록 */
   reasons: string[];
   /** 다이버전스 조건 발동 여부 (정배열 Pro1 제외 규칙 무시용) */
@@ -20,7 +21,7 @@ export interface DowngradeResult {
 }
 
 /** 전략 하향 매핑 */
-const DOWNGRADE_MAP: Record<StrategyName, StrategyName> = {
+const DOWNGRADE_MAP: Record<Strategy, Strategy> = {
   Pro3: "Pro2",
   Pro2: "Pro1",
   Pro1: "Pro1",
@@ -58,7 +59,7 @@ function checkCondition2(
  * @returns 하향 적용 결과 (다이버전스 조건 발동 여부 포함)
  */
 export function applySOXLDowngrade(
-  strategy: StrategyName,
+  strategy: Strategy,
   metrics: TechnicalMetrics,
   prices: number[],
   referenceDateIndex: number

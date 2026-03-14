@@ -27,17 +27,10 @@ export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
 // ============================================================
 
 /**
- * 전략 이름 타입
- * @deprecated Strategy 타입을 직접 사용하세요 (@/types/trading)
- * 하위 호환성을 위해 Strategy의 alias로 유지됩니다.
- */
-export type StrategyName = Strategy;
-
-/**
  * 전략별 테마 색상
  * UI 컴포넌트에서 일관된 색상 사용을 위한 상수
  */
-export const STRATEGY_COLORS: Record<StrategyName, string> = {
+export const STRATEGY_COLORS: Record<Strategy, string> = {
   Pro1: "#268bd2",
   Pro2: "#2aa198",
   Pro3: "#6c71c4",
@@ -69,7 +62,7 @@ export interface TechnicalMetrics {
  */
 export interface StrategyConfig {
   // 전략 이름
-  name: StrategyName;
+  name: Strategy;
   // 티어별 투자 비율 (6개 티어)
   tierRatios: [number, number, number, number, number, number];
   // 매수 임계값 (전일 대비 하락률)
@@ -129,7 +122,7 @@ export interface BacktestRequest {
   // 티커 심볼
   ticker: string;
   // 전략 이름
-  strategy: StrategyName;
+  strategy: Strategy;
   // 시작 날짜 (YYYY-MM-DD)
   startDate: string;
   // 종료 날짜 (YYYY-MM-DD)
@@ -187,7 +180,7 @@ export interface DailyTechnicalMetrics {
  */
 export interface BacktestResult {
   // 전략 이름
-  strategy: StrategyName;
+  strategy: Strategy;
   // 시작 날짜
   startDate: string;
   // 종료 날짜

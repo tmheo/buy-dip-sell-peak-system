@@ -8,7 +8,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPriceRange } from "@/database/prices";
 import { BacktestEngine } from "@/backtest";
-import type { BacktestRequest, StrategyName } from "@/backtest";
+import type { BacktestRequest } from "@/backtest";
+import type { Strategy } from "@/types/trading";
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 
 // 요청 스키마 정의
@@ -92,10 +93,10 @@ export async function POST(request: Request) {
     }
 
     // 백테스트 엔진 실행
-    const engine = new BacktestEngine(validatedRequest.strategy as StrategyName);
+    const engine = new BacktestEngine(validatedRequest.strategy as Strategy);
     const backtestRequest: BacktestRequest = {
       ticker: validatedRequest.ticker,
-      strategy: validatedRequest.strategy as StrategyName,
+      strategy: validatedRequest.strategy as Strategy,
       startDate: validatedRequest.startDate,
       endDate: validatedRequest.endDate,
       initialCapital: validatedRequest.initialCapital,

@@ -15,7 +15,7 @@ export type {
   MetricsVector,
   HistoricalMetrics,
   TechnicalMetrics,
-  StrategyName,
+  Strategy,
   DowngradeInfo,
 } from "./types";
 
