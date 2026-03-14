@@ -227,7 +227,7 @@ export default function BacktestPageClient() {
                 className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
-                value={form.initialCapital || ""}
+                value={form.initialCapital ?? ""}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 min={1000}
