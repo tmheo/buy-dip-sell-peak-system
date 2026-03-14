@@ -155,7 +155,7 @@ export default function AccountForm({
             }`}
             id="seedCapital"
             name="seedCapital"
-            value={formData.seedCapital ?? ""}
+            value={formData.seedCapital || ""}
             onChange={handleChange}
             min="2000"
             step="1"

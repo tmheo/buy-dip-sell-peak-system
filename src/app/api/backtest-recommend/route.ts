@@ -38,7 +38,10 @@ const RecommendBacktestRequestSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "endDate must be in YYYY-MM-DD format")
       .refine(isValidDateString, "endDate must be a valid calendar date"),
-    initialCapital: z.number().positive("initialCapital must be positive"),
+    initialCapital: z
+      .number()
+      .positive("initialCapital must be positive")
+      .min(1000, "initialCapital must be at least 1000"),
   })
   .refine(
     (data) => {

@@ -39,6 +39,7 @@ export default function AccountSettingsCard({
   isSaving,
 }: AccountSettingsCardProps): React.ReactElement {
   const [isEditing, setIsEditing] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [formData, setFormData] = useState<UpdateAccountData>({
     ticker: account.ticker,
     seedCapital: account.seedCapital,
@@ -69,6 +70,11 @@ export default function AccountSettingsCard({
   }
 
   async function handleSave(): Promise<void> {
+    if (!formData.seedCapital || formData.seedCapital < 2000) {
+      setSaveError("시드 자금은 최소 $2,000 이상이어야 합니다.");
+      return;
+    }
+    setSaveError(null);
     try {
       await onSave(formData);
       setIsEditing(false);
@@ -119,7 +125,7 @@ export default function AccountSettingsCard({
                 type="number"
                 className="form-control form-control-sm bg-dark text-light border-secondary"
                 name="seedCapital"
-                value={formData.seedCapital ?? ""}
+                value={formData.seedCapital || ""}
                 onChange={handleChange}
                 min="2000"
                 step="1"
@@ -159,6 +165,11 @@ export default function AccountSettingsCard({
                 {account.cycleNumber}
               </div>
             </div>
+            {saveError && (
+              <div className="col-12">
+                <div className="alert alert-danger py-1 mb-0 small">{saveError}</div>
+              </div>
+            )}
             <div className="col-12 mt-3">
               <button
                 type="button"
