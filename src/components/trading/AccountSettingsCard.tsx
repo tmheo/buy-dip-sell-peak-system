@@ -119,7 +119,7 @@ export default function AccountSettingsCard({
                 type="number"
                 className="form-control form-control-sm bg-dark text-light border-secondary"
                 name="seedCapital"
-                value={formData.seedCapital}
+                value={formData.seedCapital ?? ""}
                 onChange={handleChange}
                 min="2000"
                 step="1"
