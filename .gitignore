@@ -57,7 +57,6 @@ env/
 # ===========================================
 # Test Coverage
 # ===========================================
-coverage/
 .coverage
 coverage.json
 htmlcov/
@@ -115,8 +114,6 @@ logs/
 # Backups
 # ===========================================
 .moai-backups/
-.moai/cache/
-.moai/memory/
 *.backup/
 *-backup/
 *_backup_*/
@@ -159,22 +156,14 @@ secret-*.*
 .aws/credentials
 
 # ===========================================
-# Claude Code Configuration
+# Claude Code / MoAI / OMC (全体 ignore)
 # ===========================================
-.claude/settings.local.json
-.claude/settings.local.*.json
-.claude/.env.local*
-.claude/local/
-.claude/plans/
-
-# Skill-specific credentials
-.claude/skills/*/.env*
-.claude/skills/*/secrets/
-.claude/skills/*/*/*secret*
-.claude/skills/*/*/*key*
-.claude/skills/*/*/*token*
-# Re-include legitimate skill module files containing "token" in their name
-!.claude/skills/*/modules/*token*.md
+.claude/
+.moai/
+.omc/
+.mcp.json
+CLAUDE.md
+CLAUDE.local.md
 
 # ===========================================
 # Node.js (for docs/Nextra)
@@ -199,8 +188,8 @@ dist-ssr/
 .netlify/
 .firebase/
 
-# ===========================================
-# Project Runtime Data
-# ===========================================
+# User Custom Patterns (preserved by moai update)
+coverage/
+.moai/cache/
 data/
 HANDOFF.md
