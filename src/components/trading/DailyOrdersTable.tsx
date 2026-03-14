@@ -81,7 +81,9 @@ export default function DailyOrdersTable({
                     <td className="text-center">
                       <span className="badge bg-info">{order.orderMethod}</span>
                     </td>
-                    <td className="text-end">{formatCurrency(order.limitPrice)}</td>
+                    <td className="text-end">
+                      {order.orderMethod === "MOC" ? "-" : formatCurrency(order.limitPrice)}
+                    </td>
                     <td className="text-end">{order.shares.toLocaleString()}</td>
                   </tr>
                 ))}
