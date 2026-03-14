@@ -42,6 +42,11 @@ export default function BacktestRecommendPageClient() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+    if (!form.initialCapital || form.initialCapital < 1000) {
+      setError("초기 자본은 최소 $1,000 이상이어야 합니다.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setResult(null);
@@ -153,7 +158,7 @@ export default function BacktestRecommendPageClient() {
                 className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
-                value={form.initialCapital ?? ""}
+                value={form.initialCapital || ""}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 min={1000}

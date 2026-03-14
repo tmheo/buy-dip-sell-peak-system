@@ -72,6 +72,11 @@ export default function BacktestPageClient() {
   // 폼 제출 핸들러
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!form.initialCapital || form.initialCapital < 1000) {
+      setError("초기 자본은 최소 $1,000 이상이어야 합니다.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setResults(null);
@@ -227,7 +232,7 @@ export default function BacktestPageClient() {
                 className="form-control form-control-sm form-input-capital"
                 id="initialCapital"
                 name="initialCapital"
-                value={form.initialCapital ?? ""}
+                value={form.initialCapital || ""}
                 onChange={handleInputChange}
                 disabled={isLoading}
                 min={1000}
