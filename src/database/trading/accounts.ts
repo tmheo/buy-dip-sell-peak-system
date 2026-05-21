@@ -2,7 +2,7 @@
  * 트레이딩 계좌 CRUD 함수 (PRD-TRADING-001)
  */
 
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte } from "drizzle-orm";
 
 import { db } from "../db-drizzle";
 import { tradingAccounts, tierHoldings } from "../schema/index";
@@ -37,6 +37,8 @@ export async function createTradingAccount(
         strategy: request.strategy,
         cycleStartDate: request.cycleStartDate,
         cycleNumber: 1,
+        // 생성자가 곧 조회하므로 활성 상태로 시작 (스케줄러 처리 대상에 포함)
+        lastViewedAt: new Date(),
       })
       .returning();
 
@@ -70,11 +72,38 @@ export async function getTradingAccountsByUserId(userId: string): Promise<Tradin
 
 /**
  * 모든 사용자의 모든 계좌 조회 (스케줄러 전용)
- * 일일 마감 처리 cron에서 사용
+ * 일일 마감 처리 cron에서 특정 계좌 지정 처리 시 사용
  */
 export async function getAllTradingAccounts(): Promise<TradingAccount[]> {
   const rows = await db.select().from(tradingAccounts);
   return rows.map(mapDrizzleTradingAccount);
+}
+
+/**
+ * 최근 조회된 활성 계좌 조회 (스케줄러 전용)
+ * lastViewedAt이 since 이후인 계좌만 반환한다.
+ * 한 번도 조회되지 않은 계좌(lastViewedAt = NULL)는 제외된다.
+ *
+ * @param since - 이 시각 이후 조회된 계좌만 포함
+ */
+export async function getActiveTradingAccounts(since: Date): Promise<TradingAccount[]> {
+  const rows = await db
+    .select()
+    .from(tradingAccounts)
+    .where(gte(tradingAccounts.lastViewedAt, since));
+  return rows.map(mapDrizzleTradingAccount);
+}
+
+/**
+ * 계좌 조회 시각 갱신
+ * 계좌 상세 화면을 열 때 호출하여 활성 계좌로 표시한다.
+ * (updatedAt은 갱신하지 않는다 — 주문 라우트의 설정 변경 감지에 영향 방지)
+ */
+export async function markAccountViewed(id: string): Promise<void> {
+  await db
+    .update(tradingAccounts)
+    .set({ lastViewedAt: new Date() })
+    .where(eq(tradingAccounts.id, id));
 }
 
 /**

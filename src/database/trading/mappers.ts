@@ -32,6 +32,7 @@ export function mapDrizzleTradingAccount(row: DrizzleTradingAccount): TradingAcc
     cycleStartDate: row.cycleStartDate,
     cycleNumber: row.cycleNumber,
     lastProcessedDate: row.lastProcessedDate,
+    lastViewedAt: row.lastViewedAt?.toISOString() ?? null,
     createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
     updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
   };

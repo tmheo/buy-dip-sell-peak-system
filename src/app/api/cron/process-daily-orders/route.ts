@@ -1,23 +1,29 @@
 /**
- * Cron 엔드포인트: 전체 계좌 일일 마감 처리
+ * Cron 엔드포인트: 활성 계좌 일일 마감 처리
  * GET /api/cron/process-daily-orders
  *
- * 모든 트레이딩 계좌에 대해 미처리 거래일(lastProcessedDate 이후)의
+ * 최근 조회된 활성 계좌에 대해 미처리 거래일(lastProcessedDate 이후)의
  * 주문 생성 및 체결 처리를 수행하여 holdings/수익 기록을 갱신합니다.
+ * 아무도 조회하지 않는 계좌는 처리하지 않아 불필요한 계산을 건너뜁니다.
  *
  * 가격 데이터가 선행되어야 하므로 update-prices cron 직후 실행됩니다.
  * processHistoricalOrders는 증분 처리되며 거래일 단위로 진행 상태를
  * 영속화하므로, 시간 예산 초과로 중단되어도 다음 실행이 이어받습니다.
  *
  * Query params:
- *   - accountId: 지정 시 해당 계좌만 처리 (최초 catch-up 시 특정 계좌 집중 처리용)
+ *   - accountId: 지정 시 활동 여부와 무관하게 해당 계좌만 처리
+ *     (최초 catch-up 시 특정 계좌 집중 처리용)
  *
  * 인증: Authorization: Bearer ${CRON_SECRET}
  */
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
-import { getAllTradingAccounts, processHistoricalOrders } from "@/database/trading";
+import {
+  getActiveTradingAccounts,
+  getAllTradingAccounts,
+  processHistoricalOrders,
+} from "@/database/trading";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,6 +34,12 @@ export const maxDuration = 60;
  * 남은 작업은 다음 실행이 이어받도록 한다.
  */
 const TIME_BUDGET_MS = 50_000;
+
+/**
+ * 활성 계좌 판정 기간 (일). 이 기간 내에 계좌 상세 화면이 조회된 계좌만
+ * 스케줄러가 처리한다.
+ */
+const ACTIVE_WINDOW_DAYS = 14;
 
 /** GET /api/cron/process-daily-orders */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -61,9 +73,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const deadline = startTime + TIME_BUDGET_MS;
   const today = new Date().toISOString().split("T")[0];
 
-  let accounts = await getAllTradingAccounts();
+  // accountId 지정 시: 활동 여부와 무관하게 해당 계좌만 처리 (수동 override)
+  // 미지정 시: 최근 조회된 활성 계좌만 처리 (방치된 계좌는 건너뜀)
+  let accounts;
   if (accountIdFilter) {
-    accounts = accounts.filter((account) => account.id === accountIdFilter);
+    accounts = (await getAllTradingAccounts()).filter(
+      (account) => account.id === accountIdFilter
+    );
+    if (accounts.length === 0) {
+      return NextResponse.json(
+        { error: `Account not found: ${accountIdFilter}` },
+        { status: 404 }
+      );
+    }
+  } else {
+    const activeSince = new Date(startTime - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    accounts = await getActiveTradingAccounts(activeSince);
   }
   const results: Array<{ accountId: string; executed: number; error?: string }> = [];
   let skipped = 0;

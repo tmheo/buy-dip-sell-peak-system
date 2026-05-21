@@ -18,6 +18,7 @@ import {
   getTradingAccountWithHoldings,
   updateTradingAccount,
   deleteTradingAccount,
+  markAccountViewed,
 } from "@/database/trading";
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
 
@@ -36,6 +37,14 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
 
   if (!account) {
     return notFoundResponse("Account");
+  }
+
+  // 조회 시각 갱신(부가 동작): 실패해도 상세 조회 응답은 유지한다
+  try {
+    await markAccountViewed(id);
+    account.lastViewedAt = new Date().toISOString();
+  } catch (error) {
+    console.warn(`[${id}] 조회 시각 갱신 실패:`, error);
   }
 
   return NextResponse.json({ account });

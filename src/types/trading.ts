@@ -28,6 +28,7 @@ export interface TradingAccount {
   cycleStartDate: string;
   cycleNumber: number;
   lastProcessedDate: string | null;
+  lastViewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
