@@ -39,8 +39,13 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
     return notFoundResponse("Account");
   }
 
-  // 조회 시각 갱신 → 스케줄러가 활성 계좌로 인식하여 마감 처리 대상에 포함
-  await markAccountViewed(id);
+  // 조회 시각 갱신(부가 동작): 실패해도 상세 조회 응답은 유지한다
+  try {
+    await markAccountViewed(id);
+    account.lastViewedAt = new Date().toISOString();
+  } catch (error) {
+    console.warn(`[${id}] 조회 시각 갱신 실패:`, error);
+  }
 
   return NextResponse.json({ account });
 }

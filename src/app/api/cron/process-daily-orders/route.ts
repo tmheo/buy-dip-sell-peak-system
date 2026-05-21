@@ -80,6 +80,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     accounts = (await getAllTradingAccounts()).filter(
       (account) => account.id === accountIdFilter
     );
+    if (accounts.length === 0) {
+      return NextResponse.json(
+        { error: `Account not found: ${accountIdFilter}` },
+        { status: 404 }
+      );
+    }
   } else {
     const activeSince = new Date(startTime - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
     accounts = await getActiveTradingAccounts(activeSince);

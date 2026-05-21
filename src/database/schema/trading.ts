@@ -53,7 +53,10 @@ export const tradingAccounts = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
-  (table) => [index("idx_trading_accounts_user_id").on(table.userId)]
+  (table) => [
+    index("idx_trading_accounts_user_id").on(table.userId),
+    index("idx_trading_accounts_last_viewed_at").on(table.lastViewedAt),
+  ]
 );
 
 /**

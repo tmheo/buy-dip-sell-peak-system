@@ -10,3 +10,8 @@
 
 ALTER TABLE public.trading_accounts
   ADD COLUMN IF NOT EXISTS last_viewed_at timestamp;
+
+-- 스케줄러의 활성 계좌 조회(last_viewed_at >= ...)가 전체 스캔으로
+-- 떨어지지 않도록 인덱스를 생성한다.
+CREATE INDEX IF NOT EXISTS idx_trading_accounts_last_viewed_at
+  ON public.trading_accounts (last_viewed_at);
