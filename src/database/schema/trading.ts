@@ -47,6 +47,9 @@ export const tradingAccounts = pgTable(
     // 마감 처리 스케줄러가 마지막으로 처리 완료한 거래일.
     // NULL이면 아직 한 번도 처리되지 않은 상태 (cycleStartDate부터 처리).
     lastProcessedDate: date("last_processed_date"),
+    // 계좌 상세 화면을 마지막으로 조회한 시각.
+    // 스케줄러는 최근 조회된 활성 계좌만 처리한다 (방치 계좌는 건너뜀).
+    lastViewedAt: timestamp("last_viewed_at"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

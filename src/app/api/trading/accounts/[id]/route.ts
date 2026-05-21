@@ -18,6 +18,7 @@ import {
   getTradingAccountWithHoldings,
   updateTradingAccount,
   deleteTradingAccount,
+  markAccountViewed,
 } from "@/database/trading";
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
 
@@ -37,6 +38,9 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   if (!account) {
     return notFoundResponse("Account");
   }
+
+  // 조회 시각 갱신 → 스케줄러가 활성 계좌로 인식하여 마감 처리 대상에 포함
+  await markAccountViewed(id);
 
   return NextResponse.json({ account });
 }
