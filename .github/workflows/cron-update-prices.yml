@@ -1,4 +1,4 @@
-name: Daily Price Update
+name: Daily Update
 
 on:
   schedule:
@@ -15,6 +15,23 @@ jobs:
           response=$(curl -s -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://buy-dip-sell-peak-system.vercel.app/api/cron/update-prices")
+
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::API call failed with status $http_code"
+            exit 1
+          fi
+
+      - name: Call process-daily-orders API
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://buy-dip-sell-peak-system.vercel.app/api/cron/process-daily-orders")
 
           http_code=$(echo "$response" | tail -1)
           body=$(echo "$response" | head -n -1)

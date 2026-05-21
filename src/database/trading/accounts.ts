@@ -69,6 +69,15 @@ export async function getTradingAccountsByUserId(userId: string): Promise<Tradin
 }
 
 /**
+ * 모든 사용자의 모든 계좌 조회 (스케줄러 전용)
+ * 일일 마감 처리 cron에서 사용
+ */
+export async function getAllTradingAccounts(): Promise<TradingAccount[]> {
+  const rows = await db.select().from(tradingAccounts);
+  return rows.map(mapDrizzleTradingAccount);
+}
+
+/**
  * 단일 계좌 조회 (본인 확인)
  */
 export async function getTradingAccountById(
