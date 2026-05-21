@@ -268,34 +268,61 @@ export function getNextTradingDate(date: string): string {
 }
 
 /**
- * 사이클 시작일부터 어제까지의 모든 주문을 순차적으로 처리
+ * 마감 처리 완료 거래일을 계좌에 기록
+ * 다음 스케줄러 실행이 이 날짜 다음부터 이어받아 증분 처리한다.
+ * (updatedAt은 갱신하지 않는다 — 주문 라우트의 설정 변경 감지에 영향을 주지 않기 위함)
+ */
+async function updateAccountLastProcessedDate(accountId: string, date: string): Promise<void> {
+  await db
+    .update(tradingAccounts)
+    .set({ lastProcessedDate: date })
+    .where(eq(tradingAccounts.id, accountId));
+}
+
+/**
+ * 미처리 거래일의 주문을 순차적으로 마감 처리 (증분)
+ * - lastProcessedDate가 있으면 그 다음 거래일부터, 없으면 cycleStartDate부터 처리
  * - 각 거래일에 대해 주문이 없으면 생성하고, 체결 조건을 확인하여 처리
  * - 체결 결과에 따라 holdings가 업데이트되므로 순차 처리 필수
+ * - 종가가 있는 거래일을 처리할 때마다 lastProcessedDate를 갱신하여,
+ *   중간에 중단(타임아웃 등)되어도 다음 실행이 이어받을 수 있게 한다
+ * - deadline이 지정되면 그 시각을 넘기기 전에 루프를 중단 (Vercel 함수 제한 대응)
  *
  * @param accountId - 계좌 ID
  * @param cycleStartDate - 사이클 시작일 (YYYY-MM-DD)
+ * @param lastProcessedDate - 마지막으로 처리 완료한 거래일 (최초 실행이면 null)
  * @param currentDate - 현재 날짜 (YYYY-MM-DD)
  * @param ticker - 종목
  * @param strategy - 전략
  * @param seedCapital - 시드 캐피털
+ * @param deadline - 처리를 중단할 시각 (Date.now() 기준 ms, 선택)
  * @returns 전체 체결 결과 목록
  */
 export async function processHistoricalOrders(
   accountId: string,
   cycleStartDate: string,
+  lastProcessedDate: string | null,
   currentDate: string,
   ticker: Ticker,
   strategy: Strategy,
-  seedCapital: number
+  seedCapital: number,
+  deadline?: number
 ): Promise<ExecutionResult[]> {
   const allResults: ExecutionResult[] = [];
 
-  // 사이클 시작일부터 어제까지의 모든 거래일 순회
-  let processingDate = cycleStartDate;
+  // 처리 시작일: 마지막 처리일의 다음 거래일, 최초 실행이면 사이클 시작일
+  let processingDate = lastProcessedDate
+    ? getNextTradingDate(lastProcessedDate)
+    : cycleStartDate;
   const yesterday = getPreviousTradingDate(currentDate);
 
   // 종료 조건: processingDate > yesterday
   while (processingDate <= yesterday) {
+    // 시간 예산 초과 시 중단 (남은 거래일은 다음 실행이 lastProcessedDate로 이어받음)
+    if (deadline !== undefined && Date.now() >= deadline) {
+      break;
+    }
+
     // 1. 해당 날짜의 종가 확인
     const closePrice = await getClosingPrice(ticker, processingDate);
 
@@ -322,9 +349,12 @@ export async function processHistoricalOrders(
         const results = await processOrderExecution(accountId, processingDate, ticker);
         allResults.push(...results);
       }
+
+      // 5. 종가가 있는 거래일을 처리 완료 → 진행 상태 영속화
+      await updateAccountLastProcessedDate(accountId, processingDate);
     }
 
-    // 5. 다음 거래일로 이동
+    // 6. 다음 거래일로 이동
     processingDate = getNextTradingDate(processingDate);
   }
 
