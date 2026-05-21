@@ -9,6 +9,9 @@
  * processHistoricalOrders는 증분 처리되며 거래일 단위로 진행 상태를
  * 영속화하므로, 시간 예산 초과로 중단되어도 다음 실행이 이어받습니다.
  *
+ * Query params:
+ *   - accountId: 지정 시 해당 계좌만 처리 (최초 catch-up 시 특정 계좌 집중 처리용)
+ *
  * 인증: Authorization: Bearer ${CRON_SECRET}
  */
 import { timingSafeEqual } from "crypto";
@@ -47,12 +50,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log("=== 일일 마감 처리 시작 ===");
+  const accountIdFilter = request.nextUrl.searchParams.get("accountId");
+
+  console.log(
+    accountIdFilter
+      ? `=== 일일 마감 처리 시작 (계좌 ${accountIdFilter} 한정) ===`
+      : "=== 일일 마감 처리 시작 ==="
+  );
   const startTime = Date.now();
   const deadline = startTime + TIME_BUDGET_MS;
   const today = new Date().toISOString().split("T")[0];
 
-  const accounts = await getAllTradingAccounts();
+  let accounts = await getAllTradingAccounts();
+  if (accountIdFilter) {
+    accounts = accounts.filter((account) => account.id === accountIdFilter);
+  }
   const results: Array<{ accountId: string; executed: number; error?: string }> = [];
   let skipped = 0;
 
