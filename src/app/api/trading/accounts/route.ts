@@ -69,6 +69,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       await processHistoricalOrders(
         account.id,
         account.cycleStartDate,
+        account.lastProcessedDate,
         today,
         account.ticker,
         account.strategy,

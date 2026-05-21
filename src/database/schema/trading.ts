@@ -44,6 +44,9 @@ export const tradingAccounts = pgTable(
     strategy: text().notNull().$type<AllowedStrategy>(),
     cycleStartDate: date("cycle_start_date").notNull(),
     cycleNumber: integer("cycle_number").notNull().default(1),
+    // 마감 처리 스케줄러가 마지막으로 처리 완료한 거래일.
+    // NULL이면 아직 한 번도 처리되지 않은 상태 (cycleStartDate부터 처리).
+    lastProcessedDate: date("last_processed_date"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
