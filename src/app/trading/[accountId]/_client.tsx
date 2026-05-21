@@ -87,14 +87,15 @@ export default function TradingDetailClient({
 
     try {
       // 두 API는 서로 독립적이므로 병렬 호출 (마감 처리는 스케줄러가 담당)
-      const [ordersRes, accountRes] = await Promise.all([
+      // 주문 조회는 비치명 경로이므로 allSettled로 부분 실패를 격리한다.
+      const [ordersResult, accountResult] = await Promise.allSettled([
         fetch(`/api/trading/accounts/${accountId}/orders`),
         fetch(`/api/trading/accounts/${accountId}`),
       ]);
 
       setOrdersError(null);
-      if (ordersRes.ok) {
-        const ordersData: OrdersResponse = await ordersRes.json();
+      if (ordersResult.status === "fulfilled" && ordersResult.value.ok) {
+        const ordersData: OrdersResponse = await ordersResult.value.json();
         setOrders(ordersData.orders);
         setOrderDate(ordersData.date);
       } else {
@@ -102,6 +103,10 @@ export default function TradingDetailClient({
         setOrders([]);
       }
 
+      if (accountResult.status === "rejected") {
+        throw new Error("계좌 정보를 불러오는데 실패했습니다.");
+      }
+      const accountRes = accountResult.value;
       if (!accountRes.ok) {
         if (accountRes.status === 404) {
           router.push("/trading");
