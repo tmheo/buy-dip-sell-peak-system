@@ -24,6 +24,7 @@ export {
 export {
   createTradingAccount,
   getTradingAccountsByUserId,
+  getAllTradingAccounts,
   getTradingAccountById,
   getTradingAccountWithHoldings,
   updateTradingAccount,

@@ -86,8 +86,11 @@ export default function TradingDetailClient({
     setError(null);
 
     try {
-      // 주문 API를 먼저 호출 (processHistoricalOrders가 보유현황을 DB에 업데이트)
-      const ordersRes = await fetch(`/api/trading/accounts/${accountId}/orders`);
+      // 두 API는 서로 독립적이므로 병렬 호출 (마감 처리는 스케줄러가 담당)
+      const [ordersRes, accountRes] = await Promise.all([
+        fetch(`/api/trading/accounts/${accountId}/orders`),
+        fetch(`/api/trading/accounts/${accountId}`),
+      ]);
 
       setOrdersError(null);
       if (ordersRes.ok) {
@@ -98,9 +101,6 @@ export default function TradingDetailClient({
         setOrdersError("주문 정보를 불러오는데 실패했습니다.");
         setOrders([]);
       }
-
-      // 주문 처리 완료 후 계좌 조회 (업데이트된 보유현황 포함)
-      const accountRes = await fetch(`/api/trading/accounts/${accountId}`);
 
       if (!accountRes.ok) {
         if (accountRes.status === 404) {

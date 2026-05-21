@@ -33,6 +33,7 @@ export {
   // TradingAccount CRUD
   createTradingAccount,
   getTradingAccountsByUserId,
+  getAllTradingAccounts,
   getTradingAccountById,
   getTradingAccountWithHoldings,
   updateTradingAccount,

@@ -18,7 +18,6 @@ import {
   generateDailyOrders,
   processOrderExecution,
   deleteDailyOrders,
-  processHistoricalOrders,
 } from "@/database/trading";
 
 /**
@@ -53,21 +52,10 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  // [REQ-001] 사이클 시작일부터 어제까지의 모든 주문 처리
-  // - 각 거래일에 대해 주문 생성 및 체결 조건 확인
-  // - 체결 결과에 따라 holdings 업데이트
-  const executedPreviousOrders = await processHistoricalOrders(
-    id,
-    account.cycleStartDate,
-    date,
-    account.ticker,
-    account.strategy,
-    account.seedCapital
-  );
-
-  // 이전 거래일 체결이 발생했으면 오늘 주문 재생성 필요 (holdings가 변경됨)
-  // regenerate 옵션이 있어도 마찬가지로 삭제
-  if (executedPreviousOrders.length > 0 || regenerate) {
+  // [REQ-001] 사이클 시작일부터 어제까지의 마감 처리는
+  // /api/cron/process-daily-orders 스케줄러가 담당한다.
+  // 상세 화면 진입 시에는 조회/오늘 주문 생성만 수행하여 응답 속도를 확보한다.
+  if (regenerate) {
     await deleteDailyOrders(id, date);
   }
 
@@ -105,7 +93,6 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   return NextResponse.json({
     date,
     orders,
-    executedPreviousOrders, // [REQ-001] 이전 거래일 체결 결과
   });
 }
 
