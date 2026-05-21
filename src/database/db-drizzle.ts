@@ -15,14 +15,17 @@ if (!connectionString) {
 
 /**
  * PostgreSQL 연결 클라이언트
- * - max: 동시 연결 최대 수
+ * - max: 동시 연결 최대 수 (서버리스 인스턴스당 1개면 충분)
  * - idle_timeout: 유휴 연결 타임아웃 (초)
  * - connect_timeout: 연결 타임아웃 (초)
+ * - prepare: Supabase Transaction Pooler(PgBouncer transaction mode)는
+ *   prepared statement를 지원하지 않으므로 비활성화 필수
  */
 const client = postgres(connectionString, {
-  max: 10,
+  max: 1,
   idle_timeout: 20,
   connect_timeout: 10,
+  prepare: false,
 });
 
 /**
