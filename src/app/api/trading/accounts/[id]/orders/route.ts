@@ -18,6 +18,7 @@ import {
   generateDailyOrders,
   processOrderExecution,
   deleteDailyOrders,
+  hasNewerPriceSince,
 } from "@/database/trading";
 
 /**
@@ -62,7 +63,12 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // 기존 주문 조회 (체결 처리로 업데이트된 holdings 기반)
   let orders = await getDailyOrders(id, date);
 
-  // 계좌 설정 변경 감지: 미체결 주문이 있고, 계좌가 주문 생성 이후 수정되었으면 재생성
+  // 미체결 주문이 있을 때, 아래 조건이면 재생성한다.
+  //  1) 계좌 설정이 주문 생성 이후 수정됨
+  //  2) 주문 생성 이후 더 최신 가격 데이터가 적재됨
+  //     - 주문표는 화면 진입 시 지연 생성되므로, 일일 크론이 전일 종가를
+  //       적재하기 전에 진입하면 그보다 이전 거래일 종가로 잘못 생성된다.
+  //       이후 크론이 종가를 적재해도 자동으로 갱신되지 않는 문제를 복구한다.
   if (orders.length > 0) {
     const hasExecutedOrder = orders.some((order) => order.executed);
     const oldestOrderCreatedAt = orders.reduce(
@@ -70,10 +76,16 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
       orders[0].createdAt
     );
 
-    // 체결된 주문이 없고, 계좌가 주문 생성 이후 수정되었으면 재생성
-    if (!hasExecutedOrder && account.updatedAt > oldestOrderCreatedAt) {
-      await deleteDailyOrders(id, date);
-      orders = [];
+    if (!hasExecutedOrder) {
+      const accountChanged = account.updatedAt > oldestOrderCreatedAt;
+      const stalePriceBasis =
+        !accountChanged &&
+        (await hasNewerPriceSince(account.ticker, date, new Date(oldestOrderCreatedAt)));
+
+      if (accountChanged || stalePriceBasis) {
+        await deleteDailyOrders(id, date);
+        orders = [];
+      }
     }
   }
 

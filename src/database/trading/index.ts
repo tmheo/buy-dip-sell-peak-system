@@ -42,6 +42,7 @@ export {
   deleteDailyOrders,
   generateDailyOrders,
   getNextBuyTier,
+  hasNewerPriceSince,
 } from "./orders";
 
 // Order Execution

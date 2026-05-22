@@ -49,6 +49,7 @@ export {
   deleteDailyOrders,
   generateDailyOrders,
   getNextBuyTier,
+  hasNewerPriceSince,
 
   // Order Execution
   getAccountStrategy,
