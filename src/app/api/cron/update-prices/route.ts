@@ -1,21 +1,23 @@
 /**
- * Cron 엔드포인트: 일일 가격/지표 자동 업데이트
+ * Cron 엔드포인트: 일일 가격/지표 동기화
  * GET /api/cron/update-prices
  *
- * Vercel Cron 또는 외부 스케줄러에서 호출하여
- * SOXL, TQQQ의 최신 가격 데이터를 Yahoo Finance에서 가져오고
- * 기술적 지표를 계산하여 DB에 저장합니다.
+ * Vercel Cron 또는 외부 스케줄러에서 호출하여 SOXL, TQQQ의 가격 시계열을
+ * 원천(Yahoo Finance) 스냅샷 전체와 정합시키고 지표를 재계산합니다(ADR-0002).
+ * 분할 가드 발동·티커 실패가 하나라도 있으면 비 2xx로 응답해
+ * 스케줄러(GitHub Actions) 알림을 유발합니다.
+ *
+ * 페치 재시도는 동기화 서비스 내부에 있고, DB 쓰기는 재시도하지 않습니다 -
+ * 미러링은 멱등이라 실패한 날은 알림 후 다음 실행에서 자가 치유됩니다.
  *
  * 인증: Authorization: Bearer ${CRON_SECRET}
  */
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
-import { fetchSince } from "@/services/dataFetcher";
+import { syncTickerPrices } from "@/services/priceSyncService";
+import type { TickerSyncSummary } from "@/services/priceSyncService";
 import type { SupportedTicker } from "@/services/dataFetcher";
-import { getLatestDate, insertDailyPrices, getAllPricesByTicker } from "@/database/prices";
-import { getLatestMetricDate, insertMetrics } from "@/database/metrics";
-import { calculateMetricsBatch } from "@/services/metricsCalculator";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,152 +25,26 @@ export const maxDuration = 60;
 /** 대상 티커 목록 */
 const TICKERS: SupportedTicker[] = ["SOXL", "TQQQ"];
 
-/** 재시도 기본 설정 */
-const DEFAULT_MAX_ATTEMPTS = 3;
-
-/** MA60 계산에 필요한 최소 데이터 인덱스 (60일 이동평균 기준) */
-const MA60_MIN_INDEX = 59;
-
-/**
- * 재시도 래퍼 함수 (지수 백오프)
- * 실패 시 1초, 2초, 4초 간격으로 재시도합니다.
- *
- * @param fn - 실행할 비동기 함수
- * @param maxAttempts - 최대 시도 횟수
- * @param context - 로깅용 컨텍스트 문자열
- * @returns 함수 실행 결과
- */
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxAttempts: number = DEFAULT_MAX_ATTEMPTS,
-  context: string
-): Promise<T> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (attempt === maxAttempts) {
-        console.error(`[${context}] ${maxAttempts}회 시도 후 최종 실패:`, error);
-        throw error;
-      }
-
-      const delayMs = 1000 * Math.pow(2, attempt - 1);
-      console.warn(
-        `[${context}] 시도 ${attempt}/${maxAttempts} 실패, ${delayMs}ms 후 재시도:`,
-        error instanceof Error ? error.message : error
-      );
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-
-  // TypeScript 타입 안전성을 위한 도달 불가능 코드
-  throw new Error(`[${context}] 재시도 로직 오류`);
-}
+/** 티커별 동기화 결과 (응답 JSON에 그대로 직렬화) */
+type TickerSyncResult =
+  | TickerSyncSummary
+  | { status: "error"; ticker: SupportedTicker; message: string };
 
 /**
- * 단일 티커에 대한 가격 및 지표 업데이트
- *
- * @param ticker - 업데이트할 티커
- * @returns 새로 추가된 가격/지표 수
+ * 단일 티커 동기화. 실패해도 던지지 않고 결과로 기록해
+ * 다른 티커의 동기화가 계속되게 합니다.
  */
-async function updateTicker(
-  ticker: SupportedTicker
-): Promise<{ newPrices: number; newMetrics: number }> {
-  // 1. 마지막 저장된 가격 날짜 조회
-  const latestDate = await getLatestDate(ticker);
-  if (!latestDate) {
-    console.log(`[${ticker}] 저장된 가격 데이터 없음. 초기화가 필요합니다.`);
-    return { newPrices: 0, newMetrics: 0 };
+async function syncTickerSafely(ticker: SupportedTicker): Promise<TickerSyncResult> {
+  try {
+    return await syncTickerPrices(ticker);
+  } catch (error) {
+    console.error(`[${ticker}] 동기화 실패:`, error);
+    return {
+      status: "error",
+      ticker,
+      message: error instanceof Error ? error.message : String(error),
+    };
   }
-  console.log(`[${ticker}] 마지막 저장 날짜: ${latestDate}`);
-
-  // 2. Yahoo Finance에서 신규 가격 데이터 가져오기
-  const newPrices = await withRetry(
-    () => fetchSince(latestDate, ticker),
-    DEFAULT_MAX_ATTEMPTS,
-    `${ticker} fetchSince`
-  );
-
-  // 3. 새 가격이 있으면 DB에 삽입
-  if (newPrices.length > 0) {
-    console.log(`[${ticker}] 새 가격 데이터 ${newPrices.length}건 수신`);
-    await withRetry(
-      () =>
-        insertDailyPrices(
-          newPrices.map(({ date, open, high, low, close, adjClose, volume }) => ({
-            ticker,
-            date,
-            open,
-            high,
-            low,
-            close,
-            adjClose,
-            volume,
-          }))
-        ),
-      DEFAULT_MAX_ATTEMPTS,
-      `${ticker} insertDailyPrices`
-    );
-    console.log(`[${ticker}] 가격 데이터 ${newPrices.length}건 저장 완료`);
-  } else {
-    console.log(`[${ticker}] 새 가격 데이터 없음 (지표 갱신 여부 확인)`);
-  }
-
-  // 4. 전체 가격 데이터 로드 (지표 계산용)
-  const allPrices = await withRetry(
-    () => getAllPricesByTicker(ticker),
-    DEFAULT_MAX_ATTEMPTS,
-    `${ticker} getAllPricesByTicker`
-  );
-
-  const adjCloses = allPrices.map((p) => p.adjClose);
-  const dates = allPrices.map((p) => p.date);
-
-  // 5. 지표 시작 인덱스 결정 (마지막 지표 날짜의 다음 인덱스, 없으면 MA60 최소 인덱스)
-  const latestMetricDate = await getLatestMetricDate(ticker);
-  const metricDateIndex = latestMetricDate ? dates.indexOf(latestMetricDate) : -1;
-  const startIdx = metricDateIndex !== -1 ? metricDateIndex + 1 : MA60_MIN_INDEX;
-
-  const endIdx = adjCloses.length - 1;
-
-  if (startIdx > endIdx) {
-    console.log(`[${ticker}] 계산할 새 지표 없음`);
-    return { newPrices: newPrices.length, newMetrics: 0 };
-  }
-
-  // 6. 기술적 지표 배치 계산 (동기 함수)
-  console.log(`[${ticker}] 지표 계산 중 (인덱스 ${startIdx}~${endIdx})...`);
-  const newMetrics = calculateMetricsBatch(adjCloses, dates, ticker, startIdx, endIdx);
-
-  if (newMetrics.length === 0) {
-    console.log(`[${ticker}] 계산된 지표 없음`);
-    return { newPrices: newPrices.length, newMetrics: 0 };
-  }
-
-  // 7. 지표 데이터 DB 저장 (스키마 호환 필드만 추출)
-  await withRetry(
-    () =>
-      insertMetrics(
-        newMetrics.map((m) => ({
-          ticker: m.ticker,
-          date: m.date,
-          ma20: m.ma20,
-          ma60: m.ma60,
-          maSlope: m.maSlope,
-          disparity: m.disparity,
-          rsi14: m.rsi14,
-          roc12: m.roc12,
-          volatility20: m.volatility20,
-          goldenCross: m.goldenCross,
-          isGoldenCross: m.isGoldenCross,
-        }))
-      ),
-    DEFAULT_MAX_ATTEMPTS,
-    `${ticker} insertMetrics`
-  );
-  console.log(`[${ticker}] 지표 데이터 ${newMetrics.length}건 저장 완료`);
-
-  return { newPrices: newPrices.length, newMetrics: newMetrics.length };
 }
 
 /** GET /api/cron/update-prices */
@@ -192,45 +68,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log("=== 일일 가격/지표 업데이트 시작 ===");
+  console.log("=== 일일 가격/지표 동기화 시작 ===");
   const startTime = Date.now();
 
-  try {
-    const results: Array<{
-      ticker: string;
-      newPrices: number;
-      newMetrics: number;
-    }> = [];
+  const results: TickerSyncResult[] = [];
 
-    // 각 티커에 대해 순차적으로 업데이트 (Yahoo Finance Rate Limit 방지)
-    for (const ticker of TICKERS) {
-      console.log(`--- ${ticker} 업데이트 시작 ---`);
-      const result = await updateTicker(ticker);
-      results.push({ ticker, ...result });
-      console.log(`--- ${ticker} 업데이트 완료 ---`);
-    }
-
-    const elapsed = Date.now() - startTime;
-    console.log(`=== 업데이트 완료 (${elapsed}ms) ===`);
-
-    return NextResponse.json(
-      {
-        success: true,
-        updatedAt: new Date().toISOString(),
-        results,
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    const elapsed = Date.now() - startTime;
-    console.error(`=== 업데이트 실패 (${elapsed}ms) ===`, error);
-
-    return NextResponse.json(
-      {
-        error: "Update failed",
-        message: "Internal server error",
-      },
-      { status: 500 }
-    );
+  // 각 티커에 대해 순차적으로 동기화 (Yahoo Finance Rate Limit 방지)
+  for (const ticker of TICKERS) {
+    console.log(`--- ${ticker} 동기화 시작 ---`);
+    results.push(await syncTickerSafely(ticker));
+    console.log(`--- ${ticker} 동기화 완료 ---`);
   }
+
+  const success = results.every((r) => r.status === "synced");
+  const elapsed = Date.now() - startTime;
+  console.log(`=== 동기화 ${success ? "완료" : "실패"} (${elapsed}ms) ===`);
+
+  return NextResponse.json(
+    {
+      success,
+      updatedAt: new Date().toISOString(),
+      results,
+    },
+    { status: success ? 200 : 500 }
+  );
 }

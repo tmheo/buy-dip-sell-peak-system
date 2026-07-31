@@ -163,42 +163,6 @@ export async function fetchAllHistory(ticker: SupportedTicker = "SOXL"): Promise
 }
 
 /**
- * 특정 날짜 이후의 데이터만 다운로드 (증분 업데이트)
- */
-export async function fetchSince(
-  startDate: string,
-  ticker: SupportedTicker = "SOXL"
-): Promise<DailyPrice[]> {
-  if (!TICKER_CONFIG[ticker]) {
-    throw new Error(`지원하지 않는 티커입니다: ${ticker}`);
-  }
-
-  const nextDay = new Date(startDate);
-  nextDay.setDate(nextDay.getDate() + 1);
-  const period1 = formatDate(nextDay);
-  const today = getToday();
-
-  if (period1 >= today) {
-    console.log("이미 최신 데이터입니다.");
-    return [];
-  }
-
-  console.log(`${ticker} 증분 업데이트 중...`);
-  console.log(`기간: ${period1} ~ ${today}`);
-
-  const result = await fetchChartWithRetry(ticker, period1, today);
-
-  if (!result.quotes || result.quotes.length === 0) {
-    console.log("새로운 데이터가 없습니다.");
-    return [];
-  }
-
-  const prices = convertQuotesToPrices(result.quotes);
-  console.log(`${prices.length}개의 새 데이터를 가져왔습니다.`);
-  return prices;
-}
-
-/**
  * 현재 티커 시세 조회
  */
 export async function fetchCurrentQuote(

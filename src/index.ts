@@ -3,24 +3,12 @@
  * PostgreSQL (Drizzle ORM) 버전
  */
 
-import {
-  getAllPricesByTicker,
-  getCount,
-  getLatestDate,
-  getPriceRange,
-  getTotalCount,
-  insertDailyPrices,
-} from "./database/prices.js";
-import { getMetricsCount, insertMetrics, upsertMetrics } from "./database/metrics.js";
+import { getAllPricesByTicker, getCount, getPriceRange, getTotalCount } from "./database/prices.js";
+import { getMetricsCount, upsertMetrics } from "./database/metrics.js";
 import { closeConnection } from "./database/db-drizzle.js";
-import {
-  fetchAllHistory,
-  fetchSince,
-  getSupportedTickers,
-  type SupportedTicker,
-} from "./services/dataFetcher.js";
+import { getSupportedTickers, type SupportedTicker } from "./services/dataFetcher.js";
+import { convertMetricsToRows, syncTickerPrices } from "./services/priceSyncService.js";
 import { calculateMetricsBatch, verifyMetrics } from "./services/metricsCalculator.js";
-import type { DailyMetricRow, DailyPrice } from "./types/index.js";
 
 const SUPPORTED_TICKERS = getSupportedTickers();
 const DEFAULT_TICKER: SupportedTicker = "SOXL";
@@ -36,10 +24,10 @@ function showHelp(): void {
   npx tsx src/index.ts <command> [options]
 
 명령어:
-  init [--ticker TICKER]  전체 히스토리 다운로드 (지표 포함)
-  init-all                모든 티커의 전체 히스토리 다운로드 (지표 포함)
-  update [--ticker TICKER] 최신 데이터로 업데이트 (증분, 지표 포함)
-  update-all              모든 티커 업데이트 (지표 포함)
+  init [--ticker TICKER]  전체 히스토리 동기화 (update와 동일, 지표 포함)
+  init-all                모든 티커 동기화 (지표 포함)
+  update [--ticker TICKER] 원천 스냅샷 전체와 정합 (소급 조정 흡수, 지표 포함)
+  update-all              모든 티커 동기화 (지표 포함)
   init-metrics [--ticker]  기존 가격 데이터로 기술적 지표 일괄 계산
   verify-metrics [--ticker] 지표 계산 결과 검증
   query [--ticker] [--start] [--end] 데이터 조회
@@ -49,6 +37,8 @@ function showHelp(): void {
   --ticker TICKER         티커 심볼 (${SUPPORTED_TICKERS.join(", ")}) 기본값: ${DEFAULT_TICKER}
   --start YYYY-MM-DD      조회 시작일
   --end YYYY-MM-DD        조회 종료일
+  --force                 분할 가드(close 5% 초과 변경 시 쓰기 중단) 우회
+                          SPEC-SPLIT-001 런북 전용. init/update에서만 유효
 
 예시:
   npx tsx src/index.ts init --ticker SOXL
@@ -89,160 +79,31 @@ function getTickerFromArgs(args: string[]): SupportedTicker {
 }
 
 /**
- * DailyPrice를 PostgreSQL INSERT용 형식으로 변환
+ * init/update 명령어: 원천 스냅샷 전체와 정합 (ADR-0002, 지표 포함)
+ * @param bypassCloseGuard - 분할 가드 우회 (SPEC-SPLIT-001 런북 전용)
  */
-function convertToPgPrices(
-  prices: DailyPrice[],
-  ticker: string
-): Array<{
-  ticker: string;
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  adjClose: number;
-  volume: number;
-}> {
-  return prices.map((p) => ({
-    ticker,
-    date: p.date,
-    open: p.open,
-    high: p.high,
-    low: p.low,
-    close: p.close,
-    adjClose: p.adjClose,
-    volume: p.volume,
-  }));
-}
+async function handleSync(ticker: SupportedTicker, bypassCloseGuard: boolean): Promise<void> {
+  console.log(`=== ${ticker} 가격 시계열 동기화 ===\n`);
 
-/**
- * DailyMetricRow를 PostgreSQL INSERT용 형식으로 변환
- */
-function convertToPgMetrics(
-  metrics: DailyMetricRow[],
-  ticker: string
-): Array<{
-  ticker: string;
-  date: string;
-  ma20: number | null;
-  ma60: number | null;
-  maSlope: number | null;
-  disparity: number | null;
-  rsi14: number | null;
-  roc12: number | null;
-  volatility20: number | null;
-  goldenCross: number | null;
-  isGoldenCross: boolean | null;
-}> {
-  return metrics.map((m) => ({
-    ticker,
-    date: m.date,
-    ma20: m.ma20 ?? null,
-    ma60: m.ma60 ?? null,
-    maSlope: m.maSlope ?? null,
-    disparity: m.disparity ?? null,
-    rsi14: m.rsi14 ?? null,
-    roc12: m.roc12 ?? null,
-    volatility20: m.volatility20 ?? null,
-    goldenCross: m.goldenCross ?? null,
-    isGoldenCross: m.isGoldenCross ?? null,
-  }));
-}
+  const summary = await syncTickerPrices(ticker, { bypassCloseGuard });
 
-/**
- * init 명령어: 전체 히스토리 다운로드 (지표 포함)
- */
-async function handleInit(ticker: SupportedTicker): Promise<void> {
-  console.log(`=== ${ticker} 데이터베이스 초기화 ===\n`);
-
-  const prices = await fetchAllHistory(ticker);
-
-  if (prices.length > 0) {
-    const pgPrices = convertToPgPrices(prices, ticker);
-    await insertDailyPrices(pgPrices);
-    console.log(`\n${prices.length}개의 가격 레코드가 저장되었습니다.`);
-
-    // 기술적 지표 계산 및 저장
-    console.log("\n기술적 지표 계산 중...");
-    const adjClosePrices = prices.map((p) => p.adjClose);
-    const dates = prices.map((p) => p.date);
-    const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
-
-    if (metrics.length > 0) {
-      const pgMetrics = convertToPgMetrics(metrics, ticker);
-      await insertMetrics(pgMetrics);
-      console.log(`✅ ${metrics.length}개의 기술적 지표가 저장되었습니다.`);
+  if (summary.status === "guard-triggered") {
+    console.error(`\n⚠️ ${ticker}: close 5% 초과 소급 변경이 감지되어 쓰기를 건너뛰었습니다.`);
+    console.error("분할이 의심됩니다. SPEC-SPLIT-001 런북으로 대응 후 --force로 재실행하세요.");
+    summary.guardViolations.slice(0, 10).forEach((v) => {
+      console.error(
+        `  - ${v.date}: DB ${v.dbClose} → 재수집본 ${v.fetchedClose} (${(v.changeRatio * 100).toFixed(1)}%)`
+      );
+    });
+    if (summary.guardViolations.length > 10) {
+      console.error(`  ... 외 ${summary.guardViolations.length - 10}건`);
     }
-  }
-
-  const tickerCount = await getCount(ticker);
-  const metricsCount = await getMetricsCount(ticker);
-  console.log(`\n${ticker} 총 저장된 가격 레코드 수: ${tickerCount}`);
-  console.log(`${ticker} 총 저장된 지표 레코드 수: ${metricsCount}`);
-}
-
-/**
- * init-all 명령어: 모든 티커 초기화
- */
-async function handleInitAll(): Promise<void> {
-  console.log("=== 모든 티커 데이터베이스 초기화 ===\n");
-
-  for (const ticker of SUPPORTED_TICKERS) {
-    await handleInit(ticker);
-    console.log("");
-  }
-
-  const totalCount = await getTotalCount();
-  console.log(`\n전체 저장된 레코드 수: ${totalCount}`);
-}
-
-/**
- * update 명령어: 증분 업데이트 (지표 포함)
- */
-async function handleUpdate(ticker: SupportedTicker): Promise<void> {
-  console.log(`=== ${ticker} 데이터 업데이트 ===\n`);
-
-  const latestDate = await getLatestDate(ticker);
-
-  if (!latestDate) {
-    console.log(`${ticker}의 저장된 데이터가 없습니다. init 명령어를 먼저 실행하세요.`);
-    return;
-  }
-
-  console.log(`마지막 저장 날짜: ${latestDate}`);
-
-  const prices = await fetchSince(latestDate, ticker);
-
-  if (prices.length > 0) {
-    const pgPrices = convertToPgPrices(prices, ticker);
-    await insertDailyPrices(pgPrices);
-    console.log(`\n${prices.length}개의 새 가격 레코드가 저장되었습니다.`);
-
-    // 지표 재계산
-    // 새 데이터 추가 시 영향받는 지표도 업데이트 (MA60 등으로 인해 과거 60일 영향)
-    console.log("\n기술적 지표 업데이트 중...");
-    const allPrices = await getAllPricesByTicker(ticker);
-    const adjClosePrices = allPrices.map((p) => p.adjClose);
-    const dates = allPrices.map((p) => p.date);
-
-    // 새 데이터 + 영향받는 과거 데이터 재계산 (MA60 기준 60일)
-    const startIdx = Math.max(59, allPrices.length - prices.length - 60);
-    const metrics = calculateMetricsBatch(
-      adjClosePrices,
-      dates,
-      ticker,
-      startIdx,
-      allPrices.length - 1
-    );
-
-    if (metrics.length > 0) {
-      const pgMetrics = convertToPgMetrics(metrics, ticker);
-      await upsertMetrics(pgMetrics);
-      console.log(`✅ ${metrics.length}개의 기술적 지표가 업데이트되었습니다.`);
-    }
+    process.exitCode = 1;
   } else {
-    console.log("\n새 데이터가 없습니다.");
+    console.log(
+      `\n✅ 신규 ${summary.newPriceRows}건, 변경 ${summary.changedPriceRows}건, ` +
+        `지표 ${summary.upsertedMetrics}건 반영`
+    );
   }
 
   const tickerCount = await getCount(ticker);
@@ -252,13 +113,13 @@ async function handleUpdate(ticker: SupportedTicker): Promise<void> {
 }
 
 /**
- * update-all 명령어: 모든 티커 업데이트
+ * init-all/update-all 명령어: 모든 티커 동기화
  */
-async function handleUpdateAll(): Promise<void> {
-  console.log("=== 모든 티커 데이터 업데이트 ===\n");
+async function handleSyncAll(bypassCloseGuard: boolean): Promise<void> {
+  console.log("=== 모든 티커 동기화 ===\n");
 
   for (const ticker of SUPPORTED_TICKERS) {
-    await handleUpdate(ticker);
+    await handleSync(ticker, bypassCloseGuard);
     console.log("");
   }
 
@@ -334,8 +195,8 @@ async function handleInitMetrics(ticker: SupportedTicker): Promise<void> {
   const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
 
   if (metrics.length > 0) {
-    const pgMetrics = convertToPgMetrics(metrics, ticker);
-    await insertMetrics(pgMetrics);
+    const pgMetrics = convertMetricsToRows(metrics, ticker);
+    await upsertMetrics(pgMetrics);
     console.log(`\n✅ ${metrics.length}개의 기술적 지표가 저장되었습니다.`);
   } else {
     console.log("\n계산된 지표가 없습니다. (데이터 부족)");
@@ -420,20 +281,17 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args[0] ?? "help";
   const ticker = getTickerFromArgs(args);
+  const bypassCloseGuard = args.includes("--force");
 
   try {
     switch (command) {
       case "init":
-        await handleInit(ticker);
+      case "update":
+        await handleSync(ticker, bypassCloseGuard);
         break;
       case "init-all":
-        await handleInitAll();
-        break;
-      case "update":
-        await handleUpdate(ticker);
-        break;
       case "update-all":
-        await handleUpdateAll();
+        await handleSyncAll(bypassCloseGuard);
         break;
       case "init-metrics":
         await handleInitMetrics(ticker);
