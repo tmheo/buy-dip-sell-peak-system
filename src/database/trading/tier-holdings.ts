@@ -4,7 +4,7 @@
 
 import { eq, and, asc, sql } from "drizzle-orm";
 
-import { db } from "../db-drizzle";
+import { db, type DbExecutor } from "../db-drizzle";
 import { tierHoldings } from "../schema/index";
 
 import type { TierHolding } from "@/types/trading";
@@ -51,7 +51,8 @@ export async function updateTierHolding(
     shares?: number;
     buyDate?: string | null;
     sellTargetPrice?: number | null;
-  }
+  },
+  executor: DbExecutor = db
 ): Promise<TierHolding | null> {
   // 업데이트할 필드가 있는지 확인
   const hasUpdates =
@@ -74,12 +75,12 @@ export async function updateTierHolding(
   if (data.buyDate !== undefined) updateData.buyDate = data.buyDate;
   if (data.sellTargetPrice !== undefined) updateData.sellTargetPrice = data.sellTargetPrice;
 
-  await db
+  await executor
     .update(tierHoldings)
     .set(updateData as typeof tierHoldings.$inferInsert)
     .where(and(eq(tierHoldings.accountId, accountId), eq(tierHoldings.tier, tier)));
 
-  const rows = await db
+  const rows = await executor
     .select()
     .from(tierHoldings)
     .where(and(eq(tierHoldings.accountId, accountId), eq(tierHoldings.tier, tier)))

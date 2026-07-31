@@ -1,13 +1,14 @@
 /**
  * 일일 주문 CRUD 및 주문 생성 함수
+ *
+ * #43 이행 3단계: 주문표 생성 규칙은 src/strategy의 planOrders가 소유하고,
+ * 이 모듈은 가격·보유 상태를 조회해 CycleState로 변환하고 결과를 저장만 한다.
  */
 
-import Decimal from "decimal.js";
-import { eq, and, desc, asc, lt, lte, gt } from "drizzle-orm";
+import { eq, and, desc, asc, lt, gt } from "drizzle-orm";
 
-import { db } from "../db-drizzle";
-import { dailyOrders, dailyPrices } from "../schema/index";
-
+import type { CycleState, TierHolding as StrategyTierHolding } from "@/strategy";
+import { getStrategyParams, planOrders } from "@/strategy";
 import type {
   DailyOrder,
   TierHolding,
@@ -16,20 +17,11 @@ import type {
   OrderType,
   OrderMethod,
 } from "@/types/trading";
-import { TIER_RATIOS, BUY_THRESHOLDS, SELL_THRESHOLDS, STOP_LOSS_DAYS } from "@/types/trading";
 
-import {
-  calculateBuyLimitPrice,
-  calculateSellLimitPrice,
-  calculateBuyQuantity,
-  calculateReserveTierSeed,
-  getPreviousTradingDate,
-  calculateTradingDays,
-  percentToThreshold,
-} from "@/utils/trading-core";
+import { db, type DbExecutor } from "../db-drizzle";
+import { dailyOrders, dailyPrices } from "../schema/index";
 
 import { mapDrizzleDailyOrder } from "./mappers";
-import { BASE_TIER_COUNT, RESERVE_TIER_NUMBER } from "./tier-holdings";
 
 /**
  * 당일 주문표 조회
@@ -76,38 +68,124 @@ export async function createDailyOrder(
 }
 
 /**
- * 주문 실행 상태 업데이트
+ * 주문 실행 상태 업데이트 (조건부 선점)
+ * 상태가 실제로 바뀌는 경우에만 갱신한다. 동시 체결 처리가 같은 주문을
+ * 중복 반영하지 못하도록, 이미 목표 상태인 주문에는 false를 반환한다.
  */
-export async function updateOrderExecuted(orderId: string, executed: boolean): Promise<boolean> {
-  const result = await db
+export async function updateOrderExecuted(
+  orderId: string,
+  executed: boolean,
+  executor: DbExecutor = db
+): Promise<boolean> {
+  const result = await executor
     .update(dailyOrders)
     .set({ executed, updatedAt: new Date() })
-    .where(eq(dailyOrders.id, orderId))
+    .where(and(eq(dailyOrders.id, orderId), eq(dailyOrders.executed, !executed)))
     .returning();
 
   return result.length > 0;
 }
 
 /**
- * 특정 날짜의 종가 조회
+ * 특정 날짜의 종가(adjClose) 조회
+ * 해당 날짜의 가격 행이 없으면(휴장일 또는 미적재) null을 반환한다.
+ * 과거 날짜로 폴백하지 않는다 - 폴백은 휴장일과 데이터 미적재를 구분하지 못해
+ * 잘못된 기준가로 체결하는 원인이 된다 (#43 가격 불변식).
  */
 export async function getClosingPrice(ticker: Ticker, date: string): Promise<number | null> {
   const rows = await db
     .select({ adjClose: dailyPrices.adjClose })
     .from(dailyPrices)
-    .where(and(eq(dailyPrices.ticker, ticker), lte(dailyPrices.date, date)))
-    .orderBy(desc(dailyPrices.date))
+    .where(and(eq(dailyPrices.ticker, ticker), eq(dailyPrices.date, date)))
     .limit(1);
 
   return rows[0]?.adjClose ?? null;
 }
 
 /**
+ * 직전 거래일의 종가(adjClose) 조회
+ * 거래일은 가격 데이터가 존재하는 날로 정의한다 - 기준일 이전의 가장 최근 가격 행.
+ */
+export async function getPreviousTradingClose(
+  ticker: Ticker,
+  date: string
+): Promise<{ date: string; adjClose: number } | null> {
+  const rows = await db
+    .select({ date: dailyPrices.date, adjClose: dailyPrices.adjClose })
+    .from(dailyPrices)
+    .where(and(eq(dailyPrices.ticker, ticker), lt(dailyPrices.date, date)))
+    .orderBy(desc(dailyPrices.date))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
+ * 두 날짜 사이(양 끝 제외)의 실제 거래일 목록 (가격 데이터 행 기준)
+ * #41: 평일 근사는 휴장일을 거래일로 세어 백테스트보다 하루 일찍 손절하게 만든다.
+ */
+async function listTradingDatesBetween(
+  ticker: Ticker,
+  afterDate: string,
+  beforeDate: string
+): Promise<string[]> {
+  const rows = await db
+    .select({ date: dailyPrices.date })
+    .from(dailyPrices)
+    .where(
+      and(
+        eq(dailyPrices.ticker, ticker),
+        gt(dailyPrices.date, afterDate),
+        lt(dailyPrices.date, beforeDate)
+      )
+    );
+
+  return rows.map((row) => row.date);
+}
+
+/**
+ * DB 티어 홀딩을 src/strategy의 보유 상태로 변환
+ * holdingDays는 기준일 직전 거래일 마감 시점의 보유 거래일 수다
+ * (매수 당일 = 0, settle마다 +1 - src/strategy의 손절 카운트 의미).
+ * 가장 이른 매수일 이후 거래일 목록을 한 번만 조회하고 티어별 수는 메모리에서 센다.
+ *
+ * @param ticker - 종목 (거래일 수 계산에 가격 데이터 사용)
+ * @param holdings - DB 티어 홀딩 목록 (비활성 티어 포함 가능)
+ * @param date - 기준일 (주문 생성일 또는 체결 처리일)
+ */
+export async function toStrategyHoldings(
+  ticker: Ticker,
+  holdings: TierHolding[],
+  date: string
+): Promise<StrategyTierHolding[]> {
+  const active = holdings.filter(
+    (holding): holding is TierHolding & { buyPrice: number; buyDate: string } =>
+      holding.shares > 0 && holding.buyPrice !== null && holding.buyDate !== null
+  );
+  if (active.length === 0) {
+    return [];
+  }
+
+  const earliestBuyDate = active.reduce(
+    (min, holding) => (holding.buyDate < min ? holding.buyDate : min),
+    active[0].buyDate
+  );
+  const tradingDates = await listTradingDatesBetween(ticker, earliestBuyDate, date);
+
+  return active.map((holding) => ({
+    tier: holding.tier,
+    buyPrice: holding.buyPrice,
+    shares: holding.shares,
+    buyDate: holding.buyDate,
+    holdingDays: tradingDates.filter((tradingDate) => tradingDate > holding.buyDate).length,
+  }));
+}
+
+/**
  * 주문 생성 이후 더 최신 가격 데이터가 적재됐는지 확인
  *
  * 당일 주문표는 화면 진입 시 지연 생성되므로, 일일 크론이 전일 종가를
- * 적재하기 전에 생성되면 그보다 더 이전 거래일 종가로 잘못 만들어진다
- * (getClosingPrice의 lte 폴백이 휴장일과 데이터 미적재를 구분하지 못함).
+ * 적재하기 전에 생성되면 그보다 더 이전 거래일 종가로 잘못 만들어진다.
  * 주문 생성 시각(since) 이후에 주문 기준일 이전 거래일의 가격 행이 새로
  * 적재됐다면 해당 주문은 stale이므로 재생성 대상으로 판정한다.
  *
@@ -146,33 +224,9 @@ export async function deleteDailyOrders(accountId: string, date: string): Promis
 }
 
 /**
- * 다음 매수할 티어 번호 반환 (티어 고정 방식)
- * 티어 1-6 중 가장 낮은 빈 티어를 반환
- * 티어 1-6이 모두 활성화되고 예수금이 있으면 티어 7(예비) 반환
- */
-export function getNextBuyTier(holdings: TierHolding[]): number | null {
-  const activeTiers = new Set(holdings.filter((h) => h.shares > 0).map((h) => h.tier));
-
-  // 티어 1-6 중 가장 낮은 빈 티어 찾기
-  for (let i = 1; i <= BASE_TIER_COUNT; i++) {
-    if (!activeTiers.has(i)) {
-      return i;
-    }
-  }
-
-  // 티어 1-6 모두 보유 중이면 예비 티어(7) 반환
-  if (!activeTiers.has(RESERVE_TIER_NUMBER)) {
-    return RESERVE_TIER_NUMBER;
-  }
-
-  return null; // 모든 티어 보유 중
-}
-
-/**
  * 당일 주문 자동 생성
- * - 티어 고정 방식: 가장 낮은 빈 티어에만 매수 주문 (한 번에 하나의 티어만)
- * - 보유 티어: 매도 주문 생성
- * - 트랜잭션으로 삭제/생성 원자성 보장
+ * 주문표는 src/strategy의 planOrders가 직전 거래일 종가(adjClose) 기준으로 생성하고,
+ * 이 함수는 트랜잭션으로 삭제/생성 원자성만 보장한다.
  */
 export async function generateDailyOrders(
   accountId: string,
@@ -182,108 +236,61 @@ export async function generateDailyOrders(
   seedCapital: number,
   holdings: TierHolding[]
 ): Promise<DailyOrder[]> {
-  // 전일 종가 조회 (주문 생성일 기준 이전 거래일)
-  const prevDate = getPreviousTradingDate(date);
-  const closePrice = await getClosingPrice(ticker, prevDate);
-
-  if (!closePrice) {
+  const prevClose = await getPreviousTradingClose(ticker, date);
+  if (!prevClose) {
     return []; // 가격 데이터 없으면 주문 생성 불가
   }
 
-  const buyThreshold = percentToThreshold(BUY_THRESHOLDS[strategy]);
-  const sellThreshold = percentToThreshold(SELL_THRESHOLDS[strategy]);
-  const tierRatios = TIER_RATIOS[strategy];
-  const stopLossDay = STOP_LOSS_DAYS[strategy];
+  const state: CycleState = {
+    strategy: getStrategyParams(strategy),
+    cycleCapital: seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
+    holdings: await toStrategyHoldings(ticker, holdings, date),
+    cycleNumber: 0, // planOrders는 사용하지 않는다 (settle의 사이클 완료 통지용 필드)
+  };
+  const intents = planOrders(state, prevClose.adjClose);
 
-  // 트랜잭션으로 삭제 + 생성 원자성 보장
-  const orders = await db.transaction(async (tx) => {
-    const createdOrders: DailyOrder[] = [];
+  return db.transaction(async (tx) => {
+    // 체결된 주문이 있는 날짜는 재생성 불가 - 삭제 후 미체결로 되살리면
+    // 재체결 처리로 홀딩·수익 기록이 중복 반영된다
+    const executedRows = await tx
+      .select({ id: dailyOrders.id })
+      .from(dailyOrders)
+      .where(
+        and(
+          eq(dailyOrders.accountId, accountId),
+          eq(dailyOrders.date, date),
+          eq(dailyOrders.executed, true)
+        )
+      )
+      .limit(1);
+    if (executedRows.length > 0) {
+      throw new Error(`Cannot regenerate orders for ${date}: executed orders exist`);
+    }
 
-    // 기존 주문 삭제
     await tx
       .delete(dailyOrders)
       .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));
 
-    // 1. 보유 중인 티어들의 매도 주문 생성 (손절 또는 일반 매도)
-    for (const holding of holdings) {
-      if (holding.shares > 0 && holding.buyPrice && holding.buyDate) {
-        // 보유일 계산 (거래일 기준, 매수일 포함)
-        const holdingDays = calculateTradingDays(holding.buyDate, date);
-
-        if (holdingDays > stopLossDay) {
-          // 손절일 도달: MOC 주문 (시장가, 무조건 체결)
-          const result = await tx
-            .insert(dailyOrders)
-            .values({
-              accountId,
-              date,
-              tier: holding.tier,
-              type: "SELL" as OrderType,
-              orderMethod: "MOC" as OrderMethod,
-              limitPrice: closePrice, // MOC는 시장가이므로 종가로 설정
-              shares: holding.shares,
-              executed: false,
-            })
-            .returning();
-          createdOrders.push(mapDrizzleDailyOrder(result[0]));
-        } else {
-          // 일반 매도: LOC 주문 (지정가)
-          const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
-          const result = await tx
-            .insert(dailyOrders)
-            .values({
-              accountId,
-              date,
-              tier: holding.tier,
-              type: "SELL" as OrderType,
-              orderMethod: "LOC" as OrderMethod,
-              limitPrice: sellPrice,
-              shares: holding.shares,
-              executed: false,
-            })
-            .returning();
-          createdOrders.push(mapDrizzleDailyOrder(result[0]));
-        }
-      }
-    }
-
-    // 2. 다음 매수할 티어 찾기 (티어 고정 방식: 가장 낮은 빈 티어)
-    const nextBuyTier = getNextBuyTier(holdings);
-
-    if (nextBuyTier !== null) {
-      // 티어 1-6은 시드 × 고정 비율, 예비 티어(7)는 잔여 예수금 전액
-      const allocatedSeed =
-        nextBuyTier === RESERVE_TIER_NUMBER
-          ? calculateReserveTierSeed(seedCapital, holdings)
-          : new Decimal(seedCapital)
-              .mul(new Decimal(tierRatios[nextBuyTier - 1]).div(100))
-              .toNumber();
-
-      if (allocatedSeed > 0) {
-        const buyPrice = calculateBuyLimitPrice(closePrice, buyThreshold);
-        const shares = calculateBuyQuantity(allocatedSeed, buyPrice);
-
-        if (shares > 0) {
-          const result = await tx
-            .insert(dailyOrders)
-            .values({
-              accountId,
-              date,
-              tier: nextBuyTier,
-              type: "BUY" as OrderType,
-              orderMethod: "LOC" as OrderMethod,
-              limitPrice: buyPrice,
-              shares,
-              executed: false,
-            })
-            .returning();
-          createdOrders.push(mapDrizzleDailyOrder(result[0]));
-        }
-      }
+    const createdOrders: DailyOrder[] = [];
+    for (const intent of intents) {
+      const result = await tx
+        .insert(dailyOrders)
+        .values({
+          accountId,
+          date,
+          tier: intent.tier,
+          type: intent.type,
+          orderMethod: intent.orderMethod,
+          // MOC는 규칙상 지정가가 없다. limit_price 컬럼이 NOT NULL이라
+          // 표시용으로 직전 거래일 종가를 저장한다 (체결 판정에는 쓰이지 않는다).
+          limitPrice: intent.limitPrice ?? prevClose.adjClose,
+          shares: intent.shares,
+          executed: false,
+        })
+        .returning();
+      createdOrders.push(mapDrizzleDailyOrder(result[0]));
     }
 
     return createdOrders;
   });
-
-  return orders;
 }

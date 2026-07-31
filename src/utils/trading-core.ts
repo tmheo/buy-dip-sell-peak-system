@@ -4,8 +4,6 @@
  * 매매 규칙 계산 원시 함수는 src/strategy/calculations.ts로 이동했다 (#45).
  * 기존 소비자를 위해 재수출하며, 이행 완료(#43 4단계) 후 이 파일은 정리된다.
  */
-import Decimal from "decimal.js";
-
 export {
   floorToDecimal,
   roundToDecimal,
@@ -16,34 +14,6 @@ export {
   shouldExecuteSell,
   percentToThreshold,
 } from "@/strategy/calculations";
-
-/**
- * 예비 티어(7) 매수 시드 계산
- * 예비 티어는 고정 비율이 없고 잔여 예수금 전액을 사용한다 (REQ-008).
- * 잔여 예수금 = 시드 - Σ(보유 티어 수량 × 매수가), 소수점 2자리 내림
- *
- * 실계좌 주문 파이프라인 전용. 규칙의 단일 소유자는 src/strategy의 availableCash이며,
- * 실계좌 이행(#43 3단계)에서 이 함수는 삭제된다.
- *
- * @param seedCapital - 계좌 시드 금액
- * @param holdings - 티어별 보유 현황 (수량과 매수가만 사용)
- * @returns 예비 티어 매수 시드 (음수면 0)
- */
-export function calculateReserveTierSeed(
-  seedCapital: number,
-  holdings: Array<{ shares: number; buyPrice: number | null }>
-): number {
-  const invested = holdings.reduce((sum, holding) => {
-    if (holding.shares > 0 && holding.buyPrice) {
-      return sum.add(new Decimal(holding.shares).mul(holding.buyPrice));
-    }
-    return sum;
-  }, new Decimal(0));
-
-  const remaining = new Decimal(seedCapital).sub(invested);
-  if (remaining.lte(0)) return 0;
-  return remaining.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
-}
 
 // =====================================================
 // 날짜 유틸리티 함수

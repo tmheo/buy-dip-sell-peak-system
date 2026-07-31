@@ -5,7 +5,7 @@
 import Decimal from "decimal.js";
 import { eq, asc } from "drizzle-orm";
 
-import { db } from "../db-drizzle";
+import { db, type DbExecutor } from "../db-drizzle";
 import { profitRecords } from "../schema/index";
 
 import type {
@@ -31,17 +31,20 @@ export interface ProfitAggregate {
  * 매도 체결 시 호출되어 수익 기록을 저장
  * Decimal.js로 정밀한 금융 계산 수행
  */
-export async function createProfitRecord(data: {
-  accountId: string;
-  tier: number;
-  ticker: Ticker;
-  strategy: Strategy;
-  buyDate: string;
-  buyPrice: number;
-  buyQuantity: number;
-  sellDate: string;
-  sellPrice: number;
-}): Promise<ProfitRecord> {
+export async function createProfitRecord(
+  data: {
+    accountId: string;
+    tier: number;
+    ticker: Ticker;
+    strategy: Strategy;
+    buyDate: string;
+    buyPrice: number;
+    buyQuantity: number;
+    sellDate: string;
+    sellPrice: number;
+  },
+  executor: DbExecutor = db
+): Promise<ProfitRecord> {
   // Decimal.js로 정밀한 금융 계산
   const buyAmount = new Decimal(data.buyPrice)
     .mul(data.buyQuantity)
@@ -65,7 +68,7 @@ export async function createProfitRecord(data: {
     .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
     .toNumber();
 
-  const result = await db
+  const result = await executor
     .insert(profitRecords)
     .values({
       accountId: data.accountId,
