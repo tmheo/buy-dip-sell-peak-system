@@ -16,24 +16,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { BacktestResult, RemainingTier } from "@/backtest/types";
-import type { Strategy } from "@/types/trading";
-
-// 전략별 분할 비율 표시
-const STRATEGY_RATIOS: Record<Strategy, string> = {
-  Pro1: "5.0% / 10.0% / 15.0% / 20.0% / 25.0% / 25%",
-  Pro2: "10.0% / 15.0% / 20.0% / 25.0% / 20.0% / 10.0%",
-  Pro3: "16.7% / 16.7% / 16.7% / 16.7% / 16.7% / 16.7%",
-};
-
-// 전략별 매수/매도 조건
-const STRATEGY_CONDITIONS: Record<Strategy, { buyThreshold: string; sellThreshold: string }> = {
-  Pro1: { buyThreshold: "-0.01%", sellThreshold: "+0.01%" },
-  Pro2: { buyThreshold: "-0.01%", sellThreshold: "+1.50%" },
-  Pro3: { buyThreshold: "-0.10%", sellThreshold: "+2.00%" },
-};
-
-// 전략별 손절일 (추후 UI 확장 시 사용 예정)
-// Pro1: 10일, Pro2: 10일, Pro3: 12일
+import { getStrategyParams } from "@/strategy";
+import { formatThresholdPercent, formatTierRatiosPercent } from "@/lib/strategy-format";
 
 interface ProResultCardProps {
   result: BacktestResult;
@@ -45,9 +29,14 @@ interface ProResultCardProps {
   };
 }
 
-export default function ProResultCard({ result, cardNumber, sharedYAxisRange }: ProResultCardProps) {
+export default function ProResultCard({
+  result,
+  cardNumber,
+  sharedYAxisRange,
+}: ProResultCardProps) {
   const strategy = result.strategy;
-  const conditions = STRATEGY_CONDITIONS[strategy];
+  // 분할 비율과 매수/매도 조건은 src/strategy의 전략 파라미터 표에서 파생한다 (#43)
+  const params = getStrategyParams(strategy);
 
   // MDD 차트 데이터 계산 - 인덱스를 포함하여 고유성 확보
   const chartData = result.dailyHistory.map((d, index) => {
@@ -97,18 +86,18 @@ export default function ProResultCard({ result, cardNumber, sharedYAxisRange }: 
           {/* 분할 비율 */}
           <div className="mb-3">
             <small className="text-muted">분할 비율</small>
-            <div style={{ fontSize: "0.85rem" }}>{STRATEGY_RATIOS[strategy]}</div>
+            <div style={{ fontSize: "0.85rem" }}>{formatTierRatiosPercent(params).join(" / ")}</div>
           </div>
 
           {/* 매수/매도 조건 */}
           <div className="row mb-3" style={{ fontSize: "0.85rem" }}>
             <div className="col-6">
               <small className="text-muted d-block">매수 기준</small>
-              <span className="price-down">{conditions.buyThreshold}</span>
+              <span className="price-down">{formatThresholdPercent(params.buyThreshold)}</span>
             </div>
             <div className="col-6">
               <small className="text-muted d-block">매도 기준</small>
-              <span className="price-up">{conditions.sellThreshold}</span>
+              <span className="price-up">{formatThresholdPercent(params.sellThreshold)}</span>
             </div>
           </div>
 
@@ -158,7 +147,10 @@ export default function ProResultCard({ result, cardNumber, sharedYAxisRange }: 
           <div className="mb-3">
             <small className="text-muted d-block mb-2">잔여 티어 (보유 주식)</small>
             {result.remainingTiers.length > 0 ? (
-              <div className="p-2 rounded" style={{ backgroundColor: "#073642", fontSize: "0.85rem" }}>
+              <div
+                className="p-2 rounded"
+                style={{ backgroundColor: "#073642", fontSize: "0.85rem" }}
+              >
                 <div className="row g-1">
                   <div className="col-6">
                     <small className="text-muted">보유 티어</small>
@@ -178,20 +170,29 @@ export default function ProResultCard({ result, cardNumber, sharedYAxisRange }: 
                   </div>
                   <div className="col-6">
                     <small className="text-muted">수익금</small>
-                    <div className={remainingTiersSummary.totalProfitLoss >= 0 ? "price-up" : "price-down"}>
+                    <div
+                      className={
+                        remainingTiersSummary.totalProfitLoss >= 0 ? "price-up" : "price-down"
+                      }
+                    >
                       ${remainingTiersSummary.totalProfitLoss.toFixed(2)}
                     </div>
                   </div>
                   <div className="col-6">
                     <small className="text-muted">수익률</small>
-                    <div className={remainingTiersSummary.returnRate >= 0 ? "price-up" : "price-down"}>
+                    <div
+                      className={remainingTiersSummary.returnRate >= 0 ? "price-up" : "price-down"}
+                    >
                       {(remainingTiersSummary.returnRate * 100).toFixed(2)}%
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-muted text-center p-2" style={{ backgroundColor: "#073642", borderRadius: "4px" }}>
+              <div
+                className="text-muted text-center p-2"
+                style={{ backgroundColor: "#073642", borderRadius: "4px" }}
+              >
                 손절일 없음 ×
               </div>
             )}

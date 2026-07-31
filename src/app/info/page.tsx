@@ -3,25 +3,20 @@
 
 import type { StrategyParams } from "@/strategy";
 import { getStrategyParams } from "@/strategy";
+import { formatThresholdPercent, formatTierRatiosPercent } from "@/lib/strategy-format";
 import StrategyCard from "@/components/StrategyCard";
 import FlowChart from "@/components/FlowChart";
-
-// 임계값(소수 비율)을 부호 있는 퍼센트 문자열로 변환 (예: 0.015 → "+1.50%")
-function formatThreshold(threshold: number): string {
-  const percent = threshold * 100;
-  return `${percent > 0 ? "+" : ""}${percent.toFixed(2)}%`;
-}
 
 // 파라미터 수치는 src/strategy의 전략 파라미터 표에서 파생한다 (#43)
 function toStrategyCardData(params: StrategyParams, subtitle: string, feature: string) {
   return {
     title: params.name,
     subtitle,
-    tierRatios: [...params.tierRatios.map((ratio) => `${(ratio * 100).toFixed(1)}%`), "예비"],
+    tierRatios: [...formatTierRatiosPercent(params), "예비"],
     splits: params.tierRatios.length,
     stopLossDays: params.stopLossDays,
-    buyThreshold: formatThreshold(params.buyThreshold),
-    sellThreshold: formatThreshold(params.sellThreshold),
+    buyThreshold: formatThresholdPercent(params.buyThreshold),
+    sellThreshold: formatThresholdPercent(params.sellThreshold),
     feature,
   };
 }
