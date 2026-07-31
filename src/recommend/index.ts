@@ -48,6 +48,7 @@ export {
   recommendOrDefault,
   clearRecommendationCache,
   DEFAULT_STRATEGY,
+  PRICE_HISTORY_START,
   type RecommendOptions,
 } from "./service";
 

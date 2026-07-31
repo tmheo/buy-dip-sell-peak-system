@@ -38,7 +38,7 @@ import type {
 export const DEFAULT_STRATEGY: Strategy = "Pro2";
 
 /** 유사 구간 검색용 과거 데이터 시작일 (SOXL/TQQQ 모두 2010년 시작) */
-const PRICE_HISTORY_START = "2010-01-01";
+export const PRICE_HISTORY_START = "2010-01-01";
 
 /** recommend 옵션 */
 export interface RecommendOptions {
@@ -48,6 +48,12 @@ export interface RecommendOptions {
   similarityConfig?: SimilarityConfig;
   /** 계산 결과의 DB 캐시 저장 여부 (기본값: true) */
   persistCache?: boolean;
+  /**
+   * 상세 필드(analysisPeriod·similarPeriods·strategyScores·downgradeInfo)가 필요한
+   * 호출자용 (recommend route). DB 캐시는 요약만 저장하므로 조회하지 않고,
+   * 메모리 캐시도 요약만 있으면 적중으로 치지 않는다 (전체 계산 후 전체 값으로 교체)
+   */
+  requireDetail?: boolean;
 }
 
 /** 인메모리 추천 캐시 상한 (장기 실행 프로세스의 무제한 증가 방지) */
@@ -180,22 +186,25 @@ export async function recommend(
   referenceDate: string,
   opts: RecommendOptions = {}
 ): Promise<RecommendOutcome> {
-  const { prices, similarityConfig, persistCache = true } = opts;
+  const { prices, similarityConfig, persistCache = true, requireDetail = false } = opts;
   // 커스텀 유사도 설정이면 추천 캐시(메모리·DB)를 조회도 저장도 하지 않는다
   const useCache = similarityConfig === undefined;
   const cacheKey = `${ticker}:${referenceDate}`;
 
   if (useCache) {
     const memoryCached = memoryCache.get(cacheKey);
-    if (memoryCached) {
+    if (memoryCached && !(requireDetail && memoryCached.similarPeriods === undefined)) {
       return { ok: true, value: memoryCached };
     }
 
-    const dbCached = await getCachedRecommendation(ticker, referenceDate);
-    if (dbCached) {
-      const value = fromCachedRecommendation(referenceDate, dbCached);
-      setMemoryCache(cacheKey, value);
-      return { ok: true, value };
+    // DB 캐시는 요약만 저장하므로 상세가 필요한 호출에는 적중할 수 없다
+    if (!requireDetail) {
+      const dbCached = await getCachedRecommendation(ticker, referenceDate);
+      if (dbCached) {
+        const value = fromCachedRecommendation(referenceDate, dbCached);
+        setMemoryCache(cacheKey, value);
+        return { ok: true, value };
+      }
     }
   }
 
