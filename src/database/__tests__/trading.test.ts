@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { CreateTradingAccountRequest } from "@/types/trading";
 import { db } from "../db-drizzle";
 import { users } from "../schema/auth";
@@ -1123,9 +1123,12 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
     const PREV_DATE = "2009-06-01"; // 월요일 (전일 종가 기준일)
     const ORDER_DATE = "2009-06-02"; // 화요일 (주문 생성일)
 
+    // 이 테스트가 직접 삽입한 행만 정리하기 위한 식별자
+    let syntheticPriceId: number | undefined;
+
     beforeAll(async () => {
       // 전일 종가로 사용할 합성 시세 삽입
-      await db
+      const inserted = await db
         .insert(dailyPrices)
         .values({
           ticker: "TQQQ",
@@ -1137,13 +1140,16 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
           adjClose: 100,
           volume: 1000,
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: dailyPrices.id });
+      syntheticPriceId = inserted[0]?.id;
     });
 
     afterAll(async () => {
-      await db
-        .delete(dailyPrices)
-        .where(and(eq(dailyPrices.ticker, "TQQQ"), eq(dailyPrices.date, PREV_DATE)));
+      // 삽입이 스킵됐다면(동일 행이 이미 존재) 기존 데이터를 보존한다
+      if (syntheticPriceId !== undefined) {
+        await db.delete(dailyPrices).where(eq(dailyPrices.id, syntheticPriceId));
+      }
     });
 
     it("티어 1-6이 모두 보유 중이면 예비 티어(7) 매수 주문을 잔여 예수금으로 생성해야 한다", async () => {
