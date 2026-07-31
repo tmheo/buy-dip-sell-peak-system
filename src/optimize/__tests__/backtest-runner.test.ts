@@ -5,7 +5,7 @@
  * TC-06: 커스텀 파라미터가 베이스라인과 다른 결과를 생성하는지 검증
  * TC-07: 전략 점수가 올바르게 계산되는지 검증
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import Decimal from "decimal.js";
 
 import {
@@ -15,11 +15,8 @@ import {
   type PriceDataResult,
 } from "../backtest-runner";
 import type { SimilarityConfig } from "@/recommend/types";
+import { hasDb } from "@/test-utils/db";
 import type { OptimizationConfig } from "../types";
-
-// 테스트용 가격 데이터 캐시
-let soxlPriceData: PriceDataResult;
-let tqqqPriceData: PriceDataResult;
 
 // 테스트 설정 (거래일 기준 날짜 사용)
 const testConfig: OptimizationConfig = {
@@ -32,11 +29,27 @@ const testConfig: OptimizationConfig = {
   topCandidates: 3,
 };
 
-// 테스트 전 가격 데이터 로드
-beforeAll(async () => {
+// 통합 테스트 설정 (testConfig보다 긴 구간)
+const integrationConfig: OptimizationConfig = {
+  ...testConfig,
+  endDate: "2024-06-28",
+};
+
+// 테스트용 가격 데이터 캐시 (컬렉션 시점 skipIf 판단에 쓰이므로 최상위에서 로드)
+let soxlPriceData!: PriceDataResult;
+let tqqqPriceData!: PriceDataResult;
+if (hasDb) {
   soxlPriceData = await loadPriceData("SOXL");
   tqqqPriceData = await loadPriceData("TQQQ");
-});
+}
+
+// 백테스트 실행 테스트는 두 설정이 걸치는 구간의 실제 SOXL 시세가 필요하다.
+// CI의 빈 DB처럼 데이터가 없으면 건너뛴다 (#66).
+// CI에 가격 데이터를 채워 넣어 이 검증을 살리는 것은 별도 이슈로 다룬다.
+const hasBacktestData =
+  hasDb &&
+  soxlPriceData.dateToIndexMap.has(testConfig.startDate) &&
+  soxlPriceData.dateToIndexMap.has(integrationConfig.endDate);
 
 // ============================================================
 // TC-07: 전략 점수 계산 테스트
@@ -120,7 +133,7 @@ describe("calculateStrategyScore", () => {
 // loadPriceData 테스트
 // ============================================================
 
-describe("loadPriceData", () => {
+describe.skipIf(!hasDb)("loadPriceData", () => {
   it("SOXL 가격 데이터를 로드해야 한다", () => {
     // prices 배열 존재 확인
     expect(soxlPriceData.prices).toBeDefined();
@@ -163,7 +176,7 @@ describe("loadPriceData", () => {
 // (커스텀 파라미터가 베이스라인과 다른 결과 생성)
 // ============================================================
 
-describe("runBacktestWithParams", () => {
+describe.skipIf(!hasBacktestData)("runBacktestWithParams", () => {
   it("베이스라인(null params)으로 백테스트를 실행해야 한다", async () => {
     const result = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
@@ -324,17 +337,7 @@ describe("runBacktestWithParams", () => {
 // ============================================================
 
 describe("전략 점수 계산 통합 테스트", () => {
-  it("백테스트 결과의 전략 점수가 공식과 일치해야 한다", async () => {
-    const integrationConfig: OptimizationConfig = {
-      ticker: "SOXL",
-      startDate: "2024-01-02",
-      endDate: "2024-06-28",
-      initialCapital: 10000000,
-      randomCombinations: 50,
-      variationsPerTop: 10,
-      topCandidates: 3,
-    };
-
+  it.skipIf(!hasBacktestData)("백테스트 결과의 전략 점수가 공식과 일치해야 한다", async () => {
     const result = await runBacktestWithParams(integrationConfig, null, soxlPriceData);
 
     // 수동 계산

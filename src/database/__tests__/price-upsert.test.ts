@@ -10,10 +10,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 
+import { hasDb } from "@/test-utils/db";
+
 // 테스트 전용 티커 (실데이터와 충돌 방지)
 const TEST_TICKER = "TEST-UPSERT";
-
-const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe.skipIf(!hasDb)("가격/지표 upsert 통합 테스트", () => {
   let db: typeof import("../db-drizzle").db;
