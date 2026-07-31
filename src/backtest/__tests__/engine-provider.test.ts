@@ -271,3 +271,21 @@ describe("공급자 모드 - 사이클 내 첫 매수 전 재평가", () => {
     expect(calls.map((c) => c.referenceDate)).toEqual(["2025-01-01", "2025-01-02"]);
   });
 });
+
+describe("공급자 모드 - 실패 전파", () => {
+  it("공급자가 실패하면 run이 같은 오류로 거부되어야 한다", async () => {
+    const engine = new BacktestEngine("Pro2");
+    const prices = [
+      createMockPrice("2025-01-01", 100),
+      createMockPrice("2025-01-02", 100),
+      createMockPrice("2025-01-03", 99),
+    ];
+    const failing: StrategyProvider = async () => {
+      throw new Error("전략 결정 실패");
+    };
+
+    await expect(engine.run(createRequest(prices, 1), prices, 1, failing)).rejects.toThrow(
+      "전략 결정 실패"
+    );
+  });
+});
