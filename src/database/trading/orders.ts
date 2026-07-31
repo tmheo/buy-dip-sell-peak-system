@@ -22,6 +22,7 @@ import {
   calculateBuyLimitPrice,
   calculateSellLimitPrice,
   calculateBuyQuantity,
+  calculateReserveTierSeed,
   getPreviousTradingDate,
   calculateTradingDays,
   percentToThreshold,
@@ -250,10 +251,13 @@ export async function generateDailyOrders(
     const nextBuyTier = getNextBuyTier(holdings);
 
     if (nextBuyTier !== null) {
-      const tierIndex = nextBuyTier - 1;
-      // Decimal로 티어 비율 및 할당 금액 계산
-      const tierRatio = new Decimal(tierRatios[tierIndex]).div(100);
-      const allocatedSeed = new Decimal(seedCapital).mul(tierRatio).toNumber();
+      // 티어 1-6은 시드 × 고정 비율, 예비 티어(7)는 잔여 예수금 전액
+      const allocatedSeed =
+        nextBuyTier === RESERVE_TIER_NUMBER
+          ? calculateReserveTierSeed(seedCapital, holdings)
+          : new Decimal(seedCapital)
+              .mul(new Decimal(tierRatios[nextBuyTier - 1]).div(100))
+              .toNumber();
 
       if (allocatedSeed > 0) {
         const buyPrice = calculateBuyLimitPrice(closePrice, buyThreshold);
