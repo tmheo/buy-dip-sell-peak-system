@@ -510,8 +510,7 @@ export async function POST(request: Request): Promise<Response> {
       const result = applySOXLDowngrade(
         recommendedStrategy,
         referenceMetrics,
-        adjClosePrices,
-        referenceDateIndex
+        isDivergenceCondition
       );
       recommendedStrategy = result.strategy;
       downgradeInfo = {

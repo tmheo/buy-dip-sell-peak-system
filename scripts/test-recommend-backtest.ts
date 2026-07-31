@@ -30,12 +30,6 @@ async function main() {
   const endIndex = allPrices.findIndex((p) => p.date > endDate);
   const backtestPrices = endIndex > 0 ? allPrices.slice(0, endIndex) : allPrices;
 
-  // 날짜-인덱스 맵 재생성 (슬라이스된 데이터용)
-  const dateToIndexMap = new Map<string, number>();
-  for (let i = 0; i < backtestPrices.length; i++) {
-    dateToIndexMap.set(backtestPrices[i].date, i);
-  }
-
   // 시작일 인덱스 찾기 (API와 동일하게 >= 조건 사용)
   const backtestStartIndex = backtestPrices.findIndex((p) => p.date >= startDate);
   if (backtestStartIndex < 0) {
@@ -45,7 +39,7 @@ async function main() {
   console.log(`실제 종료일: ${backtestPrices[backtestPrices.length - 1].date}`);
 
   // 백테스트 엔진 생성 (기본 유사도 설정: 추천 캐시 사용)
-  const engine = new RecommendBacktestEngine(ticker, backtestPrices, dateToIndexMap);
+  const engine = new RecommendBacktestEngine(ticker, backtestPrices);
 
   // 백테스트 요청
   const request: RecommendBacktestRequest = {

@@ -109,12 +109,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 날짜-인덱스 맵 생성 (O(1) 조회용)
-    const dateToIndexMap = new Map<string, number>();
-    allPrices.forEach((price, index) => {
-      dateToIndexMap.set(price.date, index);
-    });
-
     // 백테스트 시작일 인덱스 찾기
     const backtestStartIndex = allPrices.findIndex((p) => p.date >= validatedRequest.startDate);
     if (backtestStartIndex < 0) {
@@ -142,7 +136,7 @@ export async function POST(request: Request) {
     }
 
     // 추천 백테스트 엔진 실행
-    const engine = new RecommendBacktestEngine(validatedRequest.ticker, allPrices, dateToIndexMap);
+    const engine = new RecommendBacktestEngine(validatedRequest.ticker, allPrices);
 
     const backtestRequest: RecommendBacktestRequest = {
       ticker: validatedRequest.ticker,

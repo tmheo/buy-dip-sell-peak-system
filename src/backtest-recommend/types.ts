@@ -125,20 +125,3 @@ export interface RecommendBacktestResult {
     Pro3: StrategyUsageStats;
   };
 }
-
-// ============================================================
-// 추천 헬퍼 타입
-// ============================================================
-
-/**
- * 빠른 추천 결과
- * 백테스트 중 사이클 경계에서 사용
- */
-export interface QuickRecommendResult {
-  /** 추천 전략 */
-  strategy: Strategy;
-  /** 추천 이유 */
-  reason: string;
-  /** 기준일 기술적 지표 */
-  metrics: TechnicalMetrics;
-}

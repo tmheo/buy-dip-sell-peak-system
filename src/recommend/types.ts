@@ -151,6 +151,61 @@ export interface ChartDataPoint {
   ma60: number | null;
 }
 
+/** 추천 불가 사유 코드 */
+export type InsufficientReasonCode =
+  | "PRICE_DATA_NOT_FOUND"
+  | "INSUFFICIENT_PRICE_HISTORY"
+  | "METRICS_CALCULATION_FAILED"
+  | "INSUFFICIENT_HISTORICAL_METRICS"
+  | "INSUFFICIENT_SIMILAR_PERIODS";
+
+/**
+ * 추천 불가(InsufficientData) 사유
+ * route는 이를 HTTP 400으로 매핑하고, 추천 백테스트는 기본 전략 폴백에 사용한다
+ */
+export interface InsufficientReason {
+  /** 사유 코드 */
+  code: InsufficientReasonCode;
+  /** 사람이 읽는 설명 */
+  message: string;
+  /** 실패 전에 계산된 기준일 지표 (기본 전략 폴백의 사이클 정보용) */
+  referenceMetrics?: TechnicalMetrics;
+}
+
+/**
+ * 추천 결과 (서비스 반환 단위)
+ * 상세 필드(analysisPeriod·similarPeriods·strategyScores·downgradeInfo)는
+ * 전체 계산 경로에서만 채워진다. DB 캐시 적중과 기본 전략 폴백은 요약만 반환한다.
+ */
+export interface Recommendation {
+  /** 기준일 (YYYY-MM-DD) */
+  referenceDate: string;
+  /** 추천 전략 */
+  strategy: Strategy;
+  /** 추천 사유 (generateRecommendReason 문구로 통일) */
+  reason: string;
+  /** 기준일 기술적 지표 */
+  metrics: TechnicalMetrics;
+  /** 티어별 투자 비율 (6개 티어) */
+  tierRatios: [number, number, number, number, number, number];
+  /** 분석 구간 (기준일 기준 20 거래일) */
+  analysisPeriod?: {
+    startDate: string;
+    endDate: string;
+  };
+  /** 유사 구간 Top 3 (전략별 성과 포함) */
+  similarPeriods?: SimilarPeriod[];
+  /** 전략별 점수 (Pro1, Pro2, Pro3) */
+  strategyScores?: StrategyScore[];
+  /** SOXL 전용: 전략 하향 적용 정보 */
+  downgradeInfo?: DowngradeInfo;
+}
+
+/** 추천 판별 결과: 추천 또는 추천 불가 사유 */
+export type RecommendOutcome =
+  | { ok: true; value: Recommendation }
+  | { ok: false; reason: InsufficientReason };
+
 /** 기술적 지표 벡터 (유사도 계산용, 5개 지표) */
 export type MetricsVector = [number, number, number, number, number];
 

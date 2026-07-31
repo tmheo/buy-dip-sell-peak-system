@@ -7,7 +7,8 @@ import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
 import { getAllPricesByTicker } from "@/database/prices";
 import type { SimilarityConfig } from "@/recommend/types";
-import { RecommendBacktestEngine, clearRecommendationCache } from "@/backtest-recommend";
+import { clearRecommendationCache } from "@/recommend/service";
+import { RecommendBacktestEngine } from "@/backtest-recommend";
 
 import type { OptimizationConfig, BacktestMetrics } from "./types";
 
@@ -66,14 +67,10 @@ export async function runBacktestWithParams(
 
   // 종료일까지의 가격 데이터만 사용
   const backtestPrices = prices.slice(0, endIndex + 1);
-  const backtestDateToIndexMap = new Map<string, number>();
-  for (let i = 0; i < backtestPrices.length; i++) {
-    backtestDateToIndexMap.set(backtestPrices[i].date, i);
-  }
 
   clearRecommendationCache();
 
-  const engine = new RecommendBacktestEngine(ticker, backtestPrices, backtestDateToIndexMap, {
+  const engine = new RecommendBacktestEngine(ticker, backtestPrices, {
     similarityConfig: similarityConfig ?? undefined,
   });
 

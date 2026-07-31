@@ -28,13 +28,15 @@ import {
   calculateDailyMetrics,
 } from "@/backtest/metrics";
 
+import type { Recommendation } from "@/recommend/types";
+import { recommendOrDefault } from "@/recommend/service";
+
 import type {
   RecommendBacktestRequest,
   RecommendBacktestResult,
   CycleStrategyInfo,
   DailySnapshotWithStrategy,
 } from "./types";
-import { getQuickRecommendation, type QuickRecommendationOptions } from "./recommend-helper";
 
 /** RecommendBacktestEngine 옵션 */
 export interface RecommendBacktestEngineOptions {
@@ -54,23 +56,28 @@ export class RecommendBacktestEngine {
   private currentStrategyName: Strategy;
   private ticker: "SOXL" | "TQQQ";
   private allPrices: DailyPrice[];
-  private dateToIndexMap: Map<string, number>;
-  private recommendOptions: QuickRecommendationOptions;
+  private similarityConfig?: SimilarityConfig;
 
   constructor(
     ticker: "SOXL" | "TQQQ",
     allPrices: DailyPrice[],
-    dateToIndexMap: Map<string, number>,
     options: RecommendBacktestEngineOptions = {}
   ) {
     this.ticker = ticker;
     this.allPrices = allPrices;
-    this.dateToIndexMap = dateToIndexMap;
     // 초기 전략은 run()에서 설정
     this.currentStrategyName = "Pro2";
     this.currentStrategy = getStrategyParams("Pro2");
-    // 캐시 사용 여부는 커스텀 유사도 설정의 유무로 helper가 스스로 결정한다
-    this.recommendOptions = { similarityConfig: options.similarityConfig };
+    // 캐시 사용 여부는 커스텀 유사도 설정의 유무로 서비스가 스스로 결정한다
+    this.similarityConfig = options.similarityConfig;
+  }
+
+  /** 기준일에 대한 추천 조회 (부족 시 기본 전략 Pro2 + 사유) */
+  private recommendFor(referenceDate: string): Promise<Recommendation> {
+    return recommendOrDefault(this.ticker, referenceDate, {
+      prices: this.allPrices,
+      similarityConfig: this.similarityConfig,
+    });
   }
 
   /**
@@ -94,13 +101,7 @@ export class RecommendBacktestEngine {
     const initialRecommendDateIndex = backtestStartIndex - 1;
     const initialRecommend =
       initialRecommendDateIndex >= 0
-        ? await getQuickRecommendation(
-            this.ticker,
-            prices[initialRecommendDateIndex].date,
-            this.allPrices,
-            this.dateToIndexMap,
-            this.recommendOptions
-          )
+        ? await this.recommendFor(prices[initialRecommendDateIndex].date)
         : null;
     this.currentStrategyName = initialRecommend?.strategy ?? "Pro2";
     this.currentStrategy = getStrategyParams(this.currentStrategyName);
@@ -172,6 +173,10 @@ export class RecommendBacktestEngine {
       const prevPrice = prices[i - 1];
       const currentPrice = prices[i];
 
+      // 같은 전일 종가 기준일의 추천은 한 번만 조회한다
+      // (사이클 완료 다음 날은 새 사이클 시작과 첫 매수 전 재평가가 모두 실행되므로)
+      let prevDateRecommend: Recommendation | null = null;
+
       // 전날 사이클 완료 시 새 사이클 시작 + 전략 재결정
       if (cycleCompletedToday) {
         // 이전 사이클 종료 처리 (보유 티어가 없으므로 총 자산 = 사이클 자본 + 실현 손익)
@@ -185,15 +190,10 @@ export class RecommendBacktestEngine {
         currentCycleInfo.mdd = cycleMdd;
 
         // 새 전략 추천 받기 (전일 종가 기준)
-        const newRecommend = await getQuickRecommendation(
-          this.ticker,
-          prevPrice.date,
-          this.allPrices,
-          this.dateToIndexMap,
-          this.recommendOptions
-        );
-        const newStrategy = newRecommend?.strategy ?? "Pro2";
-        const newReason = newRecommend?.reason ?? "기본 전략";
+        const newRecommend = await this.recommendFor(prevPrice.date);
+        prevDateRecommend = newRecommend;
+        const newStrategy = newRecommend.strategy;
+        const newReason = newRecommend.reason;
 
         // 전략 변경 + 새 사이클 시작 (실현 손익 복리 이월)
         this.currentStrategyName = newStrategy;
@@ -220,8 +220,8 @@ export class RecommendBacktestEngine {
           finalAsset: null,
           returnRate: null,
           mdd: 0,
-          startRsi: newRecommend?.metrics.rsi14 ?? 0,
-          isGoldenCross: newRecommend?.metrics.isGoldenCross ?? false,
+          startRsi: newRecommend.metrics.rsi14,
+          isGoldenCross: newRecommend.metrics.isGoldenCross,
           recommendReason: newReason,
         };
         cycleStrategies.push(currentCycleInfo);
@@ -233,15 +233,9 @@ export class RecommendBacktestEngine {
       // 첫 매수 전까지 매일 전략 재평가 (전일 종가 기준)
       // (사이클이 시작되었지만 아직 첫 매수가 일어나지 않은 경우)
       if (!hasTradedThisCycle) {
-        const todayRecommend = await getQuickRecommendation(
-          this.ticker,
-          prevPrice.date,
-          this.allPrices,
-          this.dateToIndexMap,
-          this.recommendOptions
-        );
-        const todayStrategy = todayRecommend?.strategy ?? "Pro2";
-        const todayReason = todayRecommend?.reason ?? "기본 전략";
+        const todayRecommend = prevDateRecommend ?? (await this.recommendFor(prevPrice.date));
+        const todayStrategy = todayRecommend.strategy;
+        const todayReason = todayRecommend.reason;
 
         // 전략이 변경되었으면 업데이트 (cycles 카운트도 조정)
         // 아직 매수가 없었으므로 사이클 경계와 동일한 상태다 - 전략 교체 허용
@@ -258,8 +252,8 @@ export class RecommendBacktestEngine {
         // 현재 사이클 정보 업데이트 (아직 매수 전이므로)
         currentCycleInfo.strategy = this.currentStrategyName;
         currentCycleInfo.startDate = currentPrice.date;
-        currentCycleInfo.startRsi = todayRecommend?.metrics.rsi14 ?? 0;
-        currentCycleInfo.isGoldenCross = todayRecommend?.metrics.isGoldenCross ?? false;
+        currentCycleInfo.startRsi = todayRecommend.metrics.rsi14;
+        currentCycleInfo.isGoldenCross = todayRecommend.metrics.isGoldenCross;
         currentCycleInfo.recommendReason = todayReason;
       }
 
