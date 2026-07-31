@@ -176,6 +176,24 @@ describe("recommend - 계산과 캐시 소유", () => {
     expect(mockedCacheRecommendation).not.toHaveBeenCalled();
   });
 
+  it("정배열 지표가 비어 있는 행은 제외해야 한다 (단일 소스 정책)", async () => {
+    const { prices, referenceDate, historicalMetrics } = successFixture();
+    // 5개 핵심 지표는 채워져 있지만 정배열 지표가 null인 행은 검색에 참여하면 안 된다
+    const rows = toMetricsRows(historicalMetrics).map((row) => ({
+      ...row,
+      goldenCross: null,
+      isGoldenCross: null,
+    }));
+    mockedGetMetricsRange.mockResolvedValue(rows as MetricsRows);
+
+    const outcome = await recommend("SOXL", referenceDate, { prices });
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: expect.objectContaining({ code: "INSUFFICIENT_HISTORICAL_METRICS" }),
+    });
+  });
+
   it("DB 지표가 부족하면 재계산 폴백 없이 InsufficientData를 반환해야 한다", async () => {
     const { prices, referenceDate } = successFixture();
     mockedGetMetricsRange.mockResolvedValue([] as MetricsRows);

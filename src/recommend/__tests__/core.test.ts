@@ -79,9 +79,9 @@ describe("computeRecommendation - 실패 정책 (InsufficientData)", () => {
   });
 
   it("유사 구간 검색 범위가 60일 미만이면 INSUFFICIENT_PRICE_HISTORY를 반환해야 한다", () => {
-    // 기준일 인덱스 80: 지표는 계산되지만 80 - 40 = 40 < 59라 검색 범위가 부족하다
+    // 지표는 계산되지만 기준일 - MIN_PAST_GAP_DAYS < 59라 검색 범위가 부족하다
     const prices = createPrices(250);
-    const referenceDate = prices[80].date;
+    const referenceDate = prices[59 + MIN_PAST_GAP_DAYS - 1].date;
 
     const outcome = computeRecommendation({
       ticker: "SOXL",

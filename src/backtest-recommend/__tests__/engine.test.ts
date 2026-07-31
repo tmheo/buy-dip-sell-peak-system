@@ -181,6 +181,31 @@ describe("RecommendBacktestEngine", () => {
     );
   });
 
+  it("같은 기준일에 대한 추천 조회는 한 번만 일어나야 한다 (사이클 완료일 중복 호출 방지)", async () => {
+    mockedRecommend.mockResolvedValue(recommendation("Pro2"));
+
+    const engine = new RecommendBacktestEngine("SOXL", PRICES);
+    await engine.run(
+      {
+        ticker: "SOXL",
+        startDate: PRICES[0].date,
+        endDate: PRICES[PRICES.length - 1].date,
+        initialCapital: 10000,
+      },
+      0
+    );
+
+    // 사이클 완료 다음 날은 새 사이클 시작 블록과 첫 매수 전 재평가 블록이
+    // 같은 전일 종가 기준일을 쓰므로, 중복 호출이 있으면 날짜별 호출 수가 2가 된다
+    const callCountByDate = new Map<string, number>();
+    for (const [, referenceDate] of mockedRecommend.mock.calls) {
+      callCountByDate.set(referenceDate, (callCountByDate.get(referenceDate) ?? 0) + 1);
+    }
+    for (const [referenceDate, count] of callCountByDate) {
+      expect(count, `기준일 ${referenceDate}의 추천 조회 수`).toBe(1);
+    }
+  });
+
   it("사이클 자본은 실현 손익을 복리로 이월해야 한다", async () => {
     mockedRecommend.mockResolvedValue(recommendation("Pro2"));
 

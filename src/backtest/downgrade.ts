@@ -96,6 +96,8 @@ export function formatDowngradeReason(baseReason: string, result: DowngradeResul
 /**
  * RSI 다이버전스 조건(조건 2) 발동 여부 체크
  * RSI 다이버전스 AND 이격도 < 120 AND 기준일 RSI >= 60
+ * disparity 지표는 (가격 - MA20) / MA20 × 100이므로,
+ * disparity < 20이 곧 이격도 지수(가격/MA20 × 100) < 120이다
  * 정배열 시 Pro1 제외 규칙 무시와 전략 하향(조건 2)에 공용으로 쓰이므로
  * 호출부가 한 번 계산해 전달한다
  *

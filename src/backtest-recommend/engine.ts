@@ -173,6 +173,10 @@ export class RecommendBacktestEngine {
       const prevPrice = prices[i - 1];
       const currentPrice = prices[i];
 
+      // 같은 전일 종가 기준일의 추천은 한 번만 조회한다
+      // (사이클 완료 다음 날은 새 사이클 시작과 첫 매수 전 재평가가 모두 실행되므로)
+      let prevDateRecommend: Recommendation | null = null;
+
       // 전날 사이클 완료 시 새 사이클 시작 + 전략 재결정
       if (cycleCompletedToday) {
         // 이전 사이클 종료 처리 (보유 티어가 없으므로 총 자산 = 사이클 자본 + 실현 손익)
@@ -187,6 +191,7 @@ export class RecommendBacktestEngine {
 
         // 새 전략 추천 받기 (전일 종가 기준)
         const newRecommend = await this.recommendFor(prevPrice.date);
+        prevDateRecommend = newRecommend;
         const newStrategy = newRecommend.strategy;
         const newReason = newRecommend.reason;
 
@@ -228,7 +233,7 @@ export class RecommendBacktestEngine {
       // 첫 매수 전까지 매일 전략 재평가 (전일 종가 기준)
       // (사이클이 시작되었지만 아직 첫 매수가 일어나지 않은 경우)
       if (!hasTradedThisCycle) {
-        const todayRecommend = await this.recommendFor(prevPrice.date);
+        const todayRecommend = prevDateRecommend ?? (await this.recommendFor(prevPrice.date));
         const todayStrategy = todayRecommend.strategy;
         const todayReason = todayRecommend.reason;
 

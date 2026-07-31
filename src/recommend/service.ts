@@ -50,8 +50,22 @@ export interface RecommendOptions {
   persistCache?: boolean;
 }
 
+/** 인메모리 추천 캐시 상한 (장기 실행 프로세스의 무제한 증가 방지) */
+const MEMORY_CACHE_MAX_ENTRIES = 5000;
+
 /** 인메모리 추천 캐시 (ticker:기준일 → 추천) */
 const memoryCache = new Map<string, Recommendation>();
+
+/** 메모리 캐시에 저장 (상한 초과 시 가장 오래된 항목부터 축출) */
+function setMemoryCache(key: string, value: Recommendation): void {
+  if (!memoryCache.has(key) && memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      memoryCache.delete(oldestKey);
+    }
+  }
+  memoryCache.set(key, value);
+}
 
 /**
  * 추천 메모리 캐시 초기화
@@ -121,7 +135,9 @@ async function loadHistoricalMetrics(
       row.disparity === null ||
       row.rsi14 === null ||
       row.roc12 === null ||
-      row.volatility20 === null
+      row.volatility20 === null ||
+      row.goldenCross === null ||
+      row.isGoldenCross === null
     ) {
       continue;
     }
@@ -178,7 +194,7 @@ export async function recommend(
     const dbCached = await getCachedRecommendation(ticker, referenceDate);
     if (dbCached) {
       const value = fromCachedRecommendation(referenceDate, dbCached);
-      memoryCache.set(cacheKey, value);
+      setMemoryCache(cacheKey, value);
       return { ok: true, value };
     }
   }
@@ -204,7 +220,7 @@ export async function recommend(
   });
 
   if (outcome.ok && useCache) {
-    memoryCache.set(cacheKey, outcome.value);
+    setMemoryCache(cacheKey, outcome.value);
     if (persistCache) {
       await cacheRecommendation({
         ticker,
