@@ -12,16 +12,20 @@
  *
  * 캐시 정책: 커스텀 similarityConfig가 오면 메모리·DB 캐시를 조회도 저장도 하지
  * 않아, 기본 설정의 추천 결과와 섞이는 일이 구조적으로 불가능하다.
+ * DB 캐시는 요약 컬럼과 상세 JSON(detail)을 함께 저장하며, 상세가 필요한
+ * 호출(requireDetail)은 상세가 저장된 행만 적중으로 친다.
  */
 import type { DailyPrice } from "@/types";
 import type { Strategy } from "@/types/trading";
 import type { TechnicalMetrics } from "@/backtest/types";
+import { buildDateToIndexMap } from "@/utils/date-index";
 import { getPriceRange, getLatestDate } from "@/database/prices";
 import { getMetricsRange } from "@/database/metrics";
 import {
   getCachedRecommendation,
   cacheRecommendation,
   toRecommendationCacheMetrics,
+  type NewRecommendationCache,
 } from "@/database/recommend-cache";
 
 import { computeRecommendation } from "./core";
@@ -30,6 +34,7 @@ import type {
   HistoricalMetrics,
   InsufficientReasonCode,
   Recommendation,
+  RecommendationCacheDetail,
   RecommendOutcome,
   SimilarityConfig,
 } from "./types";
@@ -38,7 +43,7 @@ import type {
 export const DEFAULT_STRATEGY: Strategy = "Pro2";
 
 /** 유사 구간 검색용 과거 데이터 시작일 (SOXL/TQQQ 모두 2010년 시작) */
-const PRICE_HISTORY_START = "2010-01-01";
+export const PRICE_HISTORY_START = "2010-01-01";
 
 /** recommend 옵션 */
 export interface RecommendOptions {
@@ -48,6 +53,12 @@ export interface RecommendOptions {
   similarityConfig?: SimilarityConfig;
   /** 계산 결과의 DB 캐시 저장 여부 (기본값: true) */
   persistCache?: boolean;
+  /**
+   * 상세 필드(analysisPeriod·similarPeriods·strategyScores·downgradeInfo)가 필요한
+   * 호출자용 (recommend route). 요약만 있는 캐시(상세 없는 DB 행·요약 메모리 값)는
+   * 적중으로 치지 않고, 전체를 계산해 상세와 함께 다시 캐시한다
+   */
+  requireDetail?: boolean;
 }
 
 /** 인메모리 추천 캐시 상한 (장기 실행 프로세스의 무제한 증가 방지) */
@@ -152,7 +163,7 @@ async function loadHistoricalMetrics(
   return historicalMetrics;
 }
 
-/** DB 캐시 행을 요약 Recommendation으로 변환 */
+/** DB 캐시 행을 Recommendation으로 변환 (상세 JSON이 저장된 행이면 상세까지 복원) */
 function fromCachedRecommendation(
   referenceDate: string,
   cached: NonNullable<Awaited<ReturnType<typeof getCachedRecommendation>>>
@@ -164,6 +175,27 @@ function fromCachedRecommendation(
     reason: cached.reason ?? "캐시된 추천",
     metrics: toTechnicalMetrics(cached),
     tierRatios: getStrategyTierRatios(strategy),
+    ...(cached.detail ?? {}),
+  };
+}
+
+/** 추천을 DB 캐시 행(요약 컬럼 + 상세 JSON)으로 변환 */
+export function toRecommendationCacheRow(
+  ticker: "SOXL" | "TQQQ",
+  value: Recommendation
+): NewRecommendationCache {
+  const { analysisPeriod, similarPeriods, strategyScores, downgradeInfo } = value;
+  const detail: RecommendationCacheDetail | null =
+    analysisPeriod && similarPeriods && strategyScores
+      ? { analysisPeriod, similarPeriods, strategyScores, downgradeInfo }
+      : null;
+  return {
+    ticker,
+    date: value.referenceDate,
+    strategy: value.strategy,
+    reason: value.reason,
+    detail,
+    ...toRecommendationCacheMetrics(value.metrics),
   };
 }
 
@@ -180,19 +212,20 @@ export async function recommend(
   referenceDate: string,
   opts: RecommendOptions = {}
 ): Promise<RecommendOutcome> {
-  const { prices, similarityConfig, persistCache = true } = opts;
+  const { prices, similarityConfig, persistCache = true, requireDetail = false } = opts;
   // 커스텀 유사도 설정이면 추천 캐시(메모리·DB)를 조회도 저장도 하지 않는다
   const useCache = similarityConfig === undefined;
   const cacheKey = `${ticker}:${referenceDate}`;
 
   if (useCache) {
     const memoryCached = memoryCache.get(cacheKey);
-    if (memoryCached) {
+    if (memoryCached && !(requireDetail && memoryCached.similarPeriods === undefined)) {
       return { ok: true, value: memoryCached };
     }
 
+    // 상세가 필요한 호출은 상세 JSON이 저장된 DB 행만 적중으로 친다
     const dbCached = await getCachedRecommendation(ticker, referenceDate);
-    if (dbCached) {
+    if (dbCached && !(requireDetail && !dbCached.detail)) {
       const value = fromCachedRecommendation(referenceDate, dbCached);
       setMemoryCache(cacheKey, value);
       return { ok: true, value };
@@ -200,11 +233,7 @@ export async function recommend(
   }
 
   const allPrices = prices ?? (await loadAllPrices(ticker));
-
-  const dateToIndexMap = new Map<string, number>();
-  for (let i = 0; i < allPrices.length; i++) {
-    dateToIndexMap.set(allPrices[i].date, i);
-  }
+  const dateToIndexMap = buildDateToIndexMap(allPrices);
 
   // 기준일이 가격 데이터에 없으면 지표 로드가 무의미하다 (코어가 사유를 판정한다)
   const historicalMetrics = dateToIndexMap.has(referenceDate)
@@ -222,13 +251,7 @@ export async function recommend(
   if (outcome.ok && useCache) {
     setMemoryCache(cacheKey, outcome.value);
     if (persistCache) {
-      await cacheRecommendation({
-        ticker,
-        date: referenceDate,
-        strategy: outcome.value.strategy,
-        reason: outcome.value.reason,
-        ...toRecommendationCacheMetrics(outcome.value.metrics),
-      });
+      await cacheRecommendation(toRecommendationCacheRow(ticker, outcome.value));
     }
   }
 

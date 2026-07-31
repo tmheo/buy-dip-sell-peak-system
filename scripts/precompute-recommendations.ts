@@ -6,11 +6,14 @@ import { getPriceRange } from "@/database/prices";
 import {
   bulkSaveRecommendations,
   getRecommendationCacheCount,
-  toRecommendationCacheMetrics,
   type NewRecommendationCache,
 } from "@/database/recommend-cache";
 import type { DailyPrice } from "@/types";
-import { recommend, clearRecommendationCache } from "@/recommend/service";
+import {
+  recommend,
+  clearRecommendationCache,
+  toRecommendationCacheRow,
+} from "@/recommend/service";
 
 // 설정
 const TICKERS = ["SOXL", "TQQQ"] as const;
@@ -62,19 +65,15 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
     // 추천 불가(InsufficientData)인 날짜는 캐시에 저장하지 않는다.
     // 기본 전략 폴백 결과가 캐시에 들어가면 이후 recommend()가 캐시 적중으로
     // 추천 성공 취급해 실패 정책과 충돌하기 때문이다.
+    // requireDetail: 요약만 저장된 기존 행도 전체 재계산해 상세(detail)를 채운다.
     const outcome = await recommend(ticker, referenceDate, {
       prices: allPrices,
       persistCache: false,
+      requireDetail: true,
     });
 
     if (outcome.ok) {
-      cacheItems.push({
-        ticker,
-        date: referenceDate,
-        strategy: outcome.value.strategy,
-        reason: outcome.value.reason,
-        ...toRecommendationCacheMetrics(outcome.value.metrics),
-      });
+      cacheItems.push(toRecommendationCacheRow(ticker, outcome.value));
       cachedCount++;
 
       // 배치 저장

@@ -6,6 +6,7 @@ import Decimal from "decimal.js";
 
 import type { DailyPrice } from "@/types";
 import { getAllPricesByTicker } from "@/database/prices";
+import { buildDateToIndexMap } from "@/utils/date-index";
 import type { SimilarityConfig } from "@/recommend/types";
 import { clearRecommendationCache } from "@/recommend/service";
 import { RecommendBacktestEngine } from "@/backtest-recommend";
@@ -21,13 +22,7 @@ export interface PriceDataResult {
 /** 데이터베이스에서 티커의 전체 가격 데이터 로드 */
 export async function loadPriceData(ticker: "SOXL" | "TQQQ"): Promise<PriceDataResult> {
   const prices = await getAllPricesByTicker(ticker);
-  const dateToIndexMap = new Map<string, number>();
-
-  for (let i = 0; i < prices.length; i++) {
-    dateToIndexMap.set(prices[i].date, i);
-  }
-
-  return { prices, dateToIndexMap };
+  return { prices, dateToIndexMap: buildDateToIndexMap(prices) };
 }
 
 /**

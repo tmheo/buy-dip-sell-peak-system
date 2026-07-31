@@ -13,8 +13,7 @@ import { DEFAULT_SIMILARITY_CONFIG } from "@/recommend/similarity";
 import { MIN_PAST_GAP_DAYS } from "@/recommend/similarity";
 
 import { recommend, recommendOrDefault, clearRecommendationCache } from "../service";
-import type { HistoricalMetrics } from "../types";
-import { createPrices, buildHistoricalMetrics } from "./fixtures";
+import { createPrices, buildHistoricalMetrics, toMetricsRows } from "./fixtures";
 
 vi.mock("@/database/prices", () => ({
   getPriceRange: vi.fn(),
@@ -48,15 +47,6 @@ const mockedGetLatestDate = vi.mocked(getLatestDate);
 const mockedGetMetricsRange = vi.mocked(getMetricsRange);
 const mockedGetCachedRecommendation = vi.mocked(getCachedRecommendation);
 const mockedCacheRecommendation = vi.mocked(cacheRecommendation);
-
-/** HistoricalMetrics를 daily_metrics 행 형태로 변환 */
-function toMetricsRows(historicalMetrics: HistoricalMetrics[]) {
-  return historicalMetrics.map((h) => ({
-    ticker: "SOXL",
-    date: h.date,
-    ...h.metrics,
-  }));
-}
 
 /** 추천이 성공할 수 있는 픽스처 한 벌 */
 function successFixture() {
@@ -138,6 +128,7 @@ describe("recommend - 계산과 캐시 소유", () => {
       roc12: 5.6,
       volatility20: 0.07,
       goldenCross: 1,
+      detail: null,
       createdAt: new Date(),
     } as Awaited<ReturnType<typeof getCachedRecommendation>>);
 
@@ -206,6 +197,107 @@ describe("recommend - 계산과 캐시 소유", () => {
     });
     // 실패 결과는 캐시하지 않는다
     expect(mockedCacheRecommendation).not.toHaveBeenCalled();
+  });
+});
+
+describe("recommend - requireDetail (상세 필드가 필요한 호출자)", () => {
+  const dbCachedRow = (referenceDate: string) =>
+    ({
+      id: 1,
+      ticker: "SOXL",
+      date: referenceDate,
+      strategy: "Pro3",
+      reason: "평균 점수 12.34점으로 가장 높음",
+      rsi14: 61.5,
+      isGoldenCross: true,
+      maSlope: 1.2,
+      disparity: 3.4,
+      roc12: 5.6,
+      volatility20: 0.07,
+      goldenCross: 1,
+      detail: null,
+      createdAt: new Date(),
+    }) as Awaited<ReturnType<typeof getCachedRecommendation>>;
+
+  it("requireDetail이면 상세 없는 DB 캐시 행은 적중으로 치지 않고 전체를 계산해야 한다", async () => {
+    const { prices, referenceDate, historicalMetrics } = successFixture();
+    mockedGetMetricsRange.mockResolvedValue(toMetricsRows(historicalMetrics) as MetricsRows);
+    // 요약만 저장된 기존 행 (detail 없음)
+    mockedGetCachedRecommendation.mockResolvedValue(dbCachedRow(referenceDate));
+
+    const outcome = await recommend("SOXL", referenceDate, { prices, requireDetail: true });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.value.similarPeriods).toHaveLength(3);
+    // 전체 계산 결과는 상세(detail)와 함께 DB 캐시에 저장된다
+    expect(mockedCacheRecommendation).toHaveBeenCalledOnce();
+    expect(mockedCacheRecommendation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          similarPeriods: outcome.value.similarPeriods,
+          strategyScores: outcome.value.strategyScores,
+        }),
+      })
+    );
+  });
+
+  it("상세가 저장된 DB 캐시 행이면 requireDetail도 재계산 없이 전체 값을 복원해야 한다", async () => {
+    const { prices, referenceDate, historicalMetrics } = successFixture();
+    mockedGetMetricsRange.mockResolvedValue(toMetricsRows(historicalMetrics) as MetricsRows);
+    const computed = await recommend("SOXL", referenceDate, { prices, requireDetail: true });
+    expect(computed.ok).toBe(true);
+    if (!computed.ok) return;
+    const persisted = mockedCacheRecommendation.mock.calls[0][0];
+
+    // 프로세스 재시작 재현: 메모리 캐시를 비우고 DB 캐시 행만 남긴다
+    clearRecommendationCache();
+    mockedGetMetricsRange.mockClear();
+    mockedGetCachedRecommendation.mockResolvedValue({
+      id: 1,
+      createdAt: new Date(),
+      ...persisted,
+    } as Awaited<ReturnType<typeof getCachedRecommendation>>);
+
+    const restored = await recommend("SOXL", referenceDate, { prices, requireDetail: true });
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) return;
+    expect(restored.value.similarPeriods).toEqual(computed.value.similarPeriods);
+    expect(restored.value.strategyScores).toEqual(computed.value.strategyScores);
+    expect(restored.value.analysisPeriod).toEqual(computed.value.analysisPeriod);
+    expect(mockedGetMetricsRange).not.toHaveBeenCalled();
+  });
+
+  it("메모리 캐시에 요약만 있으면 requireDetail 호출은 재계산해 전체 값으로 교체해야 한다", async () => {
+    const { prices, referenceDate, historicalMetrics } = successFixture();
+    mockedGetCachedRecommendation.mockResolvedValue(dbCachedRow(referenceDate));
+    // 1) 요약 경로: DB 캐시 적중이 메모리 캐시에 요약을 남긴다
+    const summary = await recommend("SOXL", referenceDate, { prices });
+    expect(summary.ok && summary.value.similarPeriods).toBeUndefined();
+
+    // 2) 상세 경로: 요약은 적중으로 치지 않고 재계산한다
+    mockedGetMetricsRange.mockResolvedValue(toMetricsRows(historicalMetrics) as MetricsRows);
+    const detailed = await recommend("SOXL", referenceDate, { prices, requireDetail: true });
+    expect(detailed.ok).toBe(true);
+    if (!detailed.ok) return;
+    expect(detailed.value.similarPeriods).toHaveLength(3);
+
+    // 3) 이후 요약 호출도 교체된 전체 값을 그대로 받는다
+    const after = await recommend("SOXL", referenceDate, { prices });
+    expect(after).toEqual(detailed);
+    expect(mockedGetMetricsRange).toHaveBeenCalledOnce();
+  });
+
+  it("메모리 캐시에 전체 값이 있으면 requireDetail이라도 재계산하지 않아야 한다", async () => {
+    const { prices, referenceDate, historicalMetrics } = successFixture();
+    mockedGetMetricsRange.mockResolvedValue(toMetricsRows(historicalMetrics) as MetricsRows);
+
+    const first = await recommend("SOXL", referenceDate, { prices });
+    const second = await recommend("SOXL", referenceDate, { prices, requireDetail: true });
+
+    expect(first).toEqual(second);
+    expect(mockedGetMetricsRange).toHaveBeenCalledOnce();
   });
 });
 

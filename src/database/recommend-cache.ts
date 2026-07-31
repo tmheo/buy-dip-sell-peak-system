@@ -91,6 +91,7 @@ export async function cacheRecommendation(data: NewRecommendationCache): Promise
         roc12: data.roc12,
         volatility20: data.volatility20,
         goldenCross: data.goldenCross,
+        detail: data.detail ?? null,
       },
     });
 }

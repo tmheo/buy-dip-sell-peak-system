@@ -28,6 +28,15 @@ export function createPrices(length: number): DailyPrice[] {
   return prices;
 }
 
+/** HistoricalMetrics를 daily_metrics 행 형태로 변환 (DB 대역용) */
+export function toMetricsRows(historicalMetrics: HistoricalMetrics[], ticker: string = "SOXL") {
+  return historicalMetrics.map((h) => ({
+    ticker,
+    date: h.date,
+    ...h.metrics,
+  }));
+}
+
 /** 실제 지표 모듈로 과거 지표 배열 생성 (DB 로드 껍데기가 하는 일의 순수 재현) */
 export function buildHistoricalMetrics(
   prices: DailyPrice[],

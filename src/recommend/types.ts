@@ -201,6 +201,25 @@ export interface Recommendation {
   downgradeInfo?: DowngradeInfo;
 }
 
+/**
+ * DB 추천 캐시에 JSON으로 저장되는 상세 필드
+ * 상세가 필요한 화면 요청이 프로세스 재시작 후에도 DB 캐시에서 전체 추천을
+ * 복원할 수 있게 한다. 차트 데이터는 표시 계층이 만들므로 저장하지 않는다.
+ */
+export interface RecommendationCacheDetail {
+  /** 분석 구간 (기준일 기준 20 거래일) */
+  analysisPeriod: {
+    startDate: string;
+    endDate: string;
+  };
+  /** 유사 구간 Top 3 (전략별 성과 포함) */
+  similarPeriods: SimilarPeriod[];
+  /** 전략별 점수 (Pro1, Pro2, Pro3) */
+  strategyScores: StrategyScore[];
+  /** SOXL 전용: 전략 하향 적용 정보 */
+  downgradeInfo?: DowngradeInfo;
+}
+
 /** 추천 판별 결과: 추천 또는 추천 불가 사유 */
 export type RecommendOutcome =
   | { ok: true; value: Recommendation }
