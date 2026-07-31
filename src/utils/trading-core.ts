@@ -1,89 +1,29 @@
 /**
  * 트레이딩 핵심 유틸리티 함수
- * 백테스트와 실제 트레이딩에서 공통으로 사용되는 계산 로직
  *
- * 모든 금융 계산은 decimal.js를 사용하여 부동소수점 오차를 방지합니다.
+ * 매매 규칙 계산 원시 함수는 src/strategy/calculations.ts로 이동했다 (#45).
+ * 기존 소비자를 위해 재수출하며, 이행 완료(#43 4단계) 후 이 파일은 정리된다.
  */
 import Decimal from "decimal.js";
 
-// =====================================================
-// 소수점 처리 함수
-// =====================================================
-
-/**
- * 소수점 자릿수로 내림 (decimal.js 사용)
- * 부동소수점 정밀도 문제를 해결하기 위해 decimal.js 사용
- *
- * @param value - 내림할 값
- * @param decimals - 소수점 자릿수
- * @returns 내림된 값
- */
-export function floorToDecimal(value: number, decimals: number): number {
-  return new Decimal(value).toDecimalPlaces(decimals, Decimal.ROUND_DOWN).toNumber();
-}
-
-/**
- * 소수점 자릿수로 반올림 (decimal.js 사용)
- * 금융 계산에서 사용 (현금 합계 등)
- *
- * @param value - 반올림할 값
- * @param decimals - 소수점 자릿수
- * @returns 반올림된 값
- */
-export function roundToDecimal(value: number, decimals: number): number {
-  return new Decimal(value).toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP).toNumber();
-}
-
-// =====================================================
-// 가격 계산 함수
-// =====================================================
-
-/**
- * LOC 매수 지정가 계산
- * 매수 지정가 = floor(전일 종가 × (1 + buyThreshold), 소수점 2자리)
- *
- * @param prevClose - 전일 종가
- * @param threshold - 매수 임계값 (소수점, 예: -0.0001 = -0.01%)
- * @returns 매수 지정가
- */
-export function calculateBuyLimitPrice(prevClose: number, threshold: number): number {
-  const price = new Decimal(prevClose).mul(new Decimal(1).add(threshold));
-  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
-}
-
-/**
- * LOC 매도 지정가 계산
- * 매도 지정가 = floor(매수 체결가 × (1 + sellThreshold), 소수점 2자리)
- *
- * @param buyPrice - 매수 체결가
- * @param threshold - 매도 임계값 (소수점, 예: 0.015 = +1.5%)
- * @returns 매도 지정가
- */
-export function calculateSellLimitPrice(buyPrice: number, threshold: number): number {
-  const price = new Decimal(buyPrice).mul(new Decimal(1).add(threshold));
-  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
-}
-
-/**
- * 매수 수량 계산
- * 매수 수량 = floor(티어 금액 ÷ 매수 지정가, 정수)
- *
- * @param amount - 티어 금액
- * @param limitPrice - 매수 지정가
- * @returns 매수 수량 (정수)
- */
-export function calculateBuyQuantity(amount: number, limitPrice: number): number {
-  if (limitPrice <= 0) {
-    throw new Error("limitPrice must be greater than 0");
-  }
-  if (amount <= 0) return 0;
-  return floorToDecimal(amount / limitPrice, 0);
-}
+export {
+  floorToDecimal,
+  roundToDecimal,
+  calculateBuyLimitPrice,
+  calculateSellLimitPrice,
+  calculateBuyQuantity,
+  shouldExecuteBuy,
+  shouldExecuteSell,
+  percentToThreshold,
+} from "@/strategy/calculations";
 
 /**
  * 예비 티어(7) 매수 시드 계산
  * 예비 티어는 고정 비율이 없고 잔여 예수금 전액을 사용한다 (REQ-008).
  * 잔여 예수금 = 시드 - Σ(보유 티어 수량 × 매수가), 소수점 2자리 내림
+ *
+ * 실계좌 주문 파이프라인 전용. 규칙의 단일 소유자는 src/strategy의 availableCash이며,
+ * 실계좌 이행(#43 3단계)에서 이 함수는 삭제된다.
  *
  * @param seedCapital - 계좌 시드 금액
  * @param holdings - 티어별 보유 현황 (수량과 매수가만 사용)
@@ -103,34 +43,6 @@ export function calculateReserveTierSeed(
   const remaining = new Decimal(seedCapital).sub(invested);
   if (remaining.lte(0)) return 0;
   return remaining.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
-}
-
-// =====================================================
-// 체결 판정 함수
-// =====================================================
-
-/**
- * LOC 매수 체결 여부 판정
- * 당일 종가 <= 매수 지정가 → 체결
- *
- * @param closePrice - 당일 종가
- * @param limitPrice - 매수 지정가
- * @returns 체결 여부
- */
-export function shouldExecuteBuy(closePrice: number, limitPrice: number): boolean {
-  return closePrice <= limitPrice;
-}
-
-/**
- * LOC 매도 체결 여부 판정
- * 당일 종가 >= 매도 지정가 → 체결
- *
- * @param closePrice - 당일 종가
- * @param limitPrice - 매도 지정가
- * @returns 체결 여부
- */
-export function shouldExecuteSell(closePrice: number, limitPrice: number): boolean {
-  return closePrice >= limitPrice;
 }
 
 // =====================================================
@@ -184,19 +96,4 @@ export function calculateTradingDays(startDate: string, endDate: string): number
   }
 
   return tradingDays;
-}
-
-// =====================================================
-// 전략 임계값 변환 함수
-// =====================================================
-
-/**
- * 퍼센트 값을 소수점 임계값으로 변환
- * 예: -0.01 (%) → -0.0001 (소수점)
- *
- * @param percentValue - 퍼센트 값 (예: -0.01, 1.5)
- * @returns 소수점 임계값 (예: -0.0001, 0.015)
- */
-export function percentToThreshold(percentValue: number): number {
-  return new Decimal(percentValue).div(100).toNumber();
 }
