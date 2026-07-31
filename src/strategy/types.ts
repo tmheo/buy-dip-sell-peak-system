@@ -84,19 +84,32 @@ export interface CycleState {
  * 주문 의도
  * planOrders가 전일 종가 기준으로 생성하는 주문표의 한 줄.
  * 모든 주문은 장 마감 전에 동시에 제출된다.
+ *
+ * 매수는 항상 LOC, 매도는 LOC(목표가) 또는 MOC(손절)이며,
+ * MOC 주문에는 지정가가 없다(limitPrice: null).
  */
-export interface OrderIntent {
-  // 주문 유형
-  type: "BUY" | "SELL";
-  // 티어 번호
-  tier: number;
-  // 주문 방식 (LOC: 지정가, MOC: 시장가 - 손절)
-  orderMethod: "LOC" | "MOC";
-  // 지정가 (MOC는 null)
-  limitPrice: number | null;
-  // 주문 수량
-  shares: number;
-}
+export type OrderIntent =
+  | {
+      type: "BUY";
+      tier: number;
+      orderMethod: "LOC";
+      limitPrice: number;
+      shares: number;
+    }
+  | {
+      type: "SELL";
+      tier: number;
+      orderMethod: "LOC";
+      limitPrice: number;
+      shares: number;
+    }
+  | {
+      type: "SELL";
+      tier: number;
+      orderMethod: "MOC";
+      limitPrice: null;
+      shares: number;
+    };
 
 /**
  * 하루 치 가격 데이터

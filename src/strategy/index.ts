@@ -12,19 +12,9 @@ export { planOrders } from "./plan-orders";
 export { settle } from "./settle";
 export { startNextCycle } from "./cycle";
 export { PRO_STRATEGIES, getStrategyParams } from "./params";
-export {
-  availableCash,
-  nextBuyTier,
-  tierAmount,
-  calculateBuyLimitPrice,
-  calculateSellLimitPrice,
-  calculateBuyQuantity,
-  shouldExecuteBuy,
-  shouldExecuteSell,
-  floorToDecimal,
-  roundToDecimal,
-  percentToThreshold,
-} from "./calculations";
+// 예수금 파생 규칙(ADR-0001)의 단일 소유자. 소비자가 재계산하지 않도록 함께 공개한다.
+// 매수 티어 선정, 티어 금액, 지정가, 체결 판정은 모듈 내부 구현이다.
+export { availableCash } from "./calculations";
 export type {
   CycleState,
   CycleEvent,

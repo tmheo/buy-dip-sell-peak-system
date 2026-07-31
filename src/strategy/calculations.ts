@@ -41,6 +41,14 @@ export function roundToDecimal(value: number, decimals: number): number {
 // =====================================================
 
 /**
+ * 지정가 공통 계산: floor(기준가 × (1 + threshold), 소수점 2자리)
+ */
+function applyThreshold(basePrice: number, threshold: number): number {
+  const price = new Decimal(basePrice).mul(new Decimal(1).add(threshold));
+  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+}
+
+/**
  * LOC 매수 지정가 계산
  * 매수 지정가 = floor(전일 종가 × (1 + buyThreshold), 소수점 2자리)
  *
@@ -49,8 +57,7 @@ export function roundToDecimal(value: number, decimals: number): number {
  * @returns 매수 지정가
  */
 export function calculateBuyLimitPrice(prevClose: number, threshold: number): number {
-  const price = new Decimal(prevClose).mul(new Decimal(1).add(threshold));
-  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+  return applyThreshold(prevClose, threshold);
 }
 
 /**
@@ -62,8 +69,7 @@ export function calculateBuyLimitPrice(prevClose: number, threshold: number): nu
  * @returns 매도 지정가
  */
 export function calculateSellLimitPrice(buyPrice: number, threshold: number): number {
-  const price = new Decimal(buyPrice).mul(new Decimal(1).add(threshold));
-  return price.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+  return applyThreshold(buyPrice, threshold);
 }
 
 /**

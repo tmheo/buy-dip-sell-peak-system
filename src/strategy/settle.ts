@@ -34,14 +34,17 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
   const executions: Execution[] = [];
 
   // 1. 매도 체결 (LOC: 종가 >= 지정가, MOC: 무조건) - 티어 제거, 원금 회복 (ADR-0001)
+  const holdingsByTier = new Map(state.holdings.map((h) => [h.tier, h]));
   const soldTiers = new Set<number>();
   for (const order of orders) {
     if (order.type !== "SELL") continue;
-    const executed =
-      order.orderMethod === "MOC" || shouldExecuteSell(bar.close, order.limitPrice as number);
+    const executed = order.orderMethod === "MOC" || shouldExecuteSell(bar.close, order.limitPrice);
     if (!executed) continue;
 
-    const holding = state.holdings.find((h) => h.tier === order.tier) as TierHolding;
+    const holding = holdingsByTier.get(order.tier);
+    if (!holding) {
+      throw new Error(`Tier ${order.tier} is not held`);
+    }
     soldTiers.add(order.tier);
     executions.push({
       order,
@@ -61,8 +64,8 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
     .map((h) => ({ ...h, holdingDays: h.holdingDays + 1 }));
 
   // 2. 매수 체결 (종가 <= 지정가) - 매도와 동시에 제출된 주문이므로 티어는 이미 결정됨
-  const buyOrder = orders.find((o) => o.type === "BUY");
-  if (buyOrder && shouldExecuteBuy(bar.close, buyOrder.limitPrice as number)) {
+  const buyOrder = orders.find((o): o is Extract<OrderIntent, { type: "BUY" }> => o.type === "BUY");
+  if (buyOrder && shouldExecuteBuy(bar.close, buyOrder.limitPrice)) {
     const cost = new Decimal(bar.close).mul(buyOrder.shares);
     const cashAfterSells = availableCash({ ...state, holdings: remainingHoldings });
     if (cost.gt(cashAfterSells)) {

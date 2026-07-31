@@ -10,51 +10,8 @@ import { describe, it, expect } from "vitest";
 import { planOrders } from "../plan-orders";
 import { settle } from "../settle";
 import { availableCash } from "../calculations";
-import { getStrategyParams } from "../params";
-import type { CycleState, OrderIntent, TierHolding } from "../types";
-
-function createState(overrides: Partial<CycleState> = {}): CycleState {
-  return {
-    strategy: getStrategyParams("Pro2"),
-    cycleCapital: 10000,
-    holdings: [],
-    cycleNumber: 1,
-    ...overrides,
-  };
-}
-
-function createHolding(overrides: Partial<TierHolding> = {}): TierHolding {
-  return {
-    tier: 1,
-    buyPrice: 100,
-    shares: 10,
-    buyDate: "2025-01-02",
-    holdingDays: 0,
-    ...overrides,
-  };
-}
-
-function buyOrder(overrides: Partial<OrderIntent> = {}): OrderIntent {
-  return {
-    type: "BUY",
-    tier: 1,
-    orderMethod: "LOC",
-    limitPrice: 99.99,
-    shares: 10,
-    ...overrides,
-  };
-}
-
-function sellOrder(overrides: Partial<OrderIntent> = {}): OrderIntent {
-  return {
-    type: "SELL",
-    tier: 1,
-    orderMethod: "LOC",
-    limitPrice: 100.48,
-    shares: 10,
-    ...overrides,
-  };
-}
+import type { OrderIntent } from "../types";
+import { buyOrder, createHolding, createState, sellOrder } from "./fixtures";
 
 describe("settle - 매수 체결", () => {
   it("당일 종가가 매수 지정가 이하면 체결되어야 한다", () => {
@@ -130,6 +87,17 @@ describe("settle - 매도 체결", () => {
     // 실현 손익 = (101 - 99) × 10 = 20
     expect(executions[0].profit).toBe(20);
     expect(newState.holdings).toHaveLength(0);
+  });
+
+  it("당일 종가가 매도 지정가와 같으면 체결되어야 한다", () => {
+    const state = createState({
+      holdings: [createHolding({ tier: 1, buyPrice: 99, shares: 10 })],
+    });
+    const { executions } = settle(state, [sellOrder({ limitPrice: 100.48, shares: 10 })], {
+      date: "2025-01-06",
+      close: 100.48,
+    });
+    expect(executions).toHaveLength(1);
   });
 
   it("당일 종가가 매도 지정가보다 낮으면 미체결이어야 한다", () => {
@@ -276,6 +244,18 @@ describe("settle - 주문 검증", () => {
         close: 99,
       })
     ).toThrow("At most one buy order per day");
+  });
+
+  it("매수 체결 비용이 예수금을 초과하면 에러를 발생시켜야 한다", () => {
+    // cycle.test.ts "예수금이 부족하면 에러" 이식.
+    // planOrders는 예수금 내에서만 주문을 생성하므로 이 경로는 주문표 오염 방어선이다.
+    const state = createState({ cycleCapital: 1000 });
+    expect(() =>
+      settle(state, [buyOrder({ limitPrice: 100, shares: 20 })], {
+        date: "2025-01-03",
+        close: 100,
+      })
+    ).toThrow("Insufficient cash for buy execution");
   });
 
   it("종가가 0 이하면 에러를 발생시켜야 한다", () => {

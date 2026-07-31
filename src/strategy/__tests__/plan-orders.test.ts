@@ -8,28 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { planOrders } from "../plan-orders";
 import { getStrategyParams } from "../params";
-import type { CycleState, TierHolding } from "../types";
-
-function createState(overrides: Partial<CycleState> = {}): CycleState {
-  return {
-    strategy: getStrategyParams("Pro2"),
-    cycleCapital: 10000,
-    holdings: [],
-    cycleNumber: 1,
-    ...overrides,
-  };
-}
-
-function createHolding(overrides: Partial<TierHolding> = {}): TierHolding {
-  return {
-    tier: 1,
-    buyPrice: 100,
-    shares: 10,
-    buyDate: "2025-01-02",
-    holdingDays: 0,
-    ...overrides,
-  };
-}
+import { createHolding, createState } from "./fixtures";
 
 describe("planOrders - 매수 주문 생성", () => {
   it("빈 사이클에서는 티어 1 LOC 매수 주문 하나를 생성해야 한다", () => {

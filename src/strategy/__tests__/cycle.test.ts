@@ -10,17 +10,7 @@ import { startNextCycle } from "../cycle";
 import { planOrders } from "../plan-orders";
 import { settle } from "../settle";
 import { getStrategyParams } from "../params";
-import type { CycleState } from "../types";
-
-function createState(overrides: Partial<CycleState> = {}): CycleState {
-  return {
-    strategy: getStrategyParams("Pro2"),
-    cycleCapital: 10000,
-    holdings: [],
-    cycleNumber: 1,
-    ...overrides,
-  };
-}
+import { createState } from "./fixtures";
 
 describe("startNextCycle", () => {
   it("사이클 번호를 증가시키고 공급받은 자본으로 새 사이클을 시작해야 한다", () => {
