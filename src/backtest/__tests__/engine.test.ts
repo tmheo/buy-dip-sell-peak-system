@@ -251,6 +251,157 @@ describe("BacktestEngine", () => {
     });
   });
 
+  describe("src/strategy 이행 (#46)", () => {
+    it("체결 판정과 체결가는 close가 아닌 adjClose를 사용해야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-03",
+        initialCapital: 10000,
+      };
+      // close 기준으로는 보합(매수 미체결), adjClose 기준으로는 하락(매수 체결)
+      const prices: DailyPrice[] = [
+        {
+          date: "2025-01-02",
+          open: 100,
+          high: 100,
+          low: 100,
+          close: 100,
+          adjClose: 90,
+          volume: 1000000,
+        },
+        {
+          date: "2025-01-03",
+          open: 100,
+          high: 100,
+          low: 100,
+          close: 100,
+          adjClose: 89,
+          volume: 1000000,
+        },
+      ];
+
+      const result = engine.run(request, prices);
+      const day2 = result.dailyHistory[1];
+
+      // 매수 지정가 = floor(90 × 0.9999) = 89.99, 당일 adjClose 89 ≤ 89.99 → 체결
+      const buyTrade = day2.trades.find((t) => t.type === "BUY");
+      expect(buyTrade).toBeDefined();
+      expect(buyTrade!.price).toBe(89);
+      // 수량 = floor(1000 / 89.99) = 11
+      expect(buyTrade!.shares).toBe(11);
+      // 보유 자산 평가도 adjClose 기준
+      expect(day2.holdingsValue).toBe(11 * 89);
+    });
+
+    it("ADR-0001: 손절 매도 시 원금이 즉시 회복되어 다음 매수 여력이 생겨야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-20",
+        initialCapital: 10000,
+      };
+      // 하락 지속: 티어 1-7 순차 매수 후 폭락, 손절일(10 거래일) 도달로 티어 1 MOC 매도.
+      // 예수금 = 사이클 자본 - Σ(활성 티어 투자원금)이므로 티어 1 원금은 손실과 무관하게
+      // 전액 회복되고, 다음 날 티어 1 재매수가 체결되어야 한다.
+      // (기존 예수금 의미에서는 손실만큼 현금이 부족해 매수가 불가능했다)
+      const closes = [100, 99, 98, 97, 96, 95, 94, 93, 75, 60, 50, 45, 44];
+      const prices: DailyPrice[] = closes.map((close, i) =>
+        createMockPrice(`2025-01-${(2 + i).toString().padStart(2, "0")}`, close)
+      );
+
+      const result = engine.run(request, prices);
+
+      // 11일째(45): 티어 1 손절 MOC 매도
+      const day11 = result.dailyHistory[11];
+      const stopLoss = day11.trades.find((t) => t.type === "STOP_LOSS");
+      expect(stopLoss).toBeDefined();
+      expect(stopLoss!.tier).toBe(1);
+      expect(stopLoss!.price).toBe(45);
+
+      // 12일째(44): 티어 1 재매수 체결 (금액 = min(1000, 예수금), 지정가 44.99)
+      const day12 = result.dailyHistory[12];
+      const rebuy = day12.trades.find((t) => t.type === "BUY");
+      expect(rebuy).toBeDefined();
+      expect(rebuy!.tier).toBe(1);
+      expect(rebuy!.shares).toBe(22); // floor(1000 / 44.99)
+      expect(rebuy!.price).toBe(44);
+    });
+
+    it("ADR-0001: 사이클 중 실현 수익은 현금에 쌓이되 매수 여력에 포함되지 않아야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-06",
+        initialCapital: 10000,
+      };
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99), // 티어 1 매수: 10주 @99 (원금 990)
+        createMockPrice("2025-01-04", 98), // 티어 2 매수: 15주 @98 (원금 1470)
+        createMockPrice("2025-01-05", 99.5), // 티어 2 매도 (지정가 99.47): 수익 22.5, 티어 1 보유 유지
+        createMockPrice("2025-01-06", 98.5), // 티어 2 재매수
+      ];
+
+      const result = engine.run(request, prices);
+
+      // 매도일: 현금 = 사이클 자본 - 활성 원금(990) + 실현 수익(22.5)
+      const sellDay = result.dailyHistory[3];
+      expect(sellDay.cash).toBe(10000 - 990 + 22.5);
+      expect(sellDay.holdingsValue).toBe(10 * 99.5);
+      expect(sellDay.totalAsset).toBe(10000 - 990 + 22.5 + 995);
+
+      // 재매수일: 티어 2 금액은 사이클 자본 × 15% 그대로 (실현 수익 미반영)
+      // 수량 = floor(1500 / 99.49) = 15
+      const rebuyDay = result.dailyHistory[4];
+      const rebuy = rebuyDay.trades.find((t) => t.type === "BUY");
+      expect(rebuy).toBeDefined();
+      expect(rebuy!.tier).toBe(2);
+      expect(rebuy!.shares).toBe(15);
+      expect(result.totalCycles).toBe(1);
+    });
+
+    it("사이클 경계에서 실현 손익이 다음 사이클 자본으로 복리 이월되어야 한다", () => {
+      const engine = new BacktestEngine("Pro2");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro2",
+        startDate: "2025-01-02",
+        endDate: "2025-01-07",
+        initialCapital: 10000,
+      };
+      const prices: DailyPrice[] = [
+        createMockPrice("2025-01-02", 100),
+        createMockPrice("2025-01-03", 99), // 티어 1 매수: 10주 @99
+        createMockPrice("2025-01-04", 101), // 티어 1 매도 (지정가 100.48): 수익 20 → 사이클 완료
+        createMockPrice("2025-01-06", 111.15), // 새 사이클 시작 (자본 10020), 매수 미체결
+        createMockPrice("2025-01-07", 111), // 티어 1 매수: floor(1002 / 111.13) = 9주
+      ];
+
+      const result = engine.run(request, prices);
+
+      expect(result.totalCycles).toBe(2);
+      expect(result.completedCycles).toEqual([{ profit: 20 }]);
+
+      // 새 사이클 첫날: 현금 = 새 사이클 자본 10020
+      const newCycleDay = result.dailyHistory[3];
+      expect(newCycleDay.cycleNumber).toBe(2);
+      expect(newCycleDay.cash).toBe(10020);
+
+      // 티어 1 금액 = 10020 × 10% = 1002 → floor(1002 / 111.13) = 9주
+      // (이월이 없었다면 floor(1000 / 111.13) = 8주)
+      const buy = result.dailyHistory[4].trades.find((t) => t.type === "BUY");
+      expect(buy).toBeDefined();
+      expect(buy!.shares).toBe(9);
+    });
+  });
+
   describe("backtestStartIndex", () => {
     it("backtestStartIndex가 0일 때 전체 데이터로 백테스트해야 한다", () => {
       const engine = new BacktestEngine("Pro2");
