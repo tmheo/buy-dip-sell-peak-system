@@ -20,6 +20,9 @@ export const RESERVE_TIER_NUMBER = 7;
 /** 최소 티어 번호 */
 export const MIN_TIER_NUMBER = 1;
 
+/** 최대 티어 번호 (예비 티어 포함, 전체 티어 수와 같다) */
+export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
+
 // ============================================================
 // 전략 파라미터
 // ============================================================

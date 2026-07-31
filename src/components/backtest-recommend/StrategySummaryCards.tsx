@@ -7,6 +7,8 @@
 import type { StrategyUsageStats } from "@/backtest-recommend";
 import type { Strategy } from "@/types/trading";
 import { STRATEGY_COLORS } from "@/backtest";
+import { getStrategyParams } from "@/strategy";
+import { formatThresholdPercent } from "@/lib/strategy-format";
 
 interface StrategySummaryCardsProps {
   strategyStats: {
@@ -18,24 +20,19 @@ interface StrategySummaryCardsProps {
   totalDays: number;
 }
 
-// 전략별 설정 (색상은 공유 상수 사용)
-const STRATEGY_CONFIG: Record<
-  Strategy,
-  { bgColor: string; description: string }
-> = {
-  Pro1: {
-    bgColor: "rgba(38, 139, 210, 0.15)",
-    description: "적극적 (매수 -0.01%, 매도 +0.01%)",
-  },
-  Pro2: {
-    bgColor: "rgba(42, 161, 152, 0.15)",
-    description: "균형형 (매수 -0.01%, 매도 +1.50%)",
-  },
-  Pro3: {
-    bgColor: "rgba(108, 113, 196, 0.15)",
-    description: "보수적 (매수 -0.10%, 매도 +2.00%)",
-  },
+// 전략별 설정 (색상은 공유 상수, 임계값 수치는 src/strategy 파라미터 표에서 파생 - #43)
+const STRATEGY_CONFIG: Record<Strategy, { bgColor: string; label: string }> = {
+  Pro1: { bgColor: "rgba(38, 139, 210, 0.15)", label: "적극적" },
+  Pro2: { bgColor: "rgba(42, 161, 152, 0.15)", label: "균형형" },
+  Pro3: { bgColor: "rgba(108, 113, 196, 0.15)", label: "보수적" },
 };
+
+function strategyDescription(strategy: Strategy): string {
+  const params = getStrategyParams(strategy);
+  const buy = formatThresholdPercent(params.buyThreshold);
+  const sell = formatThresholdPercent(params.sellThreshold);
+  return `${STRATEGY_CONFIG[strategy].label} (매수 ${buy}, 매도 ${sell})`;
+}
 
 export default function StrategySummaryCards({
   strategyStats,
@@ -78,7 +75,7 @@ export default function StrategySummaryCards({
                     >
                       {strategy}
                     </span>
-                    <small className="text-muted">{config.description}</small>
+                    <small className="text-muted">{strategyDescription(strategy)}</small>
                   </div>
 
                   {/* 통계 */}
@@ -101,10 +98,7 @@ export default function StrategySummaryCards({
 
                   {/* 비율 바 */}
                   <div className="mt-3">
-                    <div
-                      className="progress"
-                      style={{ height: "8px", backgroundColor: "#073642" }}
-                    >
+                    <div className="progress" style={{ height: "8px", backgroundColor: "#073642" }}>
                       <div
                         className="progress-bar"
                         role="progressbar"

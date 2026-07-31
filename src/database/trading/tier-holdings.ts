@@ -10,10 +10,6 @@ import { tierHoldings } from "../schema/index";
 import type { TierHolding } from "@/types/trading";
 import { mapDrizzleTierHolding } from "./mappers";
 
-// 티어 관련 상수
-export const BASE_TIER_COUNT = 6;
-export const RESERVE_TIER_NUMBER = 7;
-
 /**
  * 티어별 보유 현황 조회
  */

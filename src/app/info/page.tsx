@@ -1,41 +1,34 @@
 // Info 페이지 - 서비스 소개
 // Server Component
 
+import type { StrategyParams } from "@/strategy";
+import { getStrategyParams } from "@/strategy";
+import { formatThresholdPercent, formatTierRatiosPercent } from "@/lib/strategy-format";
 import StrategyCard from "@/components/StrategyCard";
 import FlowChart from "@/components/FlowChart";
 
-// 전략 데이터 (원본 사이트와 동일)
+// 파라미터 수치는 src/strategy의 전략 파라미터 표에서 파생한다 (#43)
+function toStrategyCardData(params: StrategyParams, subtitle: string, feature: string) {
+  return {
+    title: params.name,
+    subtitle,
+    tierRatios: [...formatTierRatiosPercent(params), "예비"],
+    splits: params.tierRatios.length,
+    stopLossDays: params.stopLossDays,
+    buyThreshold: formatThresholdPercent(params.buyThreshold),
+    sellThreshold: formatThresholdPercent(params.sellThreshold),
+    feature,
+  };
+}
+
 const strategies = [
-  {
-    title: "Pro1",
-    subtitle: "보수적 접근",
-    tierRatios: ["5.0%", "10.0%", "15.0%", "20.0%", "25.0%", "25.0%", "예비"],
-    splits: 6,
-    stopLossDays: 10,
-    buyThreshold: "-0.01%",
-    sellThreshold: "+0.01%",
-    feature: "보수적인 mdd가 낮은 전략",
-  },
-  {
-    title: "Pro2",
-    subtitle: "균형잡힌 효율성",
-    tierRatios: ["10.0%", "15.0%", "20.0%", "25.0%", "20.0%", "10.0%", "예비"],
-    splits: 6,
-    stopLossDays: 10,
-    buyThreshold: "-0.01%",
-    sellThreshold: "+1.50%",
-    feature: "효율적이면서 대부분 적중하는 전략",
-  },
-  {
-    title: "Pro3",
-    subtitle: "공격적 전략",
-    tierRatios: ["16.7%", "16.7%", "16.7%", "16.7%", "16.7%", "16.7%", "예비"],
-    splits: 6,
-    stopLossDays: 12,
-    buyThreshold: "-0.10%",
-    sellThreshold: "+2.00%",
-    feature: "공격적인 전략",
-  },
+  toStrategyCardData(getStrategyParams("Pro1"), "보수적 접근", "보수적인 mdd가 낮은 전략"),
+  toStrategyCardData(
+    getStrategyParams("Pro2"),
+    "균형잡힌 효율성",
+    "효율적이면서 대부분 적중하는 전략"
+  ),
+  toStrategyCardData(getStrategyParams("Pro3"), "공격적 전략", "공격적인 전략"),
 ];
 
 // 플로우차트 단계 (원본 사이트와 동일)
@@ -163,11 +156,22 @@ export default function InfoPage() {
       <section className="info-section">
         <h2>📙 전략 추천 기능 사용법</h2>
         <ul className="list-unstyled mb-0">
-          <li>• 새로운 사이클을 시작할 때 <strong>추천 전략</strong>을 확인하고 선택하세요.</li>
-          <li>• 반드시 추천된 전략을 따를 필요는 없지만, <strong>유사 구간의 성과를 참고</strong>하여 결정하는 것이 좋습니다.</li>
+          <li>
+            • 새로운 사이클을 시작할 때 <strong>추천 전략</strong>을 확인하고 선택하세요.
+          </li>
+          <li>
+            • 반드시 추천된 전략을 따를 필요는 없지만, <strong>유사 구간의 성과를 참고</strong>하여
+            결정하는 것이 좋습니다.
+          </li>
           <li>• 사이클 진행 중에는 전략을 변경하지 않습니다.</li>
-          <li>• 사이클이 종료되면 <strong>다시 추천을 확인</strong>하고 새로운 전략으로 시작하세요 (예: 모든 티어 매도 시).</li>
-          <li>• 티어가 비어있을 때는 항상 최신의 추천을 확인해서 적용하세요. (예: 연속 며칠간 매수가 안될 때)</li>
+          <li>
+            • 사이클이 종료되면 <strong>다시 추천을 확인</strong>하고 새로운 전략으로 시작하세요
+            (예: 모든 티어 매도 시).
+          </li>
+          <li>
+            • 티어가 비어있을 때는 항상 최신의 추천을 확인해서 적용하세요. (예: 연속 며칠간 매수가
+            안될 때)
+          </li>
         </ul>
       </section>
 

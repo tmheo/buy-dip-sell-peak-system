@@ -6,8 +6,13 @@
 
 import type React from "react";
 import type { TierHolding, Strategy } from "@/types/trading";
-import { TIER_RATIOS, TIER_COUNT } from "@/types/trading";
-import { calculateTradingDays } from "@/utils/trading-core";
+import {
+  BASE_TIER_COUNT,
+  MAX_TIER_NUMBER,
+  RESERVE_TIER_NUMBER,
+  getStrategyParams,
+} from "@/strategy";
+import { calculateTradingDays } from "@/lib/date";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
@@ -48,7 +53,7 @@ function calculateHoldingDays(buyDate: string | null): string {
 }
 
 function getTierLabel(tier: number): string {
-  if (tier === 7) return "예비";
+  if (tier === RESERVE_TIER_NUMBER) return "예비";
   return `${tier}`;
 }
 
@@ -58,26 +63,31 @@ export default function TierHoldingsTable({
   strategy,
   cashBalance,
 }: TierHoldingsTableProps): React.ReactElement {
-  const ratios = TIER_RATIOS[strategy];
+  // 티어 비율은 src/strategy의 전략 파라미터 표가 단일 소유한다 (#43)
+  const ratios = getStrategyParams(strategy).tierRatios;
   const holdingsByTier = new Map(holdings.map((h) => [h.tier, h]));
 
   // 티어 1~6이 모두 매수되었는지 확인
-  const allMainTiersFilled = Array.from({ length: 6 }, (_, i) => i + 1).every((tier) => {
-    const holding = holdingsByTier.get(tier);
-    return holding && holding.shares > 0;
-  });
+  const allMainTiersFilled = Array.from({ length: BASE_TIER_COUNT }, (_, i) => i + 1).every(
+    (tier) => {
+      const holding = holdingsByTier.get(tier);
+      return holding && holding.shares > 0;
+    }
+  );
 
   // 티어별 데이터 사전 계산 (데스크톱/모바일 공통)
-  const tierData = Array.from({ length: TIER_COUNT }, (_, i) => {
+  const tierData = Array.from({ length: MAX_TIER_NUMBER }, (_, i) => {
     const tier = i + 1;
     const holding = holdingsByTier.get(tier);
-    const ratio = ratios[tier - 1];
-    const isReserveTier = tier === 7;
+    const isReserveTier = tier === RESERVE_TIER_NUMBER;
+    const ratioPercent = isReserveTier ? 0 : ratios[tier - 1] * 100;
     const allocatedSeed = isReserveTier
-      ? (allMainTiersFilled ? cashBalance : 0)
-      : (seedCapital * ratio) / 100;
+      ? allMainTiersFilled
+        ? cashBalance
+        : 0
+      : seedCapital * ratios[tier - 1];
     const hasShares = holding && holding.shares > 0;
-    return { tier, holding, ratio, isReserveTier, allocatedSeed, hasShares };
+    return { tier, holding, ratioPercent, isReserveTier, allocatedSeed, hasShares };
   });
 
   return (
@@ -104,14 +114,17 @@ export default function TierHoldingsTable({
                 </tr>
               </thead>
               <tbody>
-                {tierData.map(({ tier, holding, ratio, isReserveTier, allocatedSeed, hasShares }) => (
+                {tierData.map(
+                  ({ tier, holding, ratioPercent, isReserveTier, allocatedSeed, hasShares }) => (
                     <tr key={tier} className={hasShares ? "table-active" : ""}>
                       <td className="text-center">
                         <span className={hasShares ? "badge bg-success" : "badge bg-secondary"}>
                           {getTierLabel(tier)}
                         </span>
                       </td>
-                      <td className="text-center">{isReserveTier ? "-" : `${ratio.toFixed(1)}%`}</td>
+                      <td className="text-center">
+                        {isReserveTier ? "-" : `${ratioPercent.toFixed(1)}%`}
+                      </td>
                       <td className="text-end">{formatCurrency(allocatedSeed)}</td>
                       <td className="text-center">{formatDate(holding?.buyDate ?? null)}</td>
                       <td className="text-end">
@@ -127,10 +140,15 @@ export default function TierHoldingsTable({
                           "-"
                         )}
                       </td>
-                      <td className="text-end">{formatCurrency(holding?.sellTargetPrice ?? null)}</td>
-                      <td className="text-center">{calculateHoldingDays(holding?.buyDate ?? null)}</td>
+                      <td className="text-end">
+                        {formatCurrency(holding?.sellTargetPrice ?? null)}
+                      </td>
+                      <td className="text-center">
+                        {calculateHoldingDays(holding?.buyDate ?? null)}
+                      </td>
                     </tr>
-                ))}
+                  )
+                )}
               </tbody>
             </table>
           </div>
@@ -138,7 +156,8 @@ export default function TierHoldingsTable({
 
         {/* 모바일: 티어 카드 뷰 (768px 이하) */}
         <div className="trading-mobile-card p-2">
-          {tierData.map(({ tier, holding, ratio, isReserveTier, allocatedSeed, hasShares }) => (
+          {tierData.map(
+            ({ tier, holding, ratioPercent, isReserveTier, allocatedSeed, hasShares }) => (
               <div
                 key={tier}
                 className={`card mb-2 bg-dark ${hasShares ? "border-success" : "border-secondary"}`}
@@ -149,7 +168,7 @@ export default function TierHoldingsTable({
                       {getTierLabel(tier)}
                     </span>
                     <span className="small text-secondary">
-                      {isReserveTier ? "예비" : `${ratio.toFixed(1)}%`}
+                      {isReserveTier ? "예비" : `${ratioPercent.toFixed(1)}%`}
                     </span>
                   </div>
                   <div className="row small">
@@ -173,7 +192,8 @@ export default function TierHoldingsTable({
                   </div>
                 </div>
               </div>
-          ))}
+            )
+          )}
         </div>
       </div>
     </div>

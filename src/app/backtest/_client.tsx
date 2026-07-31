@@ -8,6 +8,8 @@ import { useState, FormEvent } from "react";
 import dynamic from "next/dynamic";
 import type { BacktestResult } from "@/backtest/types";
 import type { Strategy } from "@/types/trading";
+import { PRO_STRATEGIES } from "@/strategy";
+import { formatThresholdPercent, formatTierRatiosPercent } from "@/lib/strategy-format";
 import { getTodayDate, getYearStartDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화 - Recharts는 클라이언트에서만 동작)
@@ -286,9 +288,27 @@ export default function BacktestPageClient() {
 
           {/* Pro 1,2,3 결과 카드 */}
           <div className="row">
-            {results.pro1 && <ProResultCard result={results.pro1} cardNumber={1} sharedYAxisRange={sharedYAxisRange} />}
-            {results.pro2 && <ProResultCard result={results.pro2} cardNumber={2} sharedYAxisRange={sharedYAxisRange} />}
-            {results.pro3 && <ProResultCard result={results.pro3} cardNumber={3} sharedYAxisRange={sharedYAxisRange} />}
+            {results.pro1 && (
+              <ProResultCard
+                result={results.pro1}
+                cardNumber={1}
+                sharedYAxisRange={sharedYAxisRange}
+              />
+            )}
+            {results.pro2 && (
+              <ProResultCard
+                result={results.pro2}
+                cardNumber={2}
+                sharedYAxisRange={sharedYAxisRange}
+              />
+            )}
+            {results.pro3 && (
+              <ProResultCard
+                result={results.pro3}
+                cardNumber={3}
+                sharedYAxisRange={sharedYAxisRange}
+              />
+            )}
           </div>
         </>
       )}
@@ -309,18 +329,15 @@ export default function BacktestPageClient() {
                 시뮬레이션하는 방법입니다.
               </p>
               <h5 className="card-title mt-4">Pro 전략 비교</h5>
+              {/* 파라미터 수치는 src/strategy의 전략 파라미터 표에서 파생한다 (#43) */}
               <ul className="mb-0">
-                <li>
-                  <strong>Pro1</strong>: 5%/10%/15%/20%/25%/25% 분할, 매수 -0.01%, 매도 +0.01%, 손절
-                  10일
-                </li>
-                <li>
-                  <strong>Pro2</strong>: 10%/15%/20%/25%/20%/10% 분할, 매수 -0.01%, 매도 +1.50%,
-                  손절 10일
-                </li>
-                <li>
-                  <strong>Pro3</strong>: 균등 분할 (16.7%), 매수 -0.10%, 매도 +2.00%, 손절 12일
-                </li>
+                {Object.values(PRO_STRATEGIES).map((params) => (
+                  <li key={params.name}>
+                    <strong>{params.name}</strong>: {formatTierRatiosPercent(params).join("/")}{" "}
+                    분할, 매수 {formatThresholdPercent(params.buyThreshold)}, 매도{" "}
+                    {formatThresholdPercent(params.sellThreshold)}, 손절 {params.stopLossDays}일
+                  </li>
+                ))}
               </ul>
               <h5 className="card-title mt-4">주의사항</h5>
               <ul className="mb-0">

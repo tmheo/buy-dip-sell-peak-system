@@ -1,57 +1,24 @@
 /**
  * 백테스트 모듈 내보내기
  * SPEC-BACKTEST-001
+ *
+ * 매매 규칙(전략 파라미터, 티어 상수, 주문 계산)은 src/strategy가 소유한다 (#43).
  */
 
 // 상수 내보내기
-export {
-  BASE_TIER_COUNT,
-  RESERVE_TIER_NUMBER,
-  MIN_TIER_NUMBER,
-  MAX_TIER_NUMBER,
-  STRATEGY_COLORS,
-} from "./types";
+export { STRATEGY_COLORS } from "./types";
 
 // 타입 내보내기
 export type {
-  StrategyConfig,
-  TierState,
-  CycleState,
   BacktestRequest,
   BacktestResult,
   DailySnapshot,
   TradeAction,
-  OrderCalculation,
+  OrderAction,
 } from "./types";
-
-// 전략 내보내기
-export { PRO_STRATEGIES, getStrategy } from "./strategy";
-
-// 주문 계산 함수 내보내기 (trading-core에서 re-export)
-export {
-  floorToDecimal,
-  calculateBuyLimitPrice,
-  calculateSellLimitPrice,
-  calculateBuyQuantity,
-  shouldExecuteBuy,
-  shouldExecuteSell,
-} from "@/utils/trading-core";
-
-// 사이클 관리 클래스 내보내기
-export { CycleManager } from "./cycle";
 
 // 백테스트 엔진 내보내기
 export { BacktestEngine } from "./engine";
-
-// 트레이딩 유틸리티 내보내기
-export {
-  generateBuyOrder,
-  handleSellOrders,
-  handleStopLoss,
-  createSnapshot,
-  createRemainingTiers,
-} from "./trading-utils";
-export type { BuyOrderResult, SellOrderResult } from "./trading-utils";
 
 // 성과 지표 함수 내보내기
 export { calculateReturn, calculateMDD, calculateWinRate } from "./metrics";

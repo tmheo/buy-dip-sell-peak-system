@@ -4,7 +4,7 @@
 import Decimal from "decimal.js";
 
 import type { Strategy } from "@/types/trading";
-import { getStrategy } from "@/backtest/strategy";
+import { getStrategyParams } from "@/strategy";
 
 import type { SimilarPeriod, StrategyScore, PeriodStrategyScore } from "./types";
 
@@ -132,7 +132,7 @@ export function getRecommendedStrategy(scores: StrategyScore[]): Strategy {
 export function getStrategyTierRatios(
   strategy: Strategy
 ): [number, number, number, number, number, number] {
-  return getStrategy(strategy).tierRatios;
+  return [...getStrategyParams(strategy).tierRatios];
 }
 
 /** 추천 사유 생성 */

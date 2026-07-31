@@ -12,8 +12,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      include: ["src/backtest/**/*.ts"],
-      exclude: ["src/backtest/**/*.test.ts", "src/backtest/index.ts"],
+      include: ["src/backtest/**/*.ts", "src/strategy/**/*.ts"],
+      exclude: [
+        "src/backtest/**/*.test.ts",
+        "src/backtest/index.ts",
+        "src/strategy/__tests__/**",
+        "src/strategy/index.ts",
+      ],
       thresholds: {
         lines: 85,
         functions: 85,

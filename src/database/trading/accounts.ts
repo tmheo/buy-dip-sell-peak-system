@@ -13,7 +13,7 @@ import type {
   UpdateTradingAccountRequest,
   TradingAccountWithHoldings,
 } from "@/types/trading";
-import { TIER_COUNT } from "@/types/trading";
+import { MAX_TIER_NUMBER, MIN_TIER_NUMBER } from "@/strategy";
 
 import { mapDrizzleTradingAccount } from "./mappers";
 import { getTierHoldings, getTotalShares } from "./tier-holdings";
@@ -44,8 +44,8 @@ export async function createTradingAccount(
 
     const account = accountResult[0];
 
-    // 2. 티어 홀딩 7개 자동 생성
-    for (let tier = 1; tier <= TIER_COUNT; tier++) {
+    // 2. 티어 홀딩 7개(예비 티어 포함) 자동 생성
+    for (let tier = MIN_TIER_NUMBER; tier <= MAX_TIER_NUMBER; tier++) {
       await tx.insert(tierHoldings).values({
         accountId: account.id,
         tier,
