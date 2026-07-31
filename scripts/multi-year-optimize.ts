@@ -10,7 +10,7 @@ import {
 } from "../src/optimize/backtest-runner";
 import { generateRandomParams, generateVariations } from "../src/optimize/param-generator";
 import type { SimilarityConfig } from "../src/recommend/types";
-import type { OptimizationConfig, BacktestMetrics } from "../src/optimize/types";
+import type { OptimizationConfig } from "../src/optimize/types";
 import { METRIC_WEIGHTS, METRIC_TOLERANCES } from "../src/recommend/similarity";
 
 // ============================================================
