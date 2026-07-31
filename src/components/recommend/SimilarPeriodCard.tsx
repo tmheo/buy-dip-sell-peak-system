@@ -37,7 +37,10 @@ const STRATEGY_COLORS: Record<string, string> = {
   Pro3: "#6c71c4",
 };
 
-export default function SimilarPeriodCard({ period, rank }: SimilarPeriodCardProps): React.ReactElement {
+export default function SimilarPeriodCard({
+  period,
+  rank,
+}: SimilarPeriodCardProps): React.ReactElement {
   const cardColor = RANK_COLORS[rank];
   const similarityPercent = (period.similarity * 100).toFixed(2);
   const endDateShort = period.endDate.slice(5);
@@ -112,7 +115,13 @@ export default function SimilarPeriodCard({ period, rank }: SimilarPeriodCardPro
                     }}
                     formatter={(value, name) => [
                       typeof value === "number" ? value.toFixed(2) : String(value),
-                      name === "close" ? "종가" : name === "ma20" ? "MA20" : name === "ma60" ? "MA60" : name,
+                      name === "close"
+                        ? "종가"
+                        : name === "ma20"
+                          ? "MA20"
+                          : name === "ma60"
+                            ? "MA60"
+                            : name,
                     ]}
                   />
                   <Line
@@ -150,11 +159,15 @@ export default function SimilarPeriodCard({ period, rank }: SimilarPeriodCardPro
           <div className="row mb-3" style={{ fontSize: "0.85rem" }}>
             <div className="col-6">
               <small className="text-muted d-block">분석 구간</small>
-              <span className="text-break">{period.startDate} ~ {period.endDate}</span>
+              <span className="text-break">
+                {period.startDate} ~ {period.endDate}
+              </span>
             </div>
             <div className="col-6">
               <small className="text-muted d-block">성과 확인 구간</small>
-              <span className="text-break">{period.performanceStartDate} ~ {period.performanceEndDate}</span>
+              <span className="text-break">
+                {period.performanceStartDate} ~ {period.performanceEndDate}
+              </span>
             </div>
           </div>
 
@@ -168,7 +181,8 @@ export default function SimilarPeriodCard({ period, rank }: SimilarPeriodCardPro
                 <div className="p-1 rounded text-center" style={{ backgroundColor: "#073642" }}>
                   <small className="text-muted d-block">정배열</small>
                   <span style={{ color: "#2aa198" }}>
-                    {period.metrics.isGoldenCross ? "✓" : "✗"} {period.metrics.goldenCross.toFixed(1)}%
+                    {period.metrics.isGoldenCross ? "✓" : "✗"}{" "}
+                    {period.metrics.goldenCross.toFixed(1)}%
                   </span>
                 </div>
               </div>
@@ -227,12 +241,16 @@ export default function SimilarPeriodCard({ period, rank }: SimilarPeriodCardPro
                   return (
                     <tr key={strategy}>
                       <td>
-                        <span className="badge" style={{ backgroundColor: STRATEGY_COLORS[strategy] }}>
+                        <span
+                          className="badge"
+                          style={{ backgroundColor: STRATEGY_COLORS[strategy] }}
+                        >
                           {strategy}
                         </span>
                       </td>
                       <td className={`text-end ${returnRate >= 0 ? "price-up" : "price-down"}`}>
-                        {returnRate >= 0 ? "+" : ""}{returnRate.toFixed(1)}%
+                        {returnRate >= 0 ? "+" : ""}
+                        {returnRate.toFixed(1)}%
                       </td>
                       <td className="text-end price-down">{mdd.toFixed(1)}%</td>
                     </tr>

@@ -17,7 +17,12 @@ interface MyPageClientProps {
   createdAt: string;
 }
 
-export default function MyPageClient({ name, email, image, createdAt }: MyPageClientProps): React.ReactElement {
+export default function MyPageClient({
+  name,
+  email,
+  image,
+  createdAt,
+}: MyPageClientProps): React.ReactElement {
   const createdAtDate = new Date(createdAt);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -54,12 +59,7 @@ export default function MyPageClient({ name, email, image, createdAt }: MyPageCl
         <div className="col-md-6 col-lg-5">
           <h2 className="text-light mb-4">마이페이지</h2>
 
-          <UserProfile
-            name={name}
-            email={email}
-            image={image}
-            createdAt={createdAtDate}
-          />
+          <UserProfile name={name} email={email} image={image} createdAt={createdAtDate} />
 
           <div className="mt-4 text-center">
             <button
@@ -72,10 +72,7 @@ export default function MyPageClient({ name, email, image, createdAt }: MyPageCl
             </button>
           </div>
 
-          <DeleteAccountModal
-            isDeleting={isDeleting}
-            onConfirm={handleDeleteAccount}
-          />
+          <DeleteAccountModal isDeleting={isDeleting} onConfirm={handleDeleteAccount} />
         </div>
       </div>
     </div>

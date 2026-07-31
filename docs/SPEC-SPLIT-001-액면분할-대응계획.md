@@ -8,12 +8,13 @@
 | **작성일** | 2026-06-02 |
 | **대상 종목** | SOXL (TQQQ 등 모든 지원 티커 공통) |
 | **목표** | 액면분할 발생 시 가격 시계열·지표·보유 포지션·거래 기록의 정합성을 무손실로 복원하기 위한 대응 절차(런북) 및 향후 구현 방향 정의 |
-| **상태** | 계획 |
+| **상태** | 런북 유효 - 5.1(가격 덮어쓰기) 구현 완료, 분할 가드 운영 중 (이슈 #42) |
 
-> **한 줄 요약**: 이 시스템은 가격을 **증분으로만 적재**하고 기존 행을 **덮어쓰지 않는다**.
-> 반면 Yahoo Finance는 분할 시 **과거 가격을 소급 조정**한다. 따라서 분할이 실제로 일어나면
-> 가격 시계열에 불연속이 생기고, 지표가 왜곡되며, 보유 포지션의 매도 목표가가 영원히
-> 미체결되어 사이클이 멈춘다. 사전에 대응 절차를 정의해 둔다.
+> **한 줄 요약**: 일일 동기화는 원천 스냅샷 전체를 upsert로 미러링하므로(ADR-0002, 이슈 #42)
+> 배당 규모의 소급 조정은 자동 흡수된다. 그러나 **분할 규모(행 단위 close 5% 초과)의 소급
+> 변경은 분할 가드가 해당 티커의 모든 쓰기를 중단**하고 알림만 낸다 - 보유 포지션·거래
+> 기록과의 무손실 정합은 자동화할 수 없기 때문이다. 분할이 실제로 일어나면 본 문서의
+> 런북으로 사람이 대응한다.
 
 ---
 
@@ -41,49 +42,34 @@ SOXL 주가가 지속적으로 상승하면서 액면분할(예: 2:1, 3:1) 가�
 | 거래 기록 | `profit_records` | `buyPrice/sellPrice/buyQuantity/buyAmount/sellAmount` | 손익 표시 |
 | 일일 주문 | `daily_orders` | `limitPrice`, `shares` | 체결 시뮬레이션 |
 
-### 2.2 핵심 함정 — 증분 적재 + `onConflictDoNothing`
+### 2.2 핵심 동작 - 미러링 동기화와 분할 가드 (이슈 #42로 개편)
 
-증분 업데이트는 **마지막 저장일 이후 신규일만** 가져온다:
+일일 동기화(`syncTickerPrices`, `src/services/priceSyncService.ts`)는 매일 Yahoo 전체
+히스토리를 재페치해 DB와 날짜별로 대조하고, 신규·변경 행을 upsert로 반영한다
+(`upsertDailyPrices`, `src/database/prices.ts`).
+배당 규모의 `adjClose` 소급 조정은 이 경로에서 자동 흡수된다.
 
-```typescript
-// src/services/dataFetcher.ts:168 (fetchSince)
-const nextDay = new Date(startDate);
-nextDay.setDate(nextDay.getDate() + 1);
-// ... period1 = 다음날부터 today 까지만 조회
-```
-
-그리고 삽입은 충돌 시 **무시**한다 (기존 행 절대 갱신 안 됨):
-
-```typescript
-// src/database/prices.ts:24 (insertDailyPrices)
-await db.insert(dailyPrices).values(data).onConflictDoNothing();
-```
-
+단, 기존 행 대비 `close`가 **행 단위 5% 초과**로 소급 변경되면 분할로 의심하고 **분할
+가드**가 발동한다: 해당 티커의 가격·지표 쓰기를 모두 건너뛰고 실패로 보고한다(크론 응답
+비 2xx → GitHub Actions 알림).
 Yahoo Finance는 분할이 발생하면 **과거 전체 `adjClose`(및 `close`)를 소급 조정**(2:1이면
-반토막)한다. 그러나 위 두 가지 때문에 DB의 과거 행은 **분할 전 가격 그대로 남고**, ex-date
-이후 신규 행만 분할 후(낮아진) 가격으로 들어온다 → **분할 경계에서 가격이 2배 점프하는
-불연속**이 생긴다.
+반토막)하므로, 분할 다음 동기화부터 가드가 발동해 DB는 분할 전 상태로 동결된다.
+가격 정합 자체는 `--force`로 즉시 가능하지만(4장 (1)), 보유 포지션·거래 기록(2.5, 2.7)과의
+무손실 정합이 함께 필요하므로 본 런북 전체를 따라야 한다.
 
-### 2.3 영향 1 — 가격 시계열 불연속
+### 2.3 영향 1 - 가격 시계열 불연속 (가드 발동 중)
 
-ex-date를 기준으로 과거(높은 가격)와 미래(낮은 가격)가 한 시계열에 섞인다. 차트가 끊기고,
-이후 모든 가격 기반 연산이 오염된다.
+가드가 발동한 티커는 가격·지표가 더 이상 갱신되지 않고 분할 전 상태로 동결된다.
+런북 대응 전까지 최신 데이터 기반 추천·주문 생성이 오래된 가격 위에서 이루어진다.
 
-### 2.4 영향 2 — 지표 붕괴 (최소 60거래일)
-
-모든 지표는 `adjClose` 배열로 계산된다:
-
-```typescript
-// src/index.ts:332 (init-metrics)
-const adjClosePrices = prices.map((p) => p.adjClose);
-const metrics = calculateMetricsBatch(adjClosePrices, dates, ticker, 59, prices.length - 1);
-```
+### 2.4 영향 2 - 지표 동결
 
 `calculateMetricsBatch`(`src/services/metricsCalculator.ts`)의 MA20/MA60, RSI14, ROC12,
-변동성, 이격도, 골든크로스가 모두 연속된 `adjClose`를 전제로 한다. 분할 경계 전후 값이
-섞이면 **MA60은 분할 후에도 약 60거래일간** 분할 전 높은 가격을 평균에 포함 → 이동평균이
-실제보다 높게 산출되고, 이격도·골든크로스·RSI·ROC가 전부 왜곡되어 **허위 매수/매도
-신호**가 발생한다.
+변동성, 이격도, 골든크로스가 모두 연속된 `adjClose`를 전제로 한다.
+동기화 서비스는 가격 정합과 지표 전체 재계산을 한 실행에서 수행하므로, 가드가 우회 없이
+해제되면(4장 (1)) 분할 반영 가격 위에서 지표가 함께 수렴한다.
+가드 발동 중에는 지표도 갱신되지 않고 동결된다 - 분할 전후 값이 한 시계열에 섞여
+지표가 왜곡되는 일은 가드가 막지만, 대응이 늦어질수록 오래된 신호로 매매하게 된다.
 
 ### 2.5 영향 3 — 보유 포지션 매도 불가 (치명적)
 
@@ -109,8 +95,8 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 .select({ adjClose: dailyPrices.adjClose })
 ```
 
-ex-date 이후 신규 종가는 분할 후 정상 스케일로 들어오지만, 2.3의 불연속과 2.4의 오염된
-지표가 함께 작용하면 매수 수량·신호 판단이 어긋난다.
+가드 발동 중에는 신규 종가도 적재되지 않으므로, 주문 기준가가 분할 전 마지막 종가에
+동결된 채 매수 수량·신호 판단이 이루어진다.
 
 ### 2.7 영향 5 — 종료된 거래 기록 표시 불일치
 
@@ -177,7 +163,7 @@ ex-date 이후 신규 종가는 분할 후 정상 스케일로 들어오지만, 
 ### 롤백 & 복구
 - **단계별 결정 지점**: 각 단계((1) 가격 재적재 → (2) 지표 → (3) 보유 → (4) 거래기록 →
   (5) 주문) 직후 검증을 수행하고, 실패 시 **해당 단계까지의 백업으로 복원** 후 중단·원인 분석.
-- **중간 백업**: 임시 대안(아래 (1))처럼 삭제가 포함된 단계는 **각 삭제/재적재 직후 중간 백업**을
+- **중간 백업**: (5)의 주문 삭제처럼 삭제가 포함된 단계는 **각 삭제/재생성 직후 중간 백업**을
   생성해 부분 완료 상태에서도 되돌릴 수 있게 한다.
 - **복원 순서**: 의존성 역순으로 복원 — `daily_orders` → `profit_records` → `tier_holdings`
   → `daily_metrics` → `daily_prices`. 복원 후 (6) 사후 검증을 재실행.
@@ -185,22 +171,14 @@ ex-date 이후 신규 종가는 분할 후 정상 스케일로 들어오지만, 
   스냅샷과 대조해 이상 시 즉시 중단.
 
 ### (1) 가격 히스토리 재정합
-- [ ] **권장**: 전체 재적재. 단 현재 `init`/`update`는 둘 다 `onConflictDoNothing`이라
-      기존 행을 덮어쓰지 못한다(2.2 참조) → **5장의 신규 코드가 필요**.
-- [ ] **신규 코드 없이 진행하는 임시 대안** — ⚠️ **고위험. 최후의 수단으로만 사용**:
-  > **위험성**: 삭제 후 재적재 방식은 (a) 백업 실패·손상 시 **데이터 영구 손실**, (b) 삭제와
-  > 재적재 사이 장애 발생 시 **복구 불가**, (c) 가격 데이터 일시 부재로 활성 포지션 참조 오류,
-  > (d) 크론·사용자 요청과의 **경쟁 조건** 위험을 동반한다. 가능하면 **5.1의 신규 코드(덮어쓰기/
-  > 재적재 함수) 구현을 최우선**으로 하고, 본 방식은 그것이 불가능할 때만 사용한다.
+- [ ] `npx tsx src/index.ts update --ticker SOXL --force` 실행.
+      동기화 서비스가 분할 반영된 전체 히스토리를 upsert로 덮어쓰고 지표도 전체 재계산한다.
+      `--force`는 분할 가드(close 5% 초과 변경 시 쓰기 중단)를 우회하는 런북 전용 옵션이다.
+- [ ] 출력된 요약(신규/변경 행 수, 가드 위반 목록)이 분할 비율·ex-date와 부합하는지 확인.
+- [ ] 삭제 후 재적재 방식의 임시 대안은 upsert 도입(이슈 #42)으로 **더는 필요 없다**.
 
-  사용 시 전제: 위 "백업 복원 테스트" 완료 + 유지보수 모드(크론 중지·사용자 차단) 진입.
-  1. 해당 티커의 `daily_metrics` 행 삭제. → **중간 백업 생성**
-  2. 해당 티커의 `daily_prices` 행 삭제. → **중간 백업 생성**
-  3. `npx tsx src/index.ts init --ticker SOXL` 재실행 → Yahoo에서 분할 반영된 전체
-     히스토리를 새로 적재(빈 테이블이므로 충돌 없음). → 적재 행 수 검증
-
-### (2) 지표 전체 재계산 및 검증
-- [ ] `npx tsx src/index.ts init-metrics --ticker SOXL` (또는 init 단계에서 함께 계산됨).
+### (2) 지표 검증
+- [ ] 지표는 (1)의 동기화에서 이미 전체 재계산되었다.
 - [ ] `npx tsx src/index.ts verify-metrics --ticker SOXL` 로 배치 계산 정합성 확인.
 
 ### (3) 활성 계정별 `tier_holdings` 보정
@@ -232,19 +210,19 @@ ex-date 이후 신규 종가는 분할 후 정상 스케일로 들어오지만, 
 
 ---
 
-## 5. 향후 구현 권장 (코드 변경 제안 — 현재 미구현)
+## 5. 향후 구현 권장 (코드 변경 제안)
 
-실제 분할이 확정되면 다음을 도입해 절차를 자동화·원자화하는 것을 권장한다.
+### 5.1 가격 덮어쓰기 지원 - ✅ 구현됨 (이슈 #42, ADR-0002)
+- `upsertDailyPrices`(`src/database/prices.ts`)가 `onConflictDoUpdate`로
+  OHLC/adjClose/volume을 갱신한다.
+- 일일 동기화(`syncTickerPrices`, `src/services/priceSyncService.ts`)가 전체 히스토리
+  재페치 + upsert 미러링을 수행하므로 별도의 `replaceAllPrices`는 필요 없다.
 
-### 5.1 가격 덮어쓰기 지원
-- `insertDailyPrices`에 upsert 옵션 추가(`onConflictDoUpdate`로 OHLC/adjClose 갱신), 또는
-  `replaceAllPrices(ticker)` 함수(트랜잭션으로 delete → insert)를 신설.
-  - 위치: `src/database/prices.ts`.
-
-### 5.2 분할 자동 감지
-- 현재 `fetchChartWithRetry`는 `result.quotes`만 읽는다(`src/services/dataFetcher.ts:84`).
-  Yahoo `chart`의 **split 이벤트(events)** 를 함께 조회해, 일일 크론에서 신규 분할을 감지하면
-  경고/대응 트리거를 발생시킨다.
+### 5.2 분할 자동 감지 - 부분 구현
+- 분할 가드(2.2)가 기존 close와의 대조만으로 분할 규모의 소급 변경을 감지해 쓰기를
+  중단하고 크론 실패 알림을 낸다.
+- Yahoo `chart`의 **split 이벤트(events)** 조회로 분할 비율·ex-date까지 자동 확인하는
+  것은 미구현으로 남긴다.
 
 ### 5.3 분할 적용 CLI 명령
 - `apply-split --ticker SOXL --ratio 2 --date 2026-07-01`:
@@ -276,10 +254,11 @@ ex-date 이후 신규 종가는 분할 후 정상 스케일로 들어오지만, 
 
 | 영역 | 파일 / 함수 |
 |------|-------------|
-| 데이터 페치 | `src/services/dataFetcher.ts` — `fetchAllHistory`, `fetchSince`, `normalizePrice` |
-| 가격 적재 | `src/database/prices.ts` — `insertDailyPrices`(onConflictDoNothing) |
+| 데이터 페치 | `src/services/dataFetcher.ts` - `fetchAllHistory`, `normalizePrice` |
+| 동기화 서비스 | `src/services/priceSyncService.ts` - `syncTickerPrices`, `diffPriceSnapshots`(분할 가드 포함) |
+| 가격 적재 | `src/database/prices.ts` - `upsertDailyPrices`(onConflictDoUpdate) |
 | 지표 계산 | `src/services/metricsCalculator.ts` — `calculateMetricsBatch` |
-| CLI | `src/index.ts` — `init`, `update`, `init-metrics`, `verify-metrics` |
+| CLI | `src/index.ts` - `init`/`update`(`--force` 가드 우회), `init-metrics`, `verify-metrics` |
 | 보유 보정 | `src/database/trading/tier-holdings.ts` — `updateTierHolding`, `getTierHoldings` |
 | 주문 생성/정리 | `src/database/trading/orders.ts` — `generateDailyOrders`, `deleteDailyOrders`, `getClosingPrice`, `calculateSellLimitPrice` |
 | 거래 기록 | `src/database/trading/profits.ts` |

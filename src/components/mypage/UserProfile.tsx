@@ -29,7 +29,12 @@ function ProfileRow({ label, value, isLast = false }: ProfileRowProps): React.Re
 
 const AVATAR_SIZE = 96;
 
-export default function UserProfile({ name, email, image, createdAt }: UserProfileProps): React.ReactElement {
+export default function UserProfile({
+  name,
+  email,
+  image,
+  createdAt,
+}: UserProfileProps): React.ReactElement {
   const displayName = name ?? email.split("@")[0];
   const initial = displayName.charAt(0).toUpperCase();
 

@@ -60,7 +60,9 @@ export default function CycleStrategyTable({ cycleStrategies }: CycleStrategyTab
                       <span className="text-muted">-</span>
                     )}
                   </td>
-                  <td className={`text-end ${returnRate !== null ? (returnRate >= 0 ? "price-up" : "price-down") : ""}`}>
+                  <td
+                    className={`text-end ${returnRate !== null ? (returnRate >= 0 ? "price-up" : "price-down") : ""}`}
+                  >
                     {returnRate !== null ? (
                       <>
                         {returnRate >= 0 ? "+" : ""}

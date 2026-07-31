@@ -1,6 +1,6 @@
 /**
  * 가격 데이터 CRUD 함수 (Drizzle ORM for PostgreSQL)
- * - insertDailyPrices: 일봉 데이터 일괄 삽입
+ * - upsertDailyPrices: 일봉 데이터 일괄 upsert
  * - getLatestDate: 가장 최근 날짜 조회
  * - getPriceRange: 날짜 범위 조회
  * - getPriceByDate: 특정 날짜 조회
@@ -8,20 +8,38 @@
  * - getLatestPrices: 최근 N일 조회
  */
 
-import { eq, and, between, desc, asc, count } from "drizzle-orm";
+import { eq, and, between, desc, asc, count, sql } from "drizzle-orm";
 import { db } from "./db-drizzle";
 import { dailyPrices } from "./schema/index";
 import type { DailyPrice, NewDailyPrice } from "./schema/index";
 
-/**
- * 여러 가격 데이터 일괄 삽입 (중복 무시)
- * @param data - 삽입할 가격 데이터 배열
- */
-export async function insertDailyPrices(data: NewDailyPrice[]): Promise<void> {
-  if (data.length === 0) return;
+// PostgreSQL 프로토콜의 파라미터 상한(65535)과 Vercel 함수 시간 제한을 고려한 배치 크기
+const UPSERT_CHUNK_SIZE = 500;
 
-  // onConflictDoNothing: ticker + date 유니크 인덱스 충돌 시 무시
-  await db.insert(dailyPrices).values(data).onConflictDoNothing();
+/**
+ * 여러 가격 데이터 일괄 upsert (ADR-0002: 원천 스냅샷 미러링)
+ * ticker + date 충돌 시 open/high/low/close/adjClose/volume을 갱신해
+ * 배당 등 원천의 소급 조정이 기존 행에 반영되게 한다.
+ * @param data - 삽입/갱신할 가격 데이터 배열
+ */
+export async function upsertDailyPrices(data: NewDailyPrice[]): Promise<void> {
+  for (let i = 0; i < data.length; i += UPSERT_CHUNK_SIZE) {
+    const chunk = data.slice(i, i + UPSERT_CHUNK_SIZE);
+    await db
+      .insert(dailyPrices)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [dailyPrices.ticker, dailyPrices.date],
+        set: {
+          open: sql`excluded.open`,
+          high: sql`excluded.high`,
+          low: sql`excluded.low`,
+          close: sql`excluded.close`,
+          adjClose: sql`excluded.adj_close`,
+          volume: sql`excluded.volume`,
+        },
+      });
+  }
 }
 
 /**

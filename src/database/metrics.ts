@@ -1,26 +1,18 @@
 /**
  * 기술적 지표 CRUD 함수 (Drizzle ORM for PostgreSQL)
- * - insertMetrics: 지표 데이터 일괄 삽입
+ * - upsertMetrics: 지표 데이터 일괄 upsert
  * - getMetricsByDate: 특정 날짜 지표 조회
  * - getMetricsRange: 날짜 범위 지표 조회
  * - getLatestMetricDate: 가장 최근 지표 날짜 조회
  */
 
-import { eq, and, between, desc, asc, count } from "drizzle-orm";
+import { eq, and, between, desc, asc, count, sql } from "drizzle-orm";
 import { db } from "./db-drizzle";
 import { dailyMetrics } from "./schema/index";
 import type { DailyMetric, NewDailyMetric } from "./schema/index";
 
-/**
- * 여러 기술적 지표 데이터 일괄 삽입 (중복 무시)
- * @param data - 삽입할 지표 데이터 배열
- */
-export async function insertMetrics(data: NewDailyMetric[]): Promise<void> {
-  if (data.length === 0) return;
-
-  // onConflictDoNothing: ticker + date 유니크 인덱스 충돌 시 무시
-  await db.insert(dailyMetrics).values(data).onConflictDoNothing();
-}
+// PostgreSQL 프로토콜의 파라미터 상한(65535)과 Vercel 함수 시간 제한을 고려한 배치 크기
+const UPSERT_CHUNK_SIZE = 500;
 
 /**
  * 특정 날짜의 기술적 지표 조회
@@ -91,29 +83,28 @@ export async function getMetricsCount(ticker: string = "SOXL"): Promise<number> 
 }
 
 /**
- * 기술적 지표 UPSERT (기존 데이터 갱신)
+ * 기술적 지표 일괄 UPSERT (기존 데이터 갱신)
+ * 매일 전체 구간을 재계산해 upsert하므로(ADR-0002) 행 단위가 아닌 배치로 실행한다.
  * @param data - 삽입/갱신할 지표 데이터 배열
  */
 export async function upsertMetrics(data: NewDailyMetric[]): Promise<void> {
-  if (data.length === 0) return;
-
-  // PostgreSQL의 ON CONFLICT DO UPDATE 사용
-  for (const metric of data) {
+  for (let i = 0; i < data.length; i += UPSERT_CHUNK_SIZE) {
+    const chunk = data.slice(i, i + UPSERT_CHUNK_SIZE);
     await db
       .insert(dailyMetrics)
-      .values(metric)
+      .values(chunk)
       .onConflictDoUpdate({
         target: [dailyMetrics.ticker, dailyMetrics.date],
         set: {
-          ma20: metric.ma20,
-          ma60: metric.ma60,
-          maSlope: metric.maSlope,
-          disparity: metric.disparity,
-          rsi14: metric.rsi14,
-          roc12: metric.roc12,
-          volatility20: metric.volatility20,
-          goldenCross: metric.goldenCross,
-          isGoldenCross: metric.isGoldenCross,
+          ma20: sql`excluded.ma20`,
+          ma60: sql`excluded.ma60`,
+          maSlope: sql`excluded.ma_slope`,
+          disparity: sql`excluded.disparity`,
+          rsi14: sql`excluded.rsi14`,
+          roc12: sql`excluded.roc12`,
+          volatility20: sql`excluded.volatility20`,
+          goldenCross: sql`excluded.golden_cross`,
+          isGoldenCross: sql`excluded.is_golden_cross`,
         },
       });
   }

@@ -70,47 +70,74 @@ function MonthSection({ summary, isExpanded, onToggle }: MonthSectionProps): Rea
           {/* Header - always visible for column alignment */}
           <thead style={{ visibility: isExpanded ? "visible" : "collapse" }}>
             <tr>
-              <th className="text-center" style={{ width: "6%" }}>전략</th>
-              <th className="text-center" style={{ width: "5%" }}>티어</th>
-              <th className="text-center" style={{ width: "11%" }}>매수일</th>
-              <th className="text-end" style={{ width: "8%" }}>매수가</th>
-              <th className="text-center" style={{ width: "11%" }}>매도일</th>
-              <th className="text-end" style={{ width: "8%" }}>매도가</th>
-              <th className="text-end" style={{ width: "5%" }}>수량</th>
-              <th className="text-end" style={{ width: "12%" }}>매수금액</th>
-              <th className="text-end" style={{ width: "12%" }}>매도금액</th>
-              <th className="text-end" style={{ width: "12%" }}>수익</th>
-              <th className="text-end" style={{ width: "8%" }}>수익률</th>
+              <th className="text-center" style={{ width: "6%" }}>
+                전략
+              </th>
+              <th className="text-center" style={{ width: "5%" }}>
+                티어
+              </th>
+              <th className="text-center" style={{ width: "11%" }}>
+                매수일
+              </th>
+              <th className="text-end" style={{ width: "8%" }}>
+                매수가
+              </th>
+              <th className="text-center" style={{ width: "11%" }}>
+                매도일
+              </th>
+              <th className="text-end" style={{ width: "8%" }}>
+                매도가
+              </th>
+              <th className="text-end" style={{ width: "5%" }}>
+                수량
+              </th>
+              <th className="text-end" style={{ width: "12%" }}>
+                매수금액
+              </th>
+              <th className="text-end" style={{ width: "12%" }}>
+                매도금액
+              </th>
+              <th className="text-end" style={{ width: "12%" }}>
+                수익
+              </th>
+              <th className="text-end" style={{ width: "8%" }}>
+                수익률
+              </th>
             </tr>
           </thead>
           <tbody>
             {/* Detail records - only shown when expanded */}
-            {isExpanded && summary.records.map((record: ProfitRecord) => (
-              <tr key={record.id}>
-                <td className="text-center">
-                  <span className="badge bg-info text-dark">{record.strategy}</span>
-                </td>
-                <td className="text-center">
-                  <span className="badge bg-secondary">{record.tier === 7 ? "예비" : record.tier}</span>
-                </td>
-                <td className="text-center">{formatDate(record.buyDate)}</td>
-                <td className="text-end">{formatCurrency(record.buyPrice)}</td>
-                <td className="text-center">{formatDate(record.sellDate)}</td>
-                <td className="text-end">{formatCurrency(record.sellPrice)}</td>
-                <td className="text-end">{record.buyQuantity.toLocaleString()}</td>
-                <td className="text-end">{formatCurrency(record.buyAmount)}</td>
-                <td className="text-end">{formatCurrency(record.sellAmount)}</td>
-                <td className={`text-end fw-bold ${getProfitColorClass(record.profit)}`}>
-                  {formatCurrency(record.profit)}
-                </td>
-                <td className={`text-end ${getProfitColorClass(record.profitRate)}`}>
-                  {formatPercent(record.profitRate)}
-                </td>
-              </tr>
-            ))}
+            {isExpanded &&
+              summary.records.map((record: ProfitRecord) => (
+                <tr key={record.id}>
+                  <td className="text-center">
+                    <span className="badge bg-info text-dark">{record.strategy}</span>
+                  </td>
+                  <td className="text-center">
+                    <span className="badge bg-secondary">
+                      {record.tier === 7 ? "예비" : record.tier}
+                    </span>
+                  </td>
+                  <td className="text-center">{formatDate(record.buyDate)}</td>
+                  <td className="text-end">{formatCurrency(record.buyPrice)}</td>
+                  <td className="text-center">{formatDate(record.sellDate)}</td>
+                  <td className="text-end">{formatCurrency(record.sellPrice)}</td>
+                  <td className="text-end">{record.buyQuantity.toLocaleString()}</td>
+                  <td className="text-end">{formatCurrency(record.buyAmount)}</td>
+                  <td className="text-end">{formatCurrency(record.sellAmount)}</td>
+                  <td className={`text-end fw-bold ${getProfitColorClass(record.profit)}`}>
+                    {formatCurrency(record.profit)}
+                  </td>
+                  <td className={`text-end ${getProfitColorClass(record.profitRate)}`}>
+                    {formatPercent(record.profitRate)}
+                  </td>
+                </tr>
+              ))}
             {/* Subtotal Row - always visible */}
             <tr style={{ backgroundColor: "#3a5a5a" }}>
-              <td className="text-center fw-bold text-info" style={{ whiteSpace: "nowrap" }}>{summary.yearMonth} 소계</td>
+              <td className="text-center fw-bold text-info" style={{ whiteSpace: "nowrap" }}>
+                {summary.yearMonth} 소계
+              </td>
               <td></td>
               <td></td>
               <td></td>
@@ -243,18 +270,10 @@ export default function ProfitStatusTable({
         <h5 className="mb-0 text-light">수익 현황</h5>
         {profitStatus && profitStatus.months.length > 0 && (
           <div className="btn-group btn-group-sm">
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={expandAll}
-            >
+            <button type="button" className="btn btn-outline-secondary" onClick={expandAll}>
               모두 펼치기
             </button>
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={collapseAll}
-            >
+            <button type="button" className="btn btn-outline-secondary" onClick={collapseAll}>
               모두 접기
             </button>
           </div>
@@ -284,9 +303,7 @@ export default function ProfitStatusTable({
         )}
 
         {!isLoading && !error && profitStatus && profitStatus.months.length === 0 && (
-          <div className="text-center text-secondary py-4">
-            아직 수익 기록이 없습니다.
-          </div>
+          <div className="text-center text-secondary py-4">아직 수익 기록이 없습니다.</div>
         )}
 
         {!isLoading && !error && profitStatus && profitStatus.months.length > 0 && (

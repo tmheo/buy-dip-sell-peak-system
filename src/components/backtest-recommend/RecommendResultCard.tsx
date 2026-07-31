@@ -134,9 +134,7 @@ export default function RecommendResultCard({ result }: RecommendResultCardProps
                         </div>
                         <div className="col-6">
                           <small className="text-muted">전체 수량</small>
-                          <div>
-                            {result.remainingTiers.reduce((sum, t) => sum + t.shares, 0)}주
-                          </div>
+                          <div>{result.remainingTiers.reduce((sum, t) => sum + t.shares, 0)}주</div>
                         </div>
                       </div>
                     </div>
@@ -159,7 +157,10 @@ export default function RecommendResultCard({ result }: RecommendResultCardProps
             <div className="card-body">
               <div style={{ height: "300px" }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                  <ComposedChart
+                    data={chartData}
+                    margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#073642" />
                     <XAxis
                       dataKey="index"

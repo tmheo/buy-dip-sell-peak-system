@@ -12,7 +12,10 @@ interface DailyHistoryTableProps {
   initialCapital: number;
 }
 
-export default function DailyHistoryTable({ dailyHistory, initialCapital }: DailyHistoryTableProps) {
+export default function DailyHistoryTable({
+  dailyHistory,
+  initialCapital,
+}: DailyHistoryTableProps) {
   // MDD 계산용 누적 peak
   let peak = initialCapital;
 
@@ -91,9 +94,7 @@ export default function DailyHistoryTable({ dailyHistory, initialCapital }: Dail
 }
 
 // 거래 정보 포맷 함수
-function formatTradeInfo(
-  trades: DailySnapshotWithStrategy["trades"]
-): React.ReactNode {
+function formatTradeInfo(trades: DailySnapshotWithStrategy["trades"]): React.ReactNode {
   if (!trades || trades.length === 0) {
     return <span className="text-muted">-</span>;
   }

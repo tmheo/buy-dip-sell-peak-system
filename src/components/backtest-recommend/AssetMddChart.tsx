@@ -97,10 +97,7 @@ export default function AssetMddChart({ dailyHistory, initialCapital }: AssetMdd
               return label;
             }}
           />
-          <Legend
-            wrapperStyle={{ fontSize: "0.75rem" }}
-            iconSize={10}
-          />
+          <Legend wrapperStyle={{ fontSize: "0.75rem" }} iconSize={10} />
           <Area
             yAxisId="right"
             type="monotone"
