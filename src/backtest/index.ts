@@ -12,7 +12,12 @@ export { STRATEGY_COLORS } from "./types";
 export type {
   BacktestRequest,
   BacktestResult,
+  CycleStrategyInfo,
   DailySnapshot,
+  StrategyDecision,
+  StrategyDecisionMetrics,
+  StrategyProvider,
+  StrategyUsageStats,
   TradeAction,
   OrderAction,
 } from "./types";

@@ -78,8 +78,11 @@ function insufficient(
  * 가격·지표 배열로부터 추천을 계산한다
  * 10단계 파이프라인: 기준일 지표 → 유사 구간 3개 검색 → 구간별 전략 백테스트 →
  * 점수 집계 → 추천 → SOXL 하향 조정
+ * (BacktestEngine.run이 async로 통일되면서 함께 async가 됐다 - #63)
  */
-export function computeRecommendation(input: RecommendComputeInput): RecommendOutcome {
+export async function computeRecommendation(
+  input: RecommendComputeInput
+): Promise<RecommendOutcome> {
   const { ticker, referenceDate, prices, historicalMetrics, similarityConfig } = input;
 
   // 1. 기준일 인덱스
@@ -154,7 +157,7 @@ export function computeRecommendation(input: RecommendComputeInput): RecommendOu
     for (const strategy of strategies) {
       try {
         const engine = new BacktestEngine(strategy);
-        const result = engine.run(
+        const result = await engine.run(
           {
             ticker,
             strategy,

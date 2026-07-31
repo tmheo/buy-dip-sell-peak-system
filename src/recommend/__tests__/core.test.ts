@@ -12,12 +12,12 @@ import { computeRecommendation } from "../core";
 import { createPrices, buildHistoricalMetrics } from "./fixtures";
 
 describe("computeRecommendation - 추천 성공", () => {
-  it("충분한 가격·지표가 있으면 유사 구간 3개와 점수 기반 추천을 반환해야 한다", () => {
+  it("충분한 가격·지표가 있으면 유사 구간 3개와 점수 기반 추천을 반환해야 한다", async () => {
     const prices = createPrices(250);
     const referenceDate = prices[prices.length - 1].date;
     const historicalMetrics = buildHistoricalMetrics(prices, prices.length - 1 - MIN_PAST_GAP_DAYS);
 
-    const outcome = computeRecommendation({
+    const outcome = await computeRecommendation({
       ticker: "SOXL",
       referenceDate,
       prices,
@@ -45,10 +45,10 @@ describe("computeRecommendation - 추천 성공", () => {
 });
 
 describe("computeRecommendation - 실패 정책 (InsufficientData)", () => {
-  it("기준일이 가격 데이터에 없으면 PRICE_DATA_NOT_FOUND를 반환해야 한다", () => {
+  it("기준일이 가격 데이터에 없으면 PRICE_DATA_NOT_FOUND를 반환해야 한다", async () => {
     const prices = createPrices(250);
 
-    const outcome = computeRecommendation({
+    const outcome = await computeRecommendation({
       ticker: "SOXL",
       referenceDate: "2031-01-01",
       prices,
@@ -61,11 +61,11 @@ describe("computeRecommendation - 실패 정책 (InsufficientData)", () => {
     });
   });
 
-  it("기준일 이전 데이터가 60일 미만이면 INSUFFICIENT_PRICE_HISTORY를 반환해야 한다", () => {
+  it("기준일 이전 데이터가 60일 미만이면 INSUFFICIENT_PRICE_HISTORY를 반환해야 한다", async () => {
     const prices = createPrices(250);
     const referenceDate = prices[30].date;
 
-    const outcome = computeRecommendation({
+    const outcome = await computeRecommendation({
       ticker: "SOXL",
       referenceDate,
       prices,
@@ -78,12 +78,12 @@ describe("computeRecommendation - 실패 정책 (InsufficientData)", () => {
     });
   });
 
-  it("유사 구간 검색 범위가 60일 미만이면 INSUFFICIENT_PRICE_HISTORY를 반환해야 한다", () => {
+  it("유사 구간 검색 범위가 60일 미만이면 INSUFFICIENT_PRICE_HISTORY를 반환해야 한다", async () => {
     // 지표는 계산되지만 기준일 - MIN_PAST_GAP_DAYS < 59라 검색 범위가 부족하다
     const prices = createPrices(250);
     const referenceDate = prices[59 + MIN_PAST_GAP_DAYS - 1].date;
 
-    const outcome = computeRecommendation({
+    const outcome = await computeRecommendation({
       ticker: "SOXL",
       referenceDate,
       prices,
@@ -99,7 +99,7 @@ describe("computeRecommendation - 실패 정책 (InsufficientData)", () => {
     });
   });
 
-  it("DB 지표가 3개 미만이면 재계산 폴백 없이 INSUFFICIENT_HISTORICAL_METRICS를 반환해야 한다", () => {
+  it("DB 지표가 3개 미만이면 재계산 폴백 없이 INSUFFICIENT_HISTORICAL_METRICS를 반환해야 한다", async () => {
     const prices = createPrices(250);
     const referenceDate = prices[prices.length - 1].date;
     const historicalMetrics = buildHistoricalMetrics(
@@ -107,7 +107,7 @@ describe("computeRecommendation - 실패 정책 (InsufficientData)", () => {
       prices.length - 1 - MIN_PAST_GAP_DAYS
     ).slice(0, 2);
 
-    const outcome = computeRecommendation({
+    const outcome = await computeRecommendation({
       ticker: "SOXL",
       referenceDate,
       prices,
@@ -126,7 +126,7 @@ describe("computeRecommendation - 전략 백테스트 실패 시 구간 폐기",
     vi.restoreAllMocks();
   });
 
-  it("구간 안에서 전략 하나라도 실패하면 구간 전체를 폐기하고, 3개 미만이면 InsufficientData여야 한다", () => {
+  it("구간 안에서 전략 하나라도 실패하면 구간 전체를 폐기하고, 3개 미만이면 InsufficientData여야 한다", async () => {
     const prices = createPrices(250);
     const referenceDate = prices[prices.length - 1].date;
     const historicalMetrics = buildHistoricalMetrics(prices, prices.length - 1 - MIN_PAST_GAP_DAYS);
@@ -146,7 +146,7 @@ describe("computeRecommendation - 전략 백테스트 실패 시 구간 폐기",
       return originalRun.call(this, request, allPrices, startIndex);
     });
 
-    const outcome = computeRecommendation({
+    const outcome = await computeRecommendation({
       ticker: "SOXL",
       referenceDate,
       prices,

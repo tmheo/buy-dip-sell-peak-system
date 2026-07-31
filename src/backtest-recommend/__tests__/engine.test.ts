@@ -73,7 +73,7 @@ describe("RecommendBacktestEngine", () => {
     mockedRecommend.mockResolvedValue(recommendation("Pro2"));
 
     const initialCapital = 10000;
-    const expected = new BacktestEngine("Pro2").run(
+    const expected = await new BacktestEngine("Pro2").run(
       {
         ticker: "SOXL",
         strategy: "Pro2",

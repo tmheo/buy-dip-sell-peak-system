@@ -221,7 +221,7 @@ describe.skipIf(!hasDb)("실계좌 주문 파이프라인 동등성 (#47)", () =
 
   it("BacktestEngine의 일별 주문·손절 거래와도 일치해야 한다 (첫 사이클 구간)", async () => {
     const prices: DailyPrice[] = SERIES.map(toPriceRow);
-    const result = new BacktestEngine(STRATEGY).run(
+    const result = await new BacktestEngine(STRATEGY).run(
       {
         ticker: TICKER,
         strategy: STRATEGY,

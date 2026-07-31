@@ -240,7 +240,7 @@ export async function recommend(
     ? await loadHistoricalMetrics(ticker, referenceDate, dateToIndexMap)
     : [];
 
-  const outcome = computeRecommendation({
+  const outcome = await computeRecommendation({
     ticker,
     referenceDate,
     prices: allPrices,

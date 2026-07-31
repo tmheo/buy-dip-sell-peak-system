@@ -18,11 +18,11 @@ import { createPrices, buildHistoricalMetrics } from "@/recommend/__tests__/fixt
 import { generateFutureTradingDates, generateChartData, buildRecommendResult } from "../chart";
 
 /** 추천 상세가 채워진 Recommendation 픽스처 (실제 코어로 계산) */
-function detailedRecommendationFixture() {
+async function detailedRecommendationFixture() {
   const prices = createPrices(250);
   const referenceDate = prices[prices.length - 1].date;
   const historicalMetrics = buildHistoricalMetrics(prices, prices.length - 1 - MIN_PAST_GAP_DAYS);
-  const outcome = computeRecommendation({
+  const outcome = await computeRecommendation({
     ticker: "SOXL",
     referenceDate,
     prices,
@@ -33,7 +33,7 @@ function detailedRecommendationFixture() {
 }
 
 describe("generateFutureTradingDates", () => {
-  it("주말을 건너뛰고 다음 거래일부터 생성해야 한다", () => {
+  it("주말을 건너뛰고 다음 거래일부터 생성해야 한다", async () => {
     // 2026-07-30은 목요일: 금(31) → 토·일 건너뜀 → 월(8/3), 화(8/4)
     expect(generateFutureTradingDates("2026-07-30", 3)).toEqual([
       "2026-07-31",
@@ -42,13 +42,13 @@ describe("generateFutureTradingDates", () => {
     ]);
   });
 
-  it("요청한 개수만큼 생성해야 한다", () => {
+  it("요청한 개수만큼 생성해야 한다", async () => {
     expect(generateFutureTradingDates("2026-07-30", 20)).toHaveLength(20);
   });
 });
 
 describe("generateChartData", () => {
-  it("종가와 MA20·MA60을 기존 지표 모듈(calculateSMA)로 계산해야 한다", () => {
+  it("종가와 MA20·MA60을 기존 지표 모듈(calculateSMA)로 계산해야 한다", async () => {
     const prices = createPrices(100);
     const adjClosePrices = prices.map((p) => p.adjClose);
 
@@ -65,7 +65,7 @@ describe("generateChartData", () => {
     expect(chartData[0].ma60).not.toBeNull();
   });
 
-  it("데이터가 부족한 초기 구간의 MA는 null이어야 한다", () => {
+  it("데이터가 부족한 초기 구간의 MA는 null이어야 한다", async () => {
     const prices = createPrices(30);
 
     const chartData = generateChartData(prices, 0, 29);
@@ -78,8 +78,8 @@ describe("generateChartData", () => {
 });
 
 describe("buildRecommendResult", () => {
-  it("기준일 차트는 분석 구간 뒤에 값을 비워 둔 미래 거래일을 붙여야 한다", () => {
-    const { prices, referenceDate, recommendation } = detailedRecommendationFixture();
+  it("기준일 차트는 분석 구간 뒤에 값을 비워 둔 미래 거래일을 붙여야 한다", async () => {
+    const { prices, referenceDate, recommendation } = await detailedRecommendationFixture();
 
     const result = buildRecommendResult(recommendation, prices);
 
@@ -95,8 +95,8 @@ describe("buildRecommendResult", () => {
     );
   });
 
-  it("유사 구간마다 분석+성과 구간 차트를 붙여야 한다", () => {
-    const { prices, recommendation } = detailedRecommendationFixture();
+  it("유사 구간마다 분석+성과 구간 차트를 붙여야 한다", async () => {
+    const { prices, recommendation } = await detailedRecommendationFixture();
 
     const result = buildRecommendResult(recommendation, prices);
 
@@ -108,8 +108,8 @@ describe("buildRecommendResult", () => {
     }
   });
 
-  it("추천 전략·점수·지표를 화면 응답 형태로 매핑해야 한다", () => {
-    const { prices, referenceDate, recommendation } = detailedRecommendationFixture();
+  it("추천 전략·점수·지표를 화면 응답 형태로 매핑해야 한다", async () => {
+    const { prices, referenceDate, recommendation } = await detailedRecommendationFixture();
 
     const result = buildRecommendResult(recommendation, prices);
 
@@ -123,8 +123,8 @@ describe("buildRecommendResult", () => {
     });
   });
 
-  it("하향이 적용되지 않은 downgradeInfo는 응답에서 생략해야 한다", () => {
-    const { prices, recommendation } = detailedRecommendationFixture();
+  it("하향이 적용되지 않은 downgradeInfo는 응답에서 생략해야 한다", async () => {
+    const { prices, recommendation } = await detailedRecommendationFixture();
 
     const notApplied = buildRecommendResult(
       { ...recommendation, downgradeInfo: { applied: false, reasons: [] } },
@@ -147,8 +147,8 @@ describe("buildRecommendResult", () => {
     expect(applied.downgradeInfo?.applied).toBe(true);
   });
 
-  it("상세 필드가 없는 요약 추천은 변환할 수 없어야 한다", () => {
-    const { prices, recommendation } = detailedRecommendationFixture();
+  it("상세 필드가 없는 요약 추천은 변환할 수 없어야 한다", async () => {
+    const { prices, recommendation } = await detailedRecommendationFixture();
     const summary: Recommendation = {
       referenceDate: recommendation.referenceDate,
       strategy: recommendation.strategy,

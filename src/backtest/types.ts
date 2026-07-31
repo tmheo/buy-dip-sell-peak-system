@@ -42,6 +42,79 @@ export interface TechnicalMetrics {
 }
 
 /**
+ * 전략 결정에 담기는 기준일 지표 (TechnicalMetrics의 좁은 투영)
+ */
+export interface StrategyDecisionMetrics {
+  // RSI 14일 (Wilder's EMA 방식)
+  rsi14: number;
+  // 정배열 여부: MA20 > MA60
+  isGoldenCross: boolean;
+}
+
+/**
+ * 전략 결정
+ * 전략 결정 공급자(StrategyProvider)가 기준일에 대해 반환하는 전략·사유·지표
+ */
+export interface StrategyDecision {
+  // 결정된 전략
+  strategy: Strategy;
+  // 결정 사유
+  reason: string;
+  // 기준일 지표
+  metrics: StrategyDecisionMetrics;
+}
+
+/**
+ * 전략 결정 공급자 (이슈 #61에서 확정한 분리 경계 계약)
+ * (기준일, 사이클 번호) → 전략 결정. 기준일은 항상 전일 종가 기준일이다.
+ * 엔진이 호출하는 시점 세 가지: 백테스트 시작 전날, 사이클 완료 익일,
+ * 사이클 내 첫 매수 전 매일(재평가).
+ */
+export type StrategyProvider = (
+  referenceDate: string,
+  cycleNumber: number
+) => Promise<StrategyDecision>;
+
+/**
+ * 사이클별 전략 정보
+ * 각 사이클에서 어떤 전략이 사용되었는지 추적
+ */
+export interface CycleStrategyInfo {
+  // 사이클 번호
+  cycleNumber: number;
+  // 해당 사이클에서 사용한 전략
+  strategy: Strategy;
+  // 사이클 시작일 (첫 매수 전까지는 재평가일로 갱신된다)
+  startDate: string;
+  // 사이클 종료일 (진행 중이면 null)
+  endDate: string | null;
+  // 사이클 자본 (사이클 시작 시점에 정해져 사이클 동안 고정)
+  initialCapital: number;
+  // 사이클 종료 시 자산 (진행 중이면 null)
+  finalAsset: number | null;
+  // 사이클 수익률 (진행 중이면 null)
+  returnRate: number | null;
+  // 사이클 MDD (진행 중이면 현재까지 MDD)
+  mdd: number;
+  // 시작일 RSI 14
+  startRsi: number;
+  // 시작일 정배열 여부 (MA20 > MA60)
+  isGoldenCross: boolean;
+  // 전략 결정 사유 (고정 전략 실행이면 "고정 전략")
+  recommendReason: string;
+}
+
+/**
+ * 전략별 사용 통계
+ */
+export interface StrategyUsageStats {
+  // 사용된 사이클 수
+  cycles: number;
+  // 총 사용 일수
+  totalDays: number;
+}
+
+/**
  * 백테스트 요청 인터페이스
  */
 export interface BacktestRequest {
@@ -129,12 +202,16 @@ export interface BacktestResult {
   dailyHistory: DailySnapshot[];
   // 잔여 티어 (백테스트 종료 시 미매도 보유 주식)
   remainingTiers: RemainingTier[];
-  // 완료된 사이클별 수익
-  completedCycles: { profit: number }[];
+  // 완료된 사이클별 수익 (완료 시점 전략 포함)
+  completedCycles: { profit: number; strategy: Strategy }[];
   // 종료 시점 기술적 지표 (데이터 부족 시 null) - SPEC-METRICS-001
   technicalMetrics: TechnicalMetrics | null;
   // 일별 기술적 지표 배열 (차트용)
   dailyTechnicalMetrics: DailyTechnicalMetrics[];
+  // 사이클별 전략 정보 (고정 전략 실행은 사유 "고정 전략")
+  cycleStrategies: CycleStrategyInfo[];
+  // 전략별 사용 통계
+  strategyStats: Record<Strategy, StrategyUsageStats>;
 }
 
 /**
@@ -169,6 +246,8 @@ export interface DailySnapshot {
   totalShares: number;
   // 현재 사이클 번호
   cycleNumber: number;
+  // 해당 일자에 사용 중인 전략
+  strategy: Strategy;
   // 20일 단순이동평균 (데이터 부족 시 null) - SPEC-METRICS-001
   ma20: number | null;
   // 60일 단순이동평균 (데이터 부족 시 null) - SPEC-METRICS-001
