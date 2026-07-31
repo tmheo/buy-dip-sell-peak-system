@@ -114,7 +114,7 @@ describe("기준값 검증 테스트", () => {
     }
   });
 
-  const runBacktest = (strategyName: Strategy): BacktestResult | null => {
+  const runBacktest = async (strategyName: Strategy): Promise<BacktestResult | null> => {
     if (!hasData) return null;
 
     const engine = new BacktestEngine(strategyName);
@@ -130,8 +130,8 @@ describe("기준값 검증 테스트", () => {
   };
 
   describe("Pro1 전략 검증", () => {
-    it("최종 자산이 기준값 ±1% 이내", () => {
-      const result = runBacktest("Pro1");
+    it("최종 자산이 기준값 ±1% 이내", async () => {
+      const result = await runBacktest("Pro1");
       if (!result) {
         console.log("[SKIP] Pro1 최종 자산 검증: 데이터 없음");
         return;
@@ -150,8 +150,8 @@ describe("기준값 검증 테스트", () => {
       expect(result.finalAsset).toBeLessThanOrEqual(upperBound);
     });
 
-    it("수익률이 기준값 ±1%p 이내", () => {
-      const result = runBacktest("Pro1");
+    it("수익률이 기준값 ±1%p 이내", async () => {
+      const result = await runBacktest("Pro1");
       if (!result) {
         console.log("[SKIP] Pro1 수익률 검증: 데이터 없음");
         return;
@@ -170,8 +170,8 @@ describe("기준값 검증 테스트", () => {
       expect(result.returnRate).toBeLessThanOrEqual(upperBound);
     });
 
-    it("MDD가 기준값 ±1%p 이내", () => {
-      const result = runBacktest("Pro1");
+    it("MDD가 기준값 ±1%p 이내", async () => {
+      const result = await runBacktest("Pro1");
       if (!result) {
         console.log("[SKIP] Pro1 MDD 검증: 데이터 없음");
         return;
@@ -192,8 +192,8 @@ describe("기준값 검증 테스트", () => {
   });
 
   describe("Pro2 전략 검증", () => {
-    it("최종 자산이 기준값 ±1% 이내", () => {
-      const result = runBacktest("Pro2");
+    it("최종 자산이 기준값 ±1% 이내", async () => {
+      const result = await runBacktest("Pro2");
       if (!result) {
         console.log("[SKIP] Pro2 최종 자산 검증: 데이터 없음");
         return;
@@ -212,8 +212,8 @@ describe("기준값 검증 테스트", () => {
       expect(result.finalAsset).toBeLessThanOrEqual(upperBound);
     });
 
-    it("수익률이 기준값 ±1%p 이내", () => {
-      const result = runBacktest("Pro2");
+    it("수익률이 기준값 ±1%p 이내", async () => {
+      const result = await runBacktest("Pro2");
       if (!result) {
         console.log("[SKIP] Pro2 수익률 검증: 데이터 없음");
         return;
@@ -232,8 +232,8 @@ describe("기준값 검증 테스트", () => {
       expect(result.returnRate).toBeLessThanOrEqual(upperBound);
     });
 
-    it("MDD가 기준값 ±1%p 이내", () => {
-      const result = runBacktest("Pro2");
+    it("MDD가 기준값 ±1%p 이내", async () => {
+      const result = await runBacktest("Pro2");
       if (!result) {
         console.log("[SKIP] Pro2 MDD 검증: 데이터 없음");
         return;
@@ -254,8 +254,8 @@ describe("기준값 검증 테스트", () => {
   });
 
   describe("Pro3 전략 검증", () => {
-    it("최종 자산이 기준값 ±1% 이내", () => {
-      const result = runBacktest("Pro3");
+    it("최종 자산이 기준값 ±1% 이내", async () => {
+      const result = await runBacktest("Pro3");
       if (!result) {
         console.log("[SKIP] Pro3 최종 자산 검증: 데이터 없음");
         return;
@@ -274,8 +274,8 @@ describe("기준값 검증 테스트", () => {
       expect(result.finalAsset).toBeLessThanOrEqual(upperBound);
     });
 
-    it("수익률이 기준값 ±1%p 이내", () => {
-      const result = runBacktest("Pro3");
+    it("수익률이 기준값 ±1%p 이내", async () => {
+      const result = await runBacktest("Pro3");
       if (!result) {
         console.log("[SKIP] Pro3 수익률 검증: 데이터 없음");
         return;
@@ -294,8 +294,8 @@ describe("기준값 검증 테스트", () => {
       expect(result.returnRate).toBeLessThanOrEqual(upperBound);
     });
 
-    it("MDD가 기준값 ±1%p 이내", () => {
-      const result = runBacktest("Pro3");
+    it("MDD가 기준값 ±1%p 이내", async () => {
+      const result = await runBacktest("Pro3");
       if (!result) {
         console.log("[SKIP] Pro3 MDD 검증: 데이터 없음");
         return;

@@ -33,6 +33,7 @@ function createSnapshot(date: string, totalAsset: number): DailySnapshot {
     activeTiers: 0,
     totalShares: 0,
     cycleNumber: 1,
+    strategy: "Pro2",
     ma20: null,
     ma60: null,
   };

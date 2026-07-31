@@ -35,7 +35,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("run", () => {
-    it("최소 2일 이상의 데이터가 필요하다 (첫날은 매수 불가)", () => {
+    it("최소 2일 이상의 데이터가 필요하다 (첫날은 매수 불가)", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -46,10 +46,10 @@ describe("BacktestEngine", () => {
       };
       const prices: DailyPrice[] = [createMockPrice("2025-01-02", 100)];
 
-      expect(() => engine.run(request, prices)).toThrow();
+      await expect(engine.run(request, prices)).rejects.toThrow();
     });
 
-    it("기본 백테스트 결과 구조를 반환해야 한다", () => {
+    it("기본 백테스트 결과 구조를 반환해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -63,7 +63,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-03", 100),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       expect(result.strategy).toBe("Pro2");
       expect(result.startDate).toBe("2025-01-02");
@@ -74,7 +74,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("매수 로직", () => {
-    it("둘째 날부터 매수 주문이 발생해야 한다", () => {
+    it("둘째 날부터 매수 주문이 발생해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -89,14 +89,14 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-03", 99),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
       const day2 = result.dailyHistory[1];
 
       // 둘째 날에 매수 체결이 있어야 함
       expect(day2.trades.some((t) => t.type === "BUY")).toBe(true);
     });
 
-    it("종가가 매수 지정가보다 높으면 매수 미체결", () => {
+    it("종가가 매수 지정가보다 높으면 매수 미체결", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -111,7 +111,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-03", 101),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
       const day2 = result.dailyHistory[1];
 
       expect(day2.trades.some((t) => t.type === "BUY")).toBe(false);
@@ -119,7 +119,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("매도 로직", () => {
-    it("종가가 매도 지정가 이상이면 매도 체결", () => {
+    it("종가가 매도 지정가 이상이면 매도 체결", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -138,7 +138,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-06", 101),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 매도 체결 확인
       const sellTrade = result.dailyHistory.flatMap((d) => d.trades).find((t) => t.type === "SELL");
@@ -147,7 +147,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("손절 로직", () => {
-    it("REQ-006: stopLossDay 도달 시 MOC 매도", () => {
+    it("REQ-006: stopLossDay 도달 시 MOC 매도", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -163,7 +163,7 @@ describe("BacktestEngine", () => {
         prices.push(createMockPrice(`2025-01-${i.toString().padStart(2, "0")}`, 99));
       }
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 손절 거래 확인
       const stopLossTrade = result.dailyHistory
@@ -175,7 +175,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("사이클 관리", () => {
-    it("모든 티어 매도 후 새 사이클 시작", () => {
+    it("모든 티어 매도 후 새 사이클 시작", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -195,7 +195,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-10", 102),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 최소 1개 이상의 사이클이 완료되어야 함
       expect(result.totalCycles).toBeGreaterThanOrEqual(1);
@@ -203,7 +203,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("일별 스냅샷", () => {
-    it("매일 스냅샷이 기록되어야 한다", () => {
+    it("매일 스냅샷이 기록되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -220,7 +220,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-06", 100),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       expect(result.dailyHistory.length).toBe(5);
       result.dailyHistory.forEach((snapshot, i) => {
@@ -230,7 +230,7 @@ describe("BacktestEngine", () => {
       });
     });
 
-    it("스냅샷에 총자산이 올바르게 계산되어야 한다", () => {
+    it("스냅샷에 총자산이 올바르게 계산되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -244,7 +244,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-03", 100),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 첫날은 매수 없이 예수금만
       expect(result.dailyHistory[0].totalAsset).toBe(10000);
@@ -252,7 +252,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("src/strategy 이행 (#46)", () => {
-    it("체결 판정과 체결가는 close가 아닌 adjClose를 사용해야 한다", () => {
+    it("체결 판정과 체결가는 close가 아닌 adjClose를 사용해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -283,7 +283,7 @@ describe("BacktestEngine", () => {
         },
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
       const day2 = result.dailyHistory[1];
 
       // 매수 지정가 = floor(90 × 0.9999) = 89.99, 당일 adjClose 89 ≤ 89.99 → 체결
@@ -296,7 +296,7 @@ describe("BacktestEngine", () => {
       expect(day2.holdingsValue).toBe(11 * 89);
     });
 
-    it("ADR-0001: 손절 매도 시 원금이 즉시 회복되어 다음 매수 여력이 생겨야 한다", () => {
+    it("ADR-0001: 손절 매도 시 원금이 즉시 회복되어 다음 매수 여력이 생겨야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -314,7 +314,7 @@ describe("BacktestEngine", () => {
         createMockPrice(`2025-01-${(2 + i).toString().padStart(2, "0")}`, close)
       );
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 11일째(45): 티어 1 손절 MOC 매도
       const day11 = result.dailyHistory[11];
@@ -332,7 +332,7 @@ describe("BacktestEngine", () => {
       expect(rebuy!.price).toBe(44);
     });
 
-    it("ADR-0001: 사이클 중 실현 수익은 현금에 쌓이되 매수 여력에 포함되지 않아야 한다", () => {
+    it("ADR-0001: 사이클 중 실현 수익은 현금에 쌓이되 매수 여력에 포함되지 않아야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -349,7 +349,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-06", 98.5), // 티어 2 재매수
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 매도일: 현금 = 사이클 자본 - 활성 원금(990) + 실현 수익(22.5)
       const sellDay = result.dailyHistory[3];
@@ -367,7 +367,7 @@ describe("BacktestEngine", () => {
       expect(result.totalCycles).toBe(1);
     });
 
-    it("사이클 경계에서 실현 손익이 다음 사이클 자본으로 복리 이월되어야 한다", () => {
+    it("사이클 경계에서 실현 손익이 다음 사이클 자본으로 복리 이월되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -384,10 +384,10 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-07", 111), // 티어 1 매수: floor(1002 / 111.13) = 9주
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       expect(result.totalCycles).toBe(2);
-      expect(result.completedCycles).toEqual([{ profit: 20 }]);
+      expect(result.completedCycles).toEqual([{ profit: 20, strategy: "Pro2" }]);
 
       // 새 사이클 첫날: 현금 = 새 사이클 자본 10020
       const newCycleDay = result.dailyHistory[3];
@@ -403,7 +403,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("backtestStartIndex", () => {
-    it("backtestStartIndex가 0일 때 전체 데이터로 백테스트해야 한다", () => {
+    it("backtestStartIndex가 0일 때 전체 데이터로 백테스트해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -420,13 +420,13 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-06", 100),
       ];
 
-      const result = engine.run(request, prices, 0);
+      const result = await engine.run(request, prices, 0);
 
       // 전체 5일 데이터가 dailyHistory에 포함
       expect(result.dailyHistory.length).toBe(5);
     });
 
-    it("backtestStartIndex가 설정되면 해당 인덱스부터 거래를 시작해야 한다", () => {
+    it("backtestStartIndex가 설정되면 해당 인덱스부터 거래를 시작해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -446,14 +446,14 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-08", 100),
       ];
 
-      const result = engine.run(request, prices, 3);
+      const result = await engine.run(request, prices, 3);
 
       // 백테스트 기간 4일만 dailyHistory에 포함
       expect(result.dailyHistory.length).toBe(4);
       expect(result.dailyHistory[0].date).toBe("2025-01-05");
     });
 
-    it("backtestStartIndex 이전 데이터도 지표 계산에 사용해야 한다", () => {
+    it("backtestStartIndex 이전 데이터도 지표 계산에 사용해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -472,7 +472,7 @@ describe("BacktestEngine", () => {
       }
 
       // backtestStartIndex = 60 (61번째 날부터 백테스트)
-      const result = engine.run(request, prices, 60);
+      const result = await engine.run(request, prices, 60);
 
       // 백테스트 기간 5일만 dailyHistory에 포함
       expect(result.dailyHistory.length).toBe(5);
@@ -481,7 +481,7 @@ describe("BacktestEngine", () => {
       expect(result.dailyHistory[0].ma60).not.toBeNull();
     });
 
-    it("backtestStartIndex 미지정 시 기본값 0으로 동작해야 한다", () => {
+    it("backtestStartIndex 미지정 시 기본값 0으로 동작해야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -497,14 +497,14 @@ describe("BacktestEngine", () => {
       ];
 
       // backtestStartIndex 미지정
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       expect(result.dailyHistory.length).toBe(3);
     });
   });
 
   describe("결과 계산", () => {
-    it("최종 자산이 올바르게 계산되어야 한다", () => {
+    it("최종 자산이 올바르게 계산되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -518,13 +518,13 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-03", 100),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
       const lastSnapshot = result.dailyHistory[result.dailyHistory.length - 1];
 
       expect(result.finalAsset).toBe(lastSnapshot.totalAsset);
     });
 
-    it("수익률이 올바르게 계산되어야 한다", () => {
+    it("수익률이 올바르게 계산되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -538,7 +538,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-03", 100),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 수익률 = (최종자산 - 초기자본) / 초기자본
       const expectedReturn = (result.finalAsset - result.initialCapital) / result.initialCapital;
@@ -547,7 +547,7 @@ describe("BacktestEngine", () => {
   });
 
   describe("잔여 티어", () => {
-    it("매수 후 매도되지 않은 티어가 잔여 티어로 반환되어야 한다", () => {
+    it("매수 후 매도되지 않은 티어가 잔여 티어로 반환되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -564,7 +564,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-05", 99), // 매도 미체결
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 잔여 티어가 존재해야 함
       expect(result.remainingTiers.length).toBeGreaterThan(0);
@@ -572,7 +572,7 @@ describe("BacktestEngine", () => {
       expect(result.remainingTiers[0].currentPrice).toBe(99);
     });
 
-    it("모든 티어가 매도되면 잔여 티어가 없어야 한다", () => {
+    it("모든 티어가 매도되면 잔여 티어가 없어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -590,13 +590,13 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-05", 101),
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 매도 후 새 매수가 없으므로 잔여 티어 없음
       expect(result.remainingTiers.length).toBe(0);
     });
 
-    it("잔여 티어의 수익률이 올바르게 계산되어야 한다", () => {
+    it("잔여 티어의 수익률이 올바르게 계산되어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -612,7 +612,7 @@ describe("BacktestEngine", () => {
         createMockPrice("2025-01-04", 90), // 횡보 - 매수 지정가(99*0.9999=98.99) 이상이면 추가 매수 없음
       ];
 
-      const result = engine.run(request, prices);
+      const result = await engine.run(request, prices);
 
       // 잔여 티어가 있어야 함
       expect(result.remainingTiers.length).toBeGreaterThanOrEqual(1);

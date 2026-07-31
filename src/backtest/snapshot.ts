@@ -97,7 +97,7 @@ export function toOrderActions(
 }
 
 /**
- * 일별 스냅샷 생성
+ * 일별 스냅샷 생성 (전략 필드는 각 엔진이 채운다)
  * 보유 자산 평가는 adjClose(수정종가)를 사용하여 배당/분할이 반영된 실제 수익률을 계산
  * SPEC-METRICS-001: MA20, MA60 계산
  */
@@ -109,7 +109,7 @@ export function createSnapshot(
   orders: OrderAction[],
   adjClosePrices: number[],
   priceIndex: number
-): DailySnapshot {
+): Omit<DailySnapshot, "strategy"> {
   let holdingsValue = new Decimal(0);
   let totalShares = 0;
   const closePrice = new Decimal(price.adjClose);

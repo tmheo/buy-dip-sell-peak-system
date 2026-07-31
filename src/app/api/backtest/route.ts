@@ -105,7 +105,7 @@ export async function POST(request: Request) {
       initialCapital: validatedRequest.initialCapital,
     };
 
-    const result = engine.run(backtestRequest, allPrices, backtestStartIndex);
+    const result = await engine.run(backtestRequest, allPrices, backtestStartIndex);
 
     return NextResponse.json(
       {
