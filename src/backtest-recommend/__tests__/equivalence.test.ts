@@ -4,10 +4,11 @@
  * 순수 구조 리팩토링의 증명 장치: 같은 입력(가격·추천 순서)에서 두 구현의
  * 결과 전체가 완전히 일치해야 한다. 골든 값 이동이 없음을 보인다.
  *
- * 이 커밋에서는 구 엔진이 아직 살아 있어 두 구현을 나란히 돌려 비교하고,
- * 구 엔진의 결과가 커밋된 픽스처(__fixtures__/old-engine-result.ts)와도
- * 일치함을 확인한다. 다음 커밋에서 구 엔진을 삭제하면 이 테스트는
- * 픽스처와의 비교로 전환되어 동등성 증명이 저장소에 남는다.
+ * 픽스처(__fixtures__/old-engine-result.ts)는 구 엔진이 삭제되기 직전 커밋에서
+ * 삭제된 RecommendBacktestEngine을 같은 입력으로 돌려 기록한 결과다.
+ * 그 커밋의 이 테스트가 구 엔진·신 facade·픽스처의 3자 완전 일치를 검증했다.
+ * 이 테스트가 깨지면 facade 경로의 재현 의미가 구 엔진에서 이탈한 것이다.
+ * 픽스처를 신 구현의 출력으로 다시 만들면 증명이 순환이 되므로 재생성하지 않는다.
  *
  * 시나리오는 공급자 계약(#61)의 세 호출 시점을 모두 지난다:
  * 초기 추천, 첫 매수 전 재평가(전략 교체 포함), 사이클 완료 익일 재추천.
@@ -18,7 +19,6 @@ import type { Strategy } from "@/types/trading";
 import type { Recommendation } from "@/recommend/types";
 import { getStrategyParams } from "@/strategy";
 import { recommendOrDefault } from "@/recommend/service";
-import { RecommendBacktestEngine } from "../engine";
 import { runRecommendBacktest } from "../run";
 import { OLD_ENGINE_RESULT } from "./__fixtures__/old-engine-result";
 
@@ -102,23 +102,15 @@ describe("구 엔진 ↔ 신 facade 동등성", () => {
     );
   });
 
-  it("같은 입력에서 구 엔진과 결과 전체가 완전히 일치해야 한다", async () => {
-    const oldResult = await new RecommendBacktestEngine("SOXL", PRICES).run(REQUEST, 1);
-
-    mockedRecommend.mockClear();
-    const newResult = await runRecommendBacktest(REQUEST, PRICES, 1);
+  it("같은 입력에서 구 엔진이 기록한 결과 전체와 완전히 일치해야 한다", async () => {
+    const result = await runRecommendBacktest(REQUEST, PRICES, 1);
 
     // 시나리오가 의미 있게 깊은지 확인 (여러 사이클 + 전략 다양성)
-    expect(oldResult.totalCycles).toBeGreaterThanOrEqual(2);
-    expect(new Set(oldResult.cycleStrategies.map((c) => c.strategy)).size).toBeGreaterThanOrEqual(
-      2
-    );
+    expect(result.totalCycles).toBeGreaterThanOrEqual(2);
+    expect(new Set(result.cycleStrategies.map((c) => c.strategy)).size).toBeGreaterThanOrEqual(2);
 
     // 신 결과는 구 결과의 상위집합(strategy 필드 추가)이다
-    const { strategy: _added, ...comparable } = newResult;
-    expect(comparable).toEqual(oldResult);
-
-    // 커밋된 픽스처는 구 엔진의 결과 그대로다 (구 엔진 삭제 후 증명의 앵커)
-    expect(oldResult).toEqual(OLD_ENGINE_RESULT);
+    const { strategy: _added, ...comparable } = result;
+    expect(comparable).toEqual(OLD_ENGINE_RESULT);
   });
 });

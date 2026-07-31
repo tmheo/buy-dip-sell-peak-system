@@ -9,7 +9,7 @@ import { getAllPricesByTicker } from "@/database/prices";
 import { buildDateToIndexMap } from "@/utils/date-index";
 import type { SimilarityConfig } from "@/recommend/types";
 import { clearRecommendationCache } from "@/recommend/service";
-import { RecommendBacktestEngine } from "@/backtest-recommend";
+import { runRecommendBacktest } from "@/backtest-recommend";
 
 import type { OptimizationConfig, BacktestMetrics } from "./types";
 
@@ -65,11 +65,12 @@ export async function runBacktestWithParams(
 
   clearRecommendationCache();
 
-  const engine = new RecommendBacktestEngine(ticker, backtestPrices, {
-    similarityConfig: similarityConfig ?? undefined,
-  });
-
-  const result = await engine.run({ ticker, startDate, endDate, initialCapital }, startIndex);
+  const result = await runRecommendBacktest(
+    { ticker, startDate, endDate, initialCapital },
+    backtestPrices,
+    startIndex,
+    { similarityConfig: similarityConfig ?? undefined }
+  );
   const strategyScore = calculateStrategyScore(result.returnRate, result.mdd);
 
   return {

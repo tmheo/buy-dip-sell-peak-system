@@ -1,6 +1,6 @@
 /**
  * CycleState 기반 일별 스냅샷·주문 내역 변환 헬퍼
- * BacktestEngine과 RecommendBacktestEngine이 공유한다.
+ * BacktestEngine이 소비한다 (#64: 추천 백테스트도 같은 엔진을 쓴다).
  *
  * 보유 자산 평가와 체결 내역 변환은 모두 adjClose(수정종가) 기준이다 (#43).
  */
