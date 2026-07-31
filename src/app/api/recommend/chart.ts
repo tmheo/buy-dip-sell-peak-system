@@ -5,6 +5,7 @@
  */
 import type { DailyPrice } from "@/types";
 import { calculateSMA } from "@/backtest/metrics";
+import { buildDateToIndexMap } from "@/utils/date-index";
 import { PERFORMANCE_PERIOD_DAYS } from "@/recommend/similarity";
 import type { ChartDataPoint, Recommendation, RecommendResult } from "@/recommend/types";
 
@@ -63,10 +64,7 @@ export function buildRecommendResult(
     );
   }
 
-  const dateToIndexMap = new Map<string, number>();
-  for (let i = 0; i < allPrices.length; i++) {
-    dateToIndexMap.set(allPrices[i].date, i);
-  }
+  const dateToIndexMap = buildDateToIndexMap(allPrices);
   const indexOf = (date: string): number => {
     const index = dateToIndexMap.get(date);
     if (index === undefined) {

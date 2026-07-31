@@ -16,6 +16,7 @@
 import type { DailyPrice } from "@/types";
 import type { Strategy } from "@/types/trading";
 import type { TechnicalMetrics } from "@/backtest/types";
+import { buildDateToIndexMap } from "@/utils/date-index";
 import { getPriceRange, getLatestDate } from "@/database/prices";
 import { getMetricsRange } from "@/database/metrics";
 import {
@@ -209,11 +210,7 @@ export async function recommend(
   }
 
   const allPrices = prices ?? (await loadAllPrices(ticker));
-
-  const dateToIndexMap = new Map<string, number>();
-  for (let i = 0; i < allPrices.length; i++) {
-    dateToIndexMap.set(allPrices[i].date, i);
-  }
+  const dateToIndexMap = buildDateToIndexMap(allPrices);
 
   // 기준일이 가격 데이터에 없으면 지표 로드가 무의미하다 (코어가 사유를 판정한다)
   const historicalMetrics = dateToIndexMap.has(referenceDate)
