@@ -249,6 +249,31 @@ describe("syncTickerPrices", () => {
     expect(vi.mocked(upsertDailyPrices).mock.calls[0][0]).toHaveLength(70);
   });
 
+  it("재수집본에 없는 DB 날짜가 유지되면 upsert 후 DB 시계열을 다시 읽어 지표를 계산한다", async () => {
+    const fetched = makeSeries(70);
+    // DB에는 재수집본에 없는 날짜가 하나 더 있다 (원천의 일시적 결손)
+    const dbExtra = makePrice("2020-03-15", 60);
+    const db = [...fetched, dbExtra];
+    vi.mocked(getAllPricesByTicker)
+      .mockResolvedValueOnce(db as never) // diff 계산용 1차 조회
+      .mockResolvedValueOnce(db as never); // 지표 계산용 재조회 (upsert 후 DB 시계열)
+
+    vi.mocked(fetchAllHistory).mockResolvedValue(fetched);
+
+    const summary = await syncTickerPrices("SOXL");
+
+    expect(summary.dbOnlyDates).toEqual([dbExtra.date]);
+    // 지표는 재수집본이 아니라 유지된 날짜를 포함한 DB 시계열로 계산된다
+    expect(getAllPricesByTicker).toHaveBeenCalledTimes(2);
+    expect(calculateMetricsBatch).toHaveBeenCalledWith(
+      db.map((p) => p.adjClose),
+      db.map((p) => p.date),
+      "SOXL",
+      59,
+      db.length - 1
+    );
+  });
+
   it("변경도 신규도 없으면 가격 upsert를 건너뛰지만 지표는 재계산한다", async () => {
     const fetched = makeSeries(70);
     vi.mocked(fetchAllHistory).mockResolvedValue(fetched);

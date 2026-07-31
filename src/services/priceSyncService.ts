@@ -240,13 +240,17 @@ export async function syncTickerPrices(
       `컬럼별 변경 ${JSON.stringify(diff.changedColumnCounts)}`
   );
 
-  // 지표는 원천 스냅샷 전체 구간을 매일 재계산해 소급 가격 변경과 같은 실행에서 수렴시킨다
+  // 지표는 전체 구간을 매일 재계산해 소급 가격 변경과 같은 실행에서 수렴시킨다.
+  // 재수집본에 없는 DB 날짜가 유지된 경우에는 upsert 후의 DB 시계열을 다시 읽어,
+  // 지표가 가격 테이블과 같은 시계열 위에서 계산되게 한다.
+  const seriesForMetrics =
+    diff.dbOnlyDates.length > 0 ? await getAllPricesByTicker(ticker) : fetched;
   const metrics = calculateMetricsBatch(
-    fetched.map((p) => p.adjClose),
-    fetched.map((p) => p.date),
+    seriesForMetrics.map((p) => p.adjClose),
+    seriesForMetrics.map((p) => p.date),
     ticker,
     MA60_MIN_INDEX,
-    fetched.length - 1
+    seriesForMetrics.length - 1
   );
   if (metrics.length > 0) {
     await upsertMetrics(convertMetricsToRows(metrics, ticker));

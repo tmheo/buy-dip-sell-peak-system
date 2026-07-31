@@ -38,7 +38,9 @@ function showHelp(): void {
   --start YYYY-MM-DD      조회 시작일
   --end YYYY-MM-DD        조회 종료일
   --force                 분할 가드(close 5% 초과 변경 시 쓰기 중단) 우회
-                          SPEC-SPLIT-001 런북 전용. init/update에서만 유효
+                          SPEC-SPLIT-001 런북 전용
+                          init/update/init-all/update-all에 적용되며,
+                          -all 명령에 쓰면 모든 티커의 가드를 우회한다
 
 예시:
   npx tsx src/index.ts init --ticker SOXL
