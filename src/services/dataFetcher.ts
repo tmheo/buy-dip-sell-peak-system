@@ -7,7 +7,7 @@ import type { DailyPrice } from "../types/index.js";
  * 가격을 소수점 2자리로 정규화 (금융 데이터 정밀도 보장)
  * decimal.js를 사용하여 부동소수점 오차 제거
  */
-function normalizePrice(value: number): number {
+export function normalizePrice(value: number): number {
   return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
 }
 
