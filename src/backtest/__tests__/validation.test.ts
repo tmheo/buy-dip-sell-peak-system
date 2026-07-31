@@ -21,12 +21,23 @@
  * - 모든 주문(매수/매도/손절)은 장 마감 전 동시에 제출됨
  * - 매수 티어는 손절/매도 전 상태 기준으로 결정
  *
+ * src/strategy 이행 재기준선 (2026-07-31, #46):
+ * - 체결 판정·체결가·평가를 close에서 adjClose로 전환 (#43 가격 불변식)
+ * - 예수금 = 사이클 자본 - Σ(활성 티어 투자원금), 실현 수익 사이클 중 미재투자 (ADR-0001)
+ * - 예수금 의미 변경의 영향은 미미했고(Pro1/Pro2 동일, Pro3 -$8) 차이의 대부분은
+ *   adjClose 전환에서 온다. 전략이 정수 수량 floor, 2자리 지정가, ±0.01% 임계값이라는
+ *   경계 위에서 돌기 때문에 시계열의 미세한 변화(가격 수준, 배당락일 등락률)가
+ *   판정 하나를 뒤집으면 그 경로 차이가 사이클 복리로 ±20%p까지 증폭된다.
+ *   실제로 close 시계열을 0.1%만 균일 스케일링해도(등락률 동일) Pro3는 49%→32%로
+ *   이동해 새 기준값과 일치하는 안정 경로에 수렴한다. 즉 골든 값은 특정 데이터에
+ *   대한 결정론적 회귀 앵커이지, 전략 우열의 근거가 아니다.
+ *
  * 현재 구현 기준값:
  * | Strategy | Final Asset | Return | MDD |
  * |----------|-------------|--------|-----|
- * | Pro1 | $13,376 | 33.75% | -18.90% |
- * | Pro2 | $12,929 | 29.29% | -38.61% |
- * | Pro3 | $14,920 | 49.19% | -39.29% |
+ * | Pro1 | $13,429 | 34.29% | -18.87% |
+ * | Pro2 | $15,292 | 52.92% | -27.74% |
+ * | Pro3 | $13,304 | 33.04% | -47.64% |
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { BacktestEngine } from "../engine";
@@ -54,31 +65,31 @@ interface ValidationCriteria {
 
 const VALIDATION_CRITERIA: Record<Strategy, ValidationCriteria> = {
   Pro1: {
-    finalAsset: 13376,
-    returnRate: 0.3375,
-    mdd: -0.189,
+    finalAsset: 13429,
+    returnRate: 0.3429,
+    mdd: -0.1887,
     tolerance: {
-      finalAsset: 13376 * 0.01, // ±1%
+      finalAsset: 13429 * 0.01, // ±1%
       returnRate: 0.01, // ±1%p
       mdd: 0.01, // ±1%p
     },
   },
   Pro2: {
-    finalAsset: 12929,
-    returnRate: 0.2929,
-    mdd: -0.3861,
+    finalAsset: 15292,
+    returnRate: 0.5292,
+    mdd: -0.2774,
     tolerance: {
-      finalAsset: 12929 * 0.01,
+      finalAsset: 15292 * 0.01,
       returnRate: 0.01,
       mdd: 0.01,
     },
   },
   Pro3: {
-    finalAsset: 14920,
-    returnRate: 0.4919,
-    mdd: -0.3929,
+    finalAsset: 13304,
+    returnRate: 0.3304,
+    mdd: -0.4764,
     tolerance: {
-      finalAsset: 14920 * 0.01,
+      finalAsset: 13304 * 0.01,
       returnRate: 0.01,
       mdd: 0.01,
     },
