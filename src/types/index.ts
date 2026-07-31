@@ -50,8 +50,7 @@ export type Command =
   | "update-all"
   | "query"
   | "help"
-  | "init-metrics"
-  | "verify-metrics";
+  | "init-metrics";
 
 /**
  * 일별 기술적 지표 데이터 인터페이스 (SPEC-PERFORMANCE-001)

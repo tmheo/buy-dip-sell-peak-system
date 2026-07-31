@@ -23,14 +23,14 @@ vi.mock("@/database/metrics", () => ({
   upsertMetrics: vi.fn(),
 }));
 
-vi.mock("@/services/metricsCalculator", () => ({
-  calculateMetricsBatch: vi.fn(),
+vi.mock("@/services/metricsRows", () => ({
+  buildDailyMetricRows: vi.fn(),
 }));
 
 import { fetchAllHistory } from "@/services/dataFetcher";
 import { getAllPricesByTicker, upsertDailyPrices } from "@/database/prices";
 import { upsertMetrics } from "@/database/metrics";
-import { calculateMetricsBatch } from "@/services/metricsCalculator";
+import { buildDailyMetricRows } from "@/services/metricsRows";
 import { diffPriceSnapshots, syncTickerPrices } from "@/services/priceSyncService";
 
 /** 거래일 흉내: 2020-01-01부터 count개 날짜 생성 */
@@ -143,7 +143,7 @@ describe("syncTickerPrices", () => {
     vi.clearAllMocks();
     vi.mocked(upsertDailyPrices).mockResolvedValue(undefined);
     vi.mocked(upsertMetrics).mockResolvedValue(undefined);
-    vi.mocked(calculateMetricsBatch).mockReturnValue([]);
+    vi.mocked(buildDailyMetricRows).mockReturnValue([]);
   });
 
   it("배당식 소급 조정을 흡수한다: 신규+변경 행만 ticker를 붙여 upsert한다", async () => {
@@ -191,11 +191,11 @@ describe("syncTickerPrices", () => {
         isGoldenCross: true,
       },
     ];
-    vi.mocked(calculateMetricsBatch).mockReturnValue(metricRows);
+    vi.mocked(buildDailyMetricRows).mockReturnValue(metricRows);
 
     const summary = await syncTickerPrices("SOXL");
 
-    expect(calculateMetricsBatch).toHaveBeenCalledWith(
+    expect(buildDailyMetricRows).toHaveBeenCalledWith(
       fetched.map((p) => p.adjClose),
       fetched.map((p) => p.date),
       "SOXL",
@@ -221,7 +221,7 @@ describe("syncTickerPrices", () => {
     expect(summary.guardViolations.length).toBe(30);
     expect(upsertDailyPrices).not.toHaveBeenCalled();
     expect(upsertMetrics).not.toHaveBeenCalled();
-    expect(calculateMetricsBatch).not.toHaveBeenCalled();
+    expect(buildDailyMetricRows).not.toHaveBeenCalled();
   });
 
   it("bypassCloseGuard 옵션이 있으면 가드 위반을 보고만 하고 쓰기를 진행한다 (분할 런북용)", async () => {
@@ -265,7 +265,7 @@ describe("syncTickerPrices", () => {
     expect(summary.dbOnlyDates).toEqual([dbExtra.date]);
     // 지표는 재수집본이 아니라 유지된 날짜를 포함한 DB 시계열로 계산된다
     expect(getAllPricesByTicker).toHaveBeenCalledTimes(2);
-    expect(calculateMetricsBatch).toHaveBeenCalledWith(
+    expect(buildDailyMetricRows).toHaveBeenCalledWith(
       db.map((p) => p.adjClose),
       db.map((p) => p.date),
       "SOXL",
@@ -282,7 +282,7 @@ describe("syncTickerPrices", () => {
     await syncTickerPrices("SOXL");
 
     expect(upsertDailyPrices).not.toHaveBeenCalled();
-    expect(calculateMetricsBatch).toHaveBeenCalledTimes(1);
+    expect(buildDailyMetricRows).toHaveBeenCalledTimes(1);
   });
 
   it("재수집본이 비어 있으면 에러를 던진다 (원천 이상 시 잘못된 미러링 방지)", async () => {

@@ -12,7 +12,7 @@
 import { fetchAllHistory, normalizePrice } from "@/services/dataFetcher";
 import { getAllPricesByTicker, upsertDailyPrices } from "@/database/prices";
 import { upsertMetrics } from "@/database/metrics";
-import { calculateMetricsBatch } from "@/services/metricsCalculator";
+import { buildDailyMetricRows } from "@/services/metricsRows";
 
 import type { SupportedTicker } from "@/services/dataFetcher";
 import type { NewDailyMetric } from "@/database/schema/index";
@@ -245,7 +245,7 @@ export async function syncTickerPrices(
   // 지표가 가격 테이블과 같은 시계열 위에서 계산되게 한다.
   const seriesForMetrics =
     diff.dbOnlyDates.length > 0 ? await getAllPricesByTicker(ticker) : fetched;
-  const metrics = calculateMetricsBatch(
+  const metrics = buildDailyMetricRows(
     seriesForMetrics.map((p) => p.adjClose),
     seriesForMetrics.map((p) => p.date),
     ticker,

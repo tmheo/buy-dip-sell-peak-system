@@ -43,10 +43,8 @@ import {
   calculateWinRate,
   calculateTechnicalMetrics,
   calculateCAGR,
-  calculateDailyMetrics,
-  calculateRSI,
-  calculateSMA,
 } from "./metrics";
+import { computeIndicatorSeries, computeIndicatorsAt } from "@/metrics";
 
 /** 고정 전략 실행(공급자 없음)의 사이클 전략 결정 사유 */
 const FIXED_STRATEGY_REASON = "고정 전략";
@@ -59,11 +57,8 @@ function cycleStartMetrics(adjClosePrices: number[], refIndex: number): Strategy
   if (refIndex < 0) {
     return NEUTRAL_START_METRICS;
   }
-  const rsi14 = calculateRSI(adjClosePrices, refIndex) ?? 0;
-  const ma20 = calculateSMA(adjClosePrices, 20, refIndex);
-  const ma60 = calculateSMA(adjClosePrices, 60, refIndex);
-  const isGoldenCross = ma20 !== null && ma60 !== null && ma20 > ma60;
-  return { rsi14, isGoldenCross };
+  const row = computeIndicatorsAt(adjClosePrices, refIndex);
+  return { rsi14: row.rsi14 ?? 0, isGoldenCross: row.isGoldenCross ?? false };
 }
 
 /**
@@ -400,11 +395,20 @@ export class BacktestEngine {
       backtestDays
     );
 
-    // 일별 기술적 지표 배열 생성 (차트용 - 백테스트 기간만)
-    const dailyTechnicalMetrics: DailyTechnicalMetrics[] = [];
-    for (let i = effectiveStartIndex; i < prices.length; i++) {
-      dailyTechnicalMetrics.push(calculateDailyMetrics(adjClosePrices, i, prices[i].date));
-    }
+    // 일별 기술적 지표 배열 생성 (차트용 - 백테스트 기간만, 배치 한 번 호출)
+    const dailyTechnicalMetrics: DailyTechnicalMetrics[] = computeIndicatorSeries(
+      adjClosePrices,
+      effectiveStartIndex,
+      prices.length - 1
+    ).map((row, offset) => ({
+      date: prices[effectiveStartIndex + offset].date,
+      goldenCross: row.goldenCross,
+      maSlope: row.maSlope,
+      disparity: row.disparity,
+      rsi14: row.rsi14,
+      roc12: row.roc12,
+      volatility20: row.volatility20,
+    }));
 
     return {
       strategy: request.strategy,

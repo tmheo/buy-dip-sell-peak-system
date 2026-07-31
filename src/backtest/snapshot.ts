@@ -8,7 +8,7 @@ import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { availableCash } from "@/strategy";
-import { calculateSMA } from "./metrics";
+import { calculateSMA } from "@/metrics";
 import type { DailySnapshot, OrderAction, RemainingTier, TradeAction } from "./types";
 
 /**
