@@ -13,14 +13,16 @@
  * - getDailyOrders(): 당일 주문표 조회
  * - createDailyOrder(): 주문 생성
  * - updateOrderExecuted(): 주문 실행 상태 업데이트
+ * - generateDailyOrders(): 당일 주문표 자동 생성 (예비 티어 포함)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { CreateTradingAccountRequest } from "@/types/trading";
 import { db } from "../db-drizzle";
 import { users } from "../schema/auth";
+import { dailyPrices } from "../schema/index";
 
 // 테스트 유저 ID
 const TEST_USER_ID = randomUUID();
@@ -955,13 +957,15 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
         ticker: "SOXL",
         seedCapital: 10000,
         strategy: "Pro1",
-        cycleStartDate: "2025-01-06",
+        cycleStartDate: "2009-01-05",
       };
       const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
       createdAccountIds.push(account.id);
 
       // 이전 거래일(금요일) 주문 생성
-      const prevDate = "2025-01-10"; // 금요일
+      // SOXL 상장(2010-03-11) 이전 날짜를 사용해 종가 데이터가 존재할 수 없게 함
+      // (개발 DB에 실제 시세가 적재돼 있어도 테스트 전제가 유지됨)
+      const prevDate = "2009-01-09"; // 금요일
       await tradingModule.createDailyOrder(account.id, {
         date: prevDate,
         tier: 1,
@@ -977,8 +981,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
 
       // 현재일(월요일)에서 이전 거래일 체결 처리
       // Note: 실제로는 종가 데이터가 DB에 있어야 체결됨
-      // 테스트 DB에 종가 데이터가 없으므로 빈 배열 반환 예상
-      const currentDate = "2025-01-13"; // 월요일
+      const currentDate = "2009-01-12"; // 월요일
       const results = await tradingModule.processPreviousDayExecution(
         account.id,
         currentDate,
@@ -992,17 +995,18 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
     it("TC-002: 종가 데이터 없으면 체결하지 않아야 한다 (CON-001)", async () => {
       const request: CreateTradingAccountRequest = {
         name: "종가 없음 테스트",
-        ticker: "TQQQ", // 종가 데이터가 없는 티커
+        // TQQQ 상장(2010-02-11) 이전 날짜를 사용해 종가 데이터가 존재할 수 없게 함
+        ticker: "TQQQ",
         seedCapital: 10000,
         strategy: "Pro2",
-        cycleStartDate: "2025-01-06",
+        cycleStartDate: "2009-01-05",
       };
       const account = await tradingModule.createTradingAccount(TEST_USER_ID, request);
       createdAccountIds.push(account.id);
 
       // 주문 생성
       await tradingModule.createDailyOrder(account.id, {
-        date: "2025-01-10",
+        date: "2009-01-09",
         tier: 1,
         type: "BUY",
         orderMethod: "LOC",
@@ -1013,7 +1017,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       // 체결 시도 - 종가 데이터 없음
       const results = await tradingModule.processPreviousDayExecution(
         account.id,
-        "2025-01-13",
+        "2009-01-12",
         "TQQQ"
       );
 
@@ -1021,7 +1025,7 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       expect(results).toHaveLength(0);
 
       // 주문은 여전히 미체결 상태
-      const orders = await tradingModule.getDailyOrders(account.id, "2025-01-10");
+      const orders = await tradingModule.getDailyOrders(account.id, "2009-01-09");
       expect(orders[0].executed).toBe(false);
     });
 
@@ -1111,6 +1115,83 @@ describe("트레이딩 계좌 CRUD 테스트", () => {
       );
 
       expect(results).toHaveLength(0);
+    });
+  });
+
+  describe("generateDailyOrders()", () => {
+    // TQQQ 상장(2010-02-11) 이전 날짜를 사용해 실제 시세 데이터와 충돌하지 않게 함
+    const PREV_DATE = "2009-06-01"; // 월요일 (전일 종가 기준일)
+    const ORDER_DATE = "2009-06-02"; // 화요일 (주문 생성일)
+
+    beforeAll(async () => {
+      // 전일 종가로 사용할 합성 시세 삽입
+      await db
+        .insert(dailyPrices)
+        .values({
+          ticker: "TQQQ",
+          date: PREV_DATE,
+          open: 100,
+          high: 100,
+          low: 100,
+          close: 100,
+          adjClose: 100,
+          volume: 1000,
+        })
+        .onConflictDoNothing();
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(dailyPrices)
+        .where(and(eq(dailyPrices.ticker, "TQQQ"), eq(dailyPrices.date, PREV_DATE)));
+    });
+
+    it("티어 1-6이 모두 보유 중이면 예비 티어(7) 매수 주문을 잔여 예수금으로 생성해야 한다", async () => {
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, {
+        name: "예비 티어 매수 테스트",
+        ticker: "TQQQ",
+        seedCapital: 65303.83,
+        strategy: "Pro3",
+        cycleStartDate: "2009-05-25",
+      });
+      createdAccountIds.push(account.id);
+
+      // 티어 1-6 매수 완료 상태 구성 (투자 금액 합계 $58,632.70 → 잔여 예수금 $6,671.13)
+      const filledTiers = [
+        { tier: 1, buyPrice: 157.5, shares: 67, buyDate: "2009-05-26" },
+        { tier: 2, buyPrice: 165.55, shares: 61, buyDate: "2009-05-27" },
+        { tier: 3, buyPrice: 136.81, shares: 69, buyDate: "2009-05-28" },
+        { tier: 4, buyPrice: 128.15, shares: 79, buyDate: "2009-05-29" },
+        { tier: 5, buyPrice: 109.54, shares: 85, buyDate: "2009-06-01" },
+        { tier: 6, buyPrice: 91.99, shares: 99, buyDate: "2009-06-01" },
+      ];
+      for (const holding of filledTiers) {
+        await tradingModule.updateTierHolding(account.id, holding.tier, holding);
+      }
+      const holdings = await tradingModule.getTierHoldings(account.id);
+
+      const orders = await tradingModule.generateDailyOrders(
+        account.id,
+        ORDER_DATE,
+        "TQQQ",
+        "Pro3",
+        65303.83,
+        holdings
+      );
+
+      // 보유 중인 티어 1-6은 매도 주문
+      const sellOrders = orders.filter((order) => order.type === "SELL");
+      expect(sellOrders).toHaveLength(6);
+
+      // 예비 티어(7) 매수 주문이 잔여 예수금 기준으로 생성되어야 함
+      const buyOrders = orders.filter((order) => order.type === "BUY");
+      expect(buyOrders).toHaveLength(1);
+      expect(buyOrders[0].tier).toBe(7);
+      expect(buyOrders[0].orderMethod).toBe("LOC");
+      // 매수 지정가 = floor(100 × (1 - 0.1%), 2자리) = 99.90
+      expect(buyOrders[0].limitPrice).toBe(99.9);
+      // 수량 = floor(6,671.13 ÷ 99.90) = 66
+      expect(buyOrders[0].shares).toBe(66);
     });
   });
 

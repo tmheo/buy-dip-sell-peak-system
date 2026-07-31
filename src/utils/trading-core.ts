@@ -80,6 +80,31 @@ export function calculateBuyQuantity(amount: number, limitPrice: number): number
   return floorToDecimal(amount / limitPrice, 0);
 }
 
+/**
+ * 예비 티어(7) 매수 시드 계산
+ * 예비 티어는 고정 비율이 없고 잔여 예수금 전액을 사용한다 (REQ-008).
+ * 잔여 예수금 = 시드 - Σ(보유 티어 수량 × 매수가), 소수점 2자리 내림
+ *
+ * @param seedCapital - 계좌 시드 금액
+ * @param holdings - 티어별 보유 현황 (수량과 매수가만 사용)
+ * @returns 예비 티어 매수 시드 (음수면 0)
+ */
+export function calculateReserveTierSeed(
+  seedCapital: number,
+  holdings: Array<{ shares: number; buyPrice: number | null }>
+): number {
+  const invested = holdings.reduce((sum, holding) => {
+    if (holding.shares > 0 && holding.buyPrice) {
+      return sum.add(new Decimal(holding.shares).mul(holding.buyPrice));
+    }
+    return sum;
+  }, new Decimal(0));
+
+  const remaining = new Decimal(seedCapital).sub(invested);
+  if (remaining.lte(0)) return 0;
+  return remaining.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+}
+
 // =====================================================
 // 체결 판정 함수
 // =====================================================
