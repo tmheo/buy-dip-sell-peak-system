@@ -93,6 +93,19 @@ function toPriceRow(bar: { date: string; adjClose: number }) {
   };
 }
 
+/** 합성 시계열 구간의 가격 행 삭제 (셋업 멱등성·정리 공용) */
+async function deleteSeriesPriceRows(): Promise<void> {
+  await db
+    .delete(dailyPrices)
+    .where(
+      and(
+        eq(dailyPrices.ticker, TICKER),
+        gte(dailyPrices.date, SERIES[0].date),
+        lte(dailyPrices.date, SERIES[SERIES.length - 1].date)
+      )
+    );
+}
+
 function toNormalizedDbOrder(order: DailyOrder): NormalizedOrder {
   return {
     type: order.type,
@@ -162,6 +175,8 @@ describe("실계좌 주문 파이프라인 동등성 (#47)", () => {
       .values({ id: TEST_USER_ID, email: `test-${TEST_USER_ID}@test.com` })
       .onConflictDoNothing();
 
+    // 이전 실행이 afterAll 전에 중단됐어도 유니크 위반 없이 다시 실행되게 한다
+    await deleteSeriesPriceRows();
     await db.insert(dailyPrices).values(SERIES.map(toPriceRow));
 
     tradingModule = await import("../trading");
@@ -189,15 +204,7 @@ describe("실계좌 주문 파이프라인 동등성 (#47)", () => {
 
   afterAll(async () => {
     await db.delete(users).where(eq(users.id, TEST_USER_ID)); // 계좌·주문·홀딩 CASCADE 삭제
-    await db
-      .delete(dailyPrices)
-      .where(
-        and(
-          eq(dailyPrices.ticker, TICKER),
-          gte(dailyPrices.date, SERIES[0].date),
-          lte(dailyPrices.date, SERIES[SERIES.length - 1].date)
-        )
-      );
+    await deleteSeriesPriceRows();
   });
 
   it("모든 거래일에서 실계좌 주문표가 순수 전략 루프(백테스트 하루 루프)와 일치해야 한다", async () => {

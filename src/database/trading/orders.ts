@@ -5,7 +5,7 @@
  * 이 모듈은 가격·보유 상태를 조회해 CycleState로 변환하고 결과를 저장만 한다.
  */
 
-import { eq, and, desc, asc, lt, gt, count } from "drizzle-orm";
+import { eq, and, desc, asc, lt, gt } from "drizzle-orm";
 
 import type { CycleState, TierHolding as StrategyTierHolding } from "@/strategy";
 import { getStrategyParams, planOrders } from "@/strategy";
@@ -68,7 +68,9 @@ export async function createDailyOrder(
 }
 
 /**
- * 주문 실행 상태 업데이트
+ * 주문 실행 상태 업데이트 (조건부 선점)
+ * 상태가 실제로 바뀌는 경우에만 갱신한다. 동시 체결 처리가 같은 주문을
+ * 중복 반영하지 못하도록, 이미 목표 상태인 주문에는 false를 반환한다.
  */
 export async function updateOrderExecuted(
   orderId: string,
@@ -78,7 +80,7 @@ export async function updateOrderExecuted(
   const result = await executor
     .update(dailyOrders)
     .set({ executed, updatedAt: new Date() })
-    .where(eq(dailyOrders.id, orderId))
+    .where(and(eq(dailyOrders.id, orderId), eq(dailyOrders.executed, !executed)))
     .returning();
 
   return result.length > 0;
@@ -119,16 +121,16 @@ export async function getPreviousTradingClose(
 }
 
 /**
- * 두 날짜 사이(양 끝 제외)의 실제 거래일 수 (가격 데이터 행 수 기준)
+ * 두 날짜 사이(양 끝 제외)의 실제 거래일 목록 (가격 데이터 행 기준)
  * #41: 평일 근사는 휴장일을 거래일로 세어 백테스트보다 하루 일찍 손절하게 만든다.
  */
-async function countTradingDaysBetween(
+async function listTradingDatesBetween(
   ticker: Ticker,
   afterDate: string,
   beforeDate: string
-): Promise<number> {
+): Promise<string[]> {
   const rows = await db
-    .select({ value: count() })
+    .select({ date: dailyPrices.date })
     .from(dailyPrices)
     .where(
       and(
@@ -138,13 +140,14 @@ async function countTradingDaysBetween(
       )
     );
 
-  return rows[0]?.value ?? 0;
+  return rows.map((row) => row.date);
 }
 
 /**
  * DB 티어 홀딩을 src/strategy의 보유 상태로 변환
  * holdingDays는 기준일 직전 거래일 마감 시점의 보유 거래일 수다
  * (매수 당일 = 0, settle마다 +1 - src/strategy의 손절 카운트 의미).
+ * 가장 이른 매수일 이후 거래일 목록을 한 번만 조회하고 티어별 수는 메모리에서 센다.
  *
  * @param ticker - 종목 (거래일 수 계산에 가격 데이터 사용)
  * @param holdings - DB 티어 홀딩 목록 (비활성 티어 포함 가능)
@@ -159,16 +162,23 @@ export async function toStrategyHoldings(
     (holding): holding is TierHolding & { buyPrice: number; buyDate: string } =>
       holding.shares > 0 && holding.buyPrice !== null && holding.buyDate !== null
   );
+  if (active.length === 0) {
+    return [];
+  }
 
-  return Promise.all(
-    active.map(async (holding) => ({
-      tier: holding.tier,
-      buyPrice: holding.buyPrice,
-      shares: holding.shares,
-      buyDate: holding.buyDate,
-      holdingDays: await countTradingDaysBetween(ticker, holding.buyDate, date),
-    }))
+  const earliestBuyDate = active.reduce(
+    (min, holding) => (holding.buyDate < min ? holding.buyDate : min),
+    active[0].buyDate
   );
+  const tradingDates = await listTradingDatesBetween(ticker, earliestBuyDate, date);
+
+  return active.map((holding) => ({
+    tier: holding.tier,
+    buyPrice: holding.buyPrice,
+    shares: holding.shares,
+    buyDate: holding.buyDate,
+    holdingDays: tradingDates.filter((tradingDate) => tradingDate > holding.buyDate).length,
+  }));
 }
 
 /**
@@ -240,6 +250,23 @@ export async function generateDailyOrders(
   const intents = planOrders(state, prevClose.adjClose);
 
   return db.transaction(async (tx) => {
+    // 체결된 주문이 있는 날짜는 재생성 불가 - 삭제 후 미체결로 되살리면
+    // 재체결 처리로 홀딩·수익 기록이 중복 반영된다
+    const executedRows = await tx
+      .select({ id: dailyOrders.id })
+      .from(dailyOrders)
+      .where(
+        and(
+          eq(dailyOrders.accountId, accountId),
+          eq(dailyOrders.date, date),
+          eq(dailyOrders.executed, true)
+        )
+      )
+      .limit(1);
+    if (executedRows.length > 0) {
+      throw new Error(`Cannot regenerate orders for ${date}: executed orders exist`);
+    }
+
     await tx
       .delete(dailyOrders)
       .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));

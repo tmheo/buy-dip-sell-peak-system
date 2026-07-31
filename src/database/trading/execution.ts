@@ -141,14 +141,23 @@ export async function processOrderExecution(
   };
 
   const intents = pendingOrders.map(toOrderIntent);
+  const orderByIntent = new Map(intents.map((intent, index) => [intent, pendingOrders[index]]));
   const { executions, events } = settle(state, intents, { date, close: closePrice });
   const executedIntents = new Set(executions.map((execution) => execution.order));
 
   await db.transaction(async (tx) => {
     for (const execution of executions) {
-      const order = pendingOrders[intents.indexOf(execution.order)];
+      const order = orderByIntent.get(execution.order);
+      if (!order) {
+        throw new Error("Execution does not match a submitted order intent");
+      }
+      // 미체결 조건부 갱신으로 주문을 선점한다. 다른 체결 처리(마감 스케줄러와
+      // 화면 진입)가 같은 주문을 동시에 읽었어도 한쪽만 반영되고 나머지는 롤백된다.
+      const claimed = await updateOrderExecuted(order.id, true, tx);
+      if (!claimed) {
+        throw new Error(`Order already executed concurrently: ${order.id}`);
+      }
       await applyExecution(tx, accountId, ticker, state, execution, date);
-      await updateOrderExecuted(order.id, true, tx);
     }
 
     if (events.some((event) => event.type === "CYCLE_COMPLETED")) {
