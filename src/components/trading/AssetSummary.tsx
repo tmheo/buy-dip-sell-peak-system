@@ -68,9 +68,7 @@ export default function AssetSummary({
               <div className="text-secondary small mb-1">{ticker} 평가금</div>
               <div className="h4 mb-0 text-light">
                 {formatCurrency(stockValue)}
-                <span className={`ms-2 small ${profitClass}`}>
-                  ({formatPercent(profitRate)})
-                </span>
+                <span className={`ms-2 small ${profitClass}`}>({formatPercent(profitRate)})</span>
               </div>
             </div>
           </div>

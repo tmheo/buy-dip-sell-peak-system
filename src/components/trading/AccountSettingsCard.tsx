@@ -49,9 +49,7 @@ export default function AccountSettingsCard({
 
   const canEdit = !account.isCycleInProgress;
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ): void {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -96,9 +94,7 @@ export default function AccountSettingsCard({
             설정 변경
           </button>
         )}
-        {!canEdit && (
-          <span className="badge bg-warning text-dark">사이클 진행 중</span>
-        )}
+        {!canEdit && <span className="badge bg-warning text-dark">사이클 진행 중</span>}
       </div>
       <div className="card-body">
         {isEditing ? (

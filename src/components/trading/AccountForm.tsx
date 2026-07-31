@@ -58,9 +58,7 @@ export default function AccountForm({
 
   const [errors, setErrors] = useState<Partial<Record<keyof AccountFormData, string>>>({});
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ): void {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -161,9 +159,7 @@ export default function AccountForm({
             step="1"
             disabled={isSubmitting}
           />
-          {errors.seedCapital && (
-            <div className="invalid-feedback">{errors.seedCapital}</div>
-          )}
+          {errors.seedCapital && <div className="invalid-feedback">{errors.seedCapital}</div>}
         </div>
       </div>
 
@@ -182,9 +178,7 @@ export default function AccountForm({
           onChange={handleChange}
           disabled={isSubmitting}
         />
-        {errors.cycleStartDate && (
-          <div className="invalid-feedback">{errors.cycleStartDate}</div>
-        )}
+        {errors.cycleStartDate && <div className="invalid-feedback">{errors.cycleStartDate}</div>}
       </div>
 
       <div className="mb-4">
@@ -212,18 +206,14 @@ export default function AccountForm({
       </div>
 
       <div className="d-grid gap-2">
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-        >
+        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
           {isSubmitting
             ? mode === "create"
               ? "생성 중..."
               : "저장 중..."
             : mode === "create"
-            ? "계좌 생성"
-            : "저장"}
+              ? "계좌 생성"
+              : "저장"}
         </button>
       </div>
     </form>

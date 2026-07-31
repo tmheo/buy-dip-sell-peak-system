@@ -16,10 +16,22 @@ import type { RecommendationCardProps } from "@/components/recommend/Recommendat
 import { getTodayDate } from "@/lib/date";
 
 // 동적 임포트 (SSR 비활성화 - Recharts는 클라이언트에서만 동작)
-const ReferenceChart = dynamic<ReferenceChartProps>(() => import("@/components/recommend/ReferenceChart"), { ssr: false });
-const SimilarPeriodCard = dynamic<SimilarPeriodCardProps>(() => import("@/components/recommend/SimilarPeriodCard"), { ssr: false });
-const StrategyScoreTable = dynamic<StrategyScoreTableProps>(() => import("@/components/recommend/StrategyScoreTable"), { ssr: false });
-const RecommendationCard = dynamic<RecommendationCardProps>(() => import("@/components/recommend/RecommendationCard"), { ssr: false });
+const ReferenceChart = dynamic<ReferenceChartProps>(
+  () => import("@/components/recommend/ReferenceChart"),
+  { ssr: false }
+);
+const SimilarPeriodCard = dynamic<SimilarPeriodCardProps>(
+  () => import("@/components/recommend/SimilarPeriodCard"),
+  { ssr: false }
+);
+const StrategyScoreTable = dynamic<StrategyScoreTableProps>(
+  () => import("@/components/recommend/StrategyScoreTable"),
+  { ssr: false }
+);
+const RecommendationCard = dynamic<RecommendationCardProps>(
+  () => import("@/components/recommend/RecommendationCard"),
+  { ssr: false }
+);
 
 interface RecommendForm {
   baseType: "today" | "specific";
@@ -97,7 +109,9 @@ export default function RecommendPageClient() {
               </span>{" "}
               전략 추천
             </h1>
-            <p className="lead mb-0">현재 시장 상황과 유사한 과거 구간을 분석하여 최적의 전략을 추천합니다.</p>
+            <p className="lead mb-0">
+              현재 시장 상황과 유사한 과거 구간을 분석하여 최적의 전략을 추천합니다.
+            </p>
           </div>
 
           {/* 인라인 폼 */}
@@ -211,8 +225,8 @@ export default function RecommendPageClient() {
         <>
           {/* 기준일 정보 */}
           <div className="alert alert-info mb-4">
-            <strong>분석 기준일:</strong> {result.referenceDate} |{" "}
-            <strong>분석 구간:</strong> {result.analysisPeriod.startDate} ~ {result.analysisPeriod.endDate} (20 거래일)
+            <strong>분석 기준일:</strong> {result.referenceDate} | <strong>분석 구간:</strong>{" "}
+            {result.analysisPeriod.startDate} ~ {result.analysisPeriod.endDate} (20 거래일)
           </div>
 
           {/* 기준일 차트 및 지표 */}
@@ -233,7 +247,10 @@ export default function RecommendPageClient() {
           </div>
 
           {/* 전략 점수 테이블 */}
-          <StrategyScoreTable strategyScores={result.strategyScores} downgradeInfo={result.downgradeInfo} />
+          <StrategyScoreTable
+            strategyScores={result.strategyScores}
+            downgradeInfo={result.downgradeInfo}
+          />
 
           {/* 추천 전략 카드 */}
           <RecommendationCard
@@ -257,14 +274,17 @@ export default function RecommendPageClient() {
             <div className="card-body">
               <h5 className="card-title">전략 추천 시스템이란?</h5>
               <p className="card-text">
-                현재 시장의 기술적 지표를 분석하여 과거 유사한 상황에서 가장 좋은 성과를 보인 전략을 추천합니다.
+                현재 시장의 기술적 지표를 분석하여 과거 유사한 상황에서 가장 좋은 성과를 보인 전략을
+                추천합니다.
               </p>
 
               <h5 className="card-title mt-4">분석 방법</h5>
               <ol className="mb-3">
                 <li>기준일 기준 20 거래일의 기술적 지표(6개)를 계산합니다.</li>
                 <li>과거 데이터에서 유사한 지표 패턴을 가진 구간 Top 3를 찾습니다.</li>
-                <li>각 유사 구간의 이후 20 거래일 성과를 Pro1/Pro2/Pro3 전략으로 백테스트합니다.</li>
+                <li>
+                  각 유사 구간의 이후 20 거래일 성과를 Pro1/Pro2/Pro3 전략으로 백테스트합니다.
+                </li>
                 <li>수익률과 MDD를 종합하여 점수를 계산하고 최적 전략을 추천합니다.</li>
               </ol>
 
@@ -273,7 +293,8 @@ export default function RecommendPageClient() {
                 <code>점수 = 수익률 x e^(MDD x 0.01)</code>
               </p>
               <p className="card-text small text-muted">
-                MDD가 클수록 (손실이 클수록) 점수가 낮아지는 방식으로, 안정성과 수익성을 균형있게 평가합니다.
+                MDD가 클수록 (손실이 클수록) 점수가 낮아지는 방식으로, 안정성과 수익성을 균형있게
+                평가합니다.
               </p>
 
               <h5 className="card-title mt-4">주의사항</h5>

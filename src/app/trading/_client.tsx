@@ -74,7 +74,11 @@ export default function TradingListClient(): React.ReactElement {
       const modalElement = document.getElementById("deleteAccountModal");
       if (modalElement) {
         // Bootstrap modal close
-        const bootstrap = (window as unknown as { bootstrap?: { Modal: { getInstance: (el: Element) => { hide: () => void } | null } } }).bootstrap;
+        const bootstrap = (
+          window as unknown as {
+            bootstrap?: { Modal: { getInstance: (el: Element) => { hide: () => void } | null } };
+          }
+        ).bootstrap;
         const modal = bootstrap?.Modal.getInstance(modalElement);
         modal?.hide();
       }

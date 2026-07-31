@@ -41,7 +41,11 @@ interface MetricDisplayProps {
 }
 
 /** 숫자 값을 포맷팅 (null/undefined/NaN/Infinity 처리) */
-function formatValue(value: number | null | undefined, decimalPlaces: number, unit: string): string {
+function formatValue(
+  value: number | null | undefined,
+  decimalPlaces: number,
+  unit: string
+): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return "N/A";
   }
@@ -49,7 +53,15 @@ function formatValue(value: number | null | undefined, decimalPlaces: number, un
 }
 
 /** 개별 지표 표시 컴포넌트 */
-function MetricDisplay({ title, value, unit = "", color, isBoolean = false, booleanValue, decimalPlaces = 2 }: MetricDisplayProps): React.ReactElement {
+function MetricDisplay({
+  title,
+  value,
+  unit = "",
+  color,
+  isBoolean = false,
+  booleanValue,
+  decimalPlaces = 2,
+}: MetricDisplayProps): React.ReactElement {
   let displayValue: string;
   if (isBoolean) {
     const prefix = booleanValue ? "✓ " : "✗ ";
@@ -64,7 +76,10 @@ function MetricDisplay({ title, value, unit = "", color, isBoolean = false, bool
         <div className="card-header bg-secondary text-white py-2" style={{ fontSize: "0.85rem" }}>
           {title}
         </div>
-        <div className="card-body d-flex align-items-center justify-content-center" style={{ minHeight: "60px" }}>
+        <div
+          className="card-body d-flex align-items-center justify-content-center"
+          style={{ minHeight: "60px" }}
+        >
           <span className="fw-bold" style={{ fontSize: "1.3rem", color }}>
             {displayValue}
           </span>
@@ -74,7 +89,13 @@ function MetricDisplay({ title, value, unit = "", color, isBoolean = false, bool
   );
 }
 
-export default function ReferenceChart({ metrics, ticker, analysisPeriod, chartData, referenceDate }: ReferenceChartProps): React.ReactElement {
+export default function ReferenceChart({
+  metrics,
+  ticker,
+  analysisPeriod,
+  chartData,
+  referenceDate,
+}: ReferenceChartProps): React.ReactElement {
   const formattedChartData = chartData?.map((d) => ({
     ...d,
     date: d.date.slice(5),
@@ -106,12 +127,7 @@ export default function ReferenceChart({ metrics, ticker, analysisPeriod, chartD
                 margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#073642" />
-                <XAxis
-                  dataKey="date"
-                  stroke="#839496"
-                  fontSize={11}
-                  tickLine={false}
-                />
+                <XAxis dataKey="date" stroke="#839496" fontSize={11} tickLine={false} />
                 <YAxis
                   stroke="#839496"
                   fontSize={11}
@@ -231,17 +247,8 @@ export default function ReferenceChart({ metrics, ticker, analysisPeriod, chartD
             unit="%"
             color="#cb4b16"
           />
-          <MetricDisplay
-            title="RSI(14)"
-            value={metrics.rsi14}
-            color="#6c71c4"
-          />
-          <MetricDisplay
-            title="ROC(12)"
-            value={metrics.roc12}
-            unit="%"
-            color="#d33682"
-          />
+          <MetricDisplay title="RSI(14)" value={metrics.rsi14} color="#6c71c4" />
+          <MetricDisplay title="ROC(12)" value={metrics.roc12} unit="%" color="#d33682" />
           <MetricDisplay
             title="변동성(20day)"
             value={metrics.volatility20}

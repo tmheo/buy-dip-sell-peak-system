@@ -46,9 +46,7 @@ export default function DailyOrdersTable({
       </div>
       <div className="card-body p-0">
         {orders.length === 0 ? (
-          <div className="p-4 text-center text-secondary">
-            오늘 예정된 주문이 없습니다.
-          </div>
+          <div className="p-4 text-center text-secondary">오늘 예정된 주문이 없습니다.</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-dark table-striped table-hover mb-0">
@@ -71,9 +69,7 @@ export default function DailyOrdersTable({
                     </td>
                     <td className="text-center">
                       <span
-                        className={`badge ${
-                          order.type === "BUY" ? "trading-buy" : "trading-sell"
-                        }`}
+                        className={`badge ${order.type === "BUY" ? "trading-buy" : "trading-sell"}`}
                       >
                         {order.type === "BUY" ? "매수" : "매도"}
                       </span>
@@ -93,9 +89,7 @@ export default function DailyOrdersTable({
         )}
       </div>
       <div className="card-footer border-secondary">
-        <small className="text-secondary">
-          * 주문표는 매일 AM 9시~10시에 갱신됩니다.
-        </small>
+        <small className="text-secondary">* 주문표는 매일 AM 9시~10시에 갱신됩니다.</small>
       </div>
     </div>
   );

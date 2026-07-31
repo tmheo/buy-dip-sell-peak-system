@@ -60,11 +60,7 @@ export default function TradingNewClient(): React.ReactElement {
 
           <div className="card bg-dark border-secondary">
             <div className="card-body">
-              <AccountForm
-                onSubmit={handleSubmit}
-                isSubmitting={isSubmitting}
-                mode="create"
-              />
+              <AccountForm onSubmit={handleSubmit} isSubmitting={isSubmitting} mode="create" />
             </div>
           </div>
         </div>

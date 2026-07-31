@@ -43,9 +43,7 @@ export default function DeleteAccountModal({
           </div>
           <div className="modal-body">
             <p className="mb-2">정말로 탈퇴하시겠습니까?</p>
-            <p className="text-warning mb-0">
-              탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.
-            </p>
+            <p className="text-warning mb-0">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
           </div>
           <div className="modal-footer border-secondary">
             <button
