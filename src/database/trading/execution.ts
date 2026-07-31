@@ -8,9 +8,9 @@
 import { eq } from "drizzle-orm";
 
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
-import { getStrategyParams, settle } from "@/strategy";
+import { calculateSellLimitPrice, getStrategyParams, settle } from "@/strategy";
 import type { DailyOrder, Ticker, Strategy } from "@/types/trading";
-import { calculateSellLimitPrice, getPreviousTradingDate } from "@/utils/trading-core";
+import { getPreviousTradingDate } from "@/lib/date";
 
 import { db, type DbExecutor } from "../db-drizzle";
 import { tradingAccounts } from "../schema/index";

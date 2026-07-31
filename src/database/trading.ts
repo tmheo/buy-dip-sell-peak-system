@@ -21,10 +21,6 @@ export {
   mapDrizzleDailyOrder,
   mapDrizzleProfitRecord,
 
-  // Constants
-  BASE_TIER_COUNT,
-  RESERVE_TIER_NUMBER,
-
   // TierHolding CRUD
   getTierHoldings,
   getTotalShares,

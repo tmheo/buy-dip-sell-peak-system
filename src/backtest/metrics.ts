@@ -5,7 +5,7 @@
  */
 import Decimal from "decimal.js";
 import type { DailySnapshot, TechnicalMetrics } from "./types";
-import { floorToDecimal, roundToDecimal } from "@/utils/trading-core";
+import { floorToDecimal, roundToDecimal } from "@/utils/decimal";
 
 /**
  * 수익률 계산

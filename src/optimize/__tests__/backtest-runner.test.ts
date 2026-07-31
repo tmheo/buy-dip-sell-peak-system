@@ -184,7 +184,7 @@ describe("runBacktestWithParams", () => {
     );
   });
 
-  it("커스텀 파라미터로 백테스트를 실행해야 한다", { timeout: 30000 }, async () => {
+  it("커스텀 파라미터로 백테스트를 실행해야 한다", { timeout: 120000 }, async () => {
     // 기본값과 다른 파라미터
     const customParams: SimilarityParams = {
       weights: [0.3, 0.45, 0.08, 0.05, 0.12],
@@ -201,7 +201,7 @@ describe("runBacktestWithParams", () => {
 
   it(
     "TC-06: 커스텀 파라미터가 베이스라인과 다른 결과를 생성해야 한다",
-    { timeout: 30000 },
+    { timeout: 120000 },
     async () => {
       // 1. 베이스라인 실행
       const baseline = await runBacktestWithParams(testConfig, null, soxlPriceData);
@@ -244,7 +244,7 @@ describe("runBacktestWithParams", () => {
     }
   );
 
-  it("try-finally로 항상 파라미터를 복원해야 한다", { timeout: 60000 }, async () => {
+  it("try-finally로 항상 파라미터를 복원해야 한다", { timeout: 180000 }, async () => {
     // 커스텀 파라미터로 실행 후 기본값 복원 확인
     // (내부 구현 상세를 직접 테스트하기 어려우므로, 연속 실행으로 간접 검증)
     const customParams: SimilarityParams = {

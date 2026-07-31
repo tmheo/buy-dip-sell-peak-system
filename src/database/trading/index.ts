@@ -12,13 +12,7 @@ export {
 } from "./mappers";
 
 // TierHolding CRUD
-export {
-  BASE_TIER_COUNT,
-  RESERVE_TIER_NUMBER,
-  getTierHoldings,
-  getTotalShares,
-  updateTierHolding,
-} from "./tier-holdings";
+export { getTierHoldings, getTotalShares, updateTierHolding } from "./tier-holdings";
 
 // TradingAccount CRUD
 export {

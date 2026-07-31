@@ -7,22 +7,6 @@
 import type { Strategy } from "@/types/trading";
 
 // ============================================================
-// 상수 정의
-// ============================================================
-
-/** 기본 티어 개수 (티어 1-6) */
-export const BASE_TIER_COUNT = 6;
-
-/** 예비 티어 번호 */
-export const RESERVE_TIER_NUMBER = 7;
-
-/** 최소 티어 번호 */
-export const MIN_TIER_NUMBER = 1;
-
-/** 최대 티어 번호 (예비 티어 포함) */
-export const MAX_TIER_NUMBER = RESERVE_TIER_NUMBER;
-
-// ============================================================
 // 타입 정의
 // ============================================================
 
@@ -55,64 +39,6 @@ export interface TechnicalMetrics {
   roc12: number;
   // 20일 일별 표준편차
   volatility20: number;
-}
-
-/**
- * 전략 설정 인터페이스
- */
-export interface StrategyConfig {
-  // 전략 이름
-  name: Strategy;
-  // 티어별 투자 비율 (6개 티어)
-  tierRatios: [number, number, number, number, number, number];
-  // 매수 임계값 (전일 대비 하락률)
-  buyThreshold: number;
-  // 매도 임계값 (매수가 대비 상승률)
-  sellThreshold: number;
-  // 손절일 (보유일 수 초과 시 MOC 매도)
-  stopLossDay: number;
-}
-
-/**
- * 티어 상태 인터페이스
- */
-export interface TierState {
-  // 티어 번호 (1-7, 7은 예비 티어)
-  tier: number;
-  // 활성화 여부
-  isActive: boolean;
-  // 매수 체결가
-  buyPrice: number;
-  // 보유 수량
-  shares: number;
-  // 매수 체결일
-  buyDate: string;
-  // 매수 체결 시점의 거래일 인덱스 (손절일 계산용)
-  buyDayIndex: number;
-  // 매도 지정가
-  sellLimitPrice: number;
-}
-
-/**
- * 사이클 상태 인터페이스
- */
-export interface CycleState {
-  // 사이클 번호
-  cycleNumber: number;
-  // 사이클 시작일
-  startDate: string;
-  // 사이클 종료일 (진행 중이면 null)
-  endDate: string | null;
-  // 사이클 시작 시 투자금
-  initialCapital: number;
-  // 사이클 종료 시 총 자산 (진행 중이면 null)
-  finalAsset: number | null;
-  // 티어 상태 배열
-  tiers: TierState[];
-  // 현재 예수금
-  cash: number;
-  // 사이클 시작 후 경과 일수
-  dayCount: number;
 }
 
 /**
@@ -265,18 +191,6 @@ export interface TradeAction {
   amount: number;
   // 거래 시간 (LOC/MOC)
   orderType: "LOC" | "MOC";
-}
-
-/**
- * 주문 계산 결과 인터페이스
- */
-export interface OrderCalculation {
-  // 지정가
-  limitPrice: number;
-  // 주문 수량
-  shares: number;
-  // 총 금액
-  amount: number;
 }
 
 /**

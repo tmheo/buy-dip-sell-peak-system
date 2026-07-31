@@ -6,35 +6,9 @@
  * 입력 가격은 분할·배당 조정된 연속 시계열(adjClose)이어야 한다.
  */
 import Decimal from "decimal.js";
+import { floorToDecimal } from "@/utils/decimal";
 import type { CycleState, TierHolding } from "./types";
 import { BASE_TIER_COUNT, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";
-
-// =====================================================
-// 소수점 처리 함수
-// =====================================================
-
-/**
- * 소수점 자릿수로 내림
- *
- * @param value - 내림할 값
- * @param decimals - 소수점 자릿수
- * @returns 내림된 값
- */
-export function floorToDecimal(value: number, decimals: number): number {
-  return new Decimal(value).toDecimalPlaces(decimals, Decimal.ROUND_DOWN).toNumber();
-}
-
-/**
- * 소수점 자릿수로 반올림
- * 금융 계산에서 사용 (현금 합계 등)
- *
- * @param value - 반올림할 값
- * @param decimals - 소수점 자릿수
- * @returns 반올림된 값
- */
-export function roundToDecimal(value: number, decimals: number): number {
-  return new Decimal(value).toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP).toNumber();
-}
 
 // =====================================================
 // 가격 계산 함수
@@ -114,21 +88,6 @@ export function shouldExecuteBuy(closePrice: number, limitPrice: number): boolea
  */
 export function shouldExecuteSell(closePrice: number, limitPrice: number): boolean {
   return closePrice >= limitPrice;
-}
-
-// =====================================================
-// 전략 임계값 변환 함수
-// =====================================================
-
-/**
- * 퍼센트 값을 소수점 임계값으로 변환
- * 예: -0.01 (%) → -0.0001 (소수점)
- *
- * @param percentValue - 퍼센트 값 (예: -0.01, 1.5)
- * @returns 소수점 임계값 (예: -0.0001, 0.015)
- */
-export function percentToThreshold(percentValue: number): number {
-  return new Decimal(percentValue).div(100).toNumber();
 }
 
 // =====================================================

@@ -1,18 +1,24 @@
 /**
  * 추천 전략 백테스트 엔진
  * 사이클 경계에서 전략을 동적으로 전환
+ *
+ * #48: 하루 루프는 src/strategy의 planOrders + settle 합성이다 (BacktestEngine과 동일).
+ * 이 엔진은 가격 공급, 사이클 자본 복리 이월, 사이클 경계의 전략 재추천,
+ * 스냅샷·지표 계산만 담당한다. 가격은 adjClose 하나로 통일한다 (#43).
  */
 import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
-import type {
-  StrategyConfig,
-  TradeAction,
-  OrderAction,
-  DailyTechnicalMetrics,
-} from "@/backtest/types";
+import type { DailyTechnicalMetrics } from "@/backtest/types";
 import type { Strategy } from "@/types/trading";
-import { getStrategy } from "@/backtest/strategy";
-import { CycleManager } from "@/backtest/cycle";
+import type { CycleState, StrategyParams } from "@/strategy";
+import { getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
+import {
+  cashBalance,
+  createRemainingTiers,
+  createSnapshot,
+  toOrderActions,
+  toTradeActions,
+} from "@/backtest/snapshot";
 import {
   calculateMDD,
   calculateWinRate,
@@ -20,13 +26,6 @@ import {
   calculateCAGR,
   calculateDailyMetrics,
 } from "@/backtest/metrics";
-import {
-  generateBuyOrder,
-  handleSellOrders,
-  handleStopLoss,
-  createSnapshot,
-  createRemainingTiers,
-} from "@/backtest/trading-utils";
 
 import type {
   RecommendBacktestRequest,
@@ -47,7 +46,7 @@ export interface RecommendBacktestEngineOptions {
  * 기존 BacktestEngine과 유사하지만 사이클 경계에서 전략을 동적으로 변경
  */
 export class RecommendBacktestEngine {
-  private currentStrategy: StrategyConfig;
+  private currentStrategy: StrategyParams;
   private currentStrategyName: Strategy;
   private ticker: "SOXL" | "TQQQ";
   private allPrices: DailyPrice[];
@@ -65,7 +64,7 @@ export class RecommendBacktestEngine {
     this.dateToIndexMap = dateToIndexMap;
     // 초기 전략은 run()에서 설정
     this.currentStrategyName = "Pro2";
-    this.currentStrategy = getStrategy("Pro2");
+    this.currentStrategy = getStrategyParams("Pro2");
     // 추천 옵션 설정 (커스텀 파라미터 사용 시 DB 캐시 건너뛰기)
     this.recommendOptions = {
       persistToDb: !options.skipDbCache, // skipDbCache면 저장도 안 함
@@ -103,15 +102,20 @@ export class RecommendBacktestEngine {
           )
         : null;
     this.currentStrategyName = initialRecommend?.strategy ?? "Pro2";
-    this.currentStrategy = getStrategy(this.currentStrategyName);
+    this.currentStrategy = getStrategyParams(this.currentStrategyName);
     const initialReason = initialRecommend?.reason ?? "기본 전략";
 
-    // 사이클 매니저 생성
-    const cycleManager = new CycleManager(
-      initialCapital,
-      this.currentStrategy,
-      prices[backtestStartIndex].date
-    );
+    let state: CycleState = {
+      strategy: this.currentStrategy,
+      cycleCapital: initialCapital,
+      holdings: [],
+      cycleNumber: 1,
+    };
+    // 사이클 중 실현 손익 누적 (ADR-0001: 예수금이 아닌 현금에만 쌓이고,
+    // 사이클 경계에서 다음 사이클 자본으로 복리 이월된다)
+    let realizedProfit = new Decimal(0);
+    let hasTradedThisCycle = false;
+    let cycleCompletedToday = false;
 
     const dailyHistory: DailySnapshotWithStrategy[] = [];
     const cycleStrategies: CycleStrategyInfo[] = [];
@@ -146,19 +150,17 @@ export class RecommendBacktestEngine {
     let cyclePeak = initialCapital;
     let cycleMdd = 0;
 
-    let cycleCompletedToday = false;
-
-    // 첫날 처리 - 공유 유틸리티로 기본 스냅샷 생성 후 strategy 추가
-    const firstDayBaseSnapshot = createSnapshot(
-      prices[backtestStartIndex],
-      cycleManager,
-      [],
-      [],
-      adjClosePrices,
-      backtestStartIndex
-    );
+    // 첫날 처리 (매수 불가 - 전일 종가 없음)
     const firstDaySnapshot: DailySnapshotWithStrategy = {
-      ...firstDayBaseSnapshot,
+      ...createSnapshot(
+        prices[backtestStartIndex],
+        state,
+        realizedProfit,
+        [],
+        [],
+        adjClosePrices,
+        backtestStartIndex
+      ),
       strategy: this.currentStrategyName,
     };
     dailyHistory.push(firstDaySnapshot);
@@ -168,14 +170,14 @@ export class RecommendBacktestEngine {
     for (let i = backtestStartIndex + 1; i < prices.length; i++) {
       const prevPrice = prices[i - 1];
       const currentPrice = prices[i];
-      const trades: TradeAction[] = [];
-      const orders: OrderAction[] = [];
 
       // 전날 사이클 완료 시 새 사이클 시작 + 전략 재결정
       if (cycleCompletedToday) {
-        // 이전 사이클 종료 처리
+        // 이전 사이클 종료 처리 (보유 티어가 없으므로 총 자산 = 사이클 자본 + 실현 손익)
         currentCycleInfo.endDate = prevPrice.date;
-        currentCycleInfo.finalAsset = cycleManager.getCash();
+        currentCycleInfo.finalAsset = cashBalance(state, realizedProfit)
+          .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+          .toNumber();
         currentCycleInfo.returnRate =
           (currentCycleInfo.finalAsset - currentCycleInfo.initialCapital) /
           currentCycleInfo.initialCapital;
@@ -192,27 +194,28 @@ export class RecommendBacktestEngine {
         const newStrategy = newRecommend?.strategy ?? "Pro2";
         const newReason = newRecommend?.reason ?? "기본 전략";
 
-        // 전략 변경
+        // 전략 변경 + 새 사이클 시작 (실현 손익 복리 이월)
         this.currentStrategyName = newStrategy;
-        this.currentStrategy = getStrategy(newStrategy);
-
-        // CycleManager의 strategy 업데이트
-        cycleManager.setStrategy(this.currentStrategy);
-
-        // 새 사이클 시작
-        cycleManager.startNewCycle(currentPrice.date);
+        this.currentStrategy = getStrategyParams(newStrategy);
+        state = startNextCycle(
+          state,
+          new Decimal(state.cycleCapital).add(realizedProfit).toNumber(),
+          this.currentStrategy
+        );
+        realizedProfit = new Decimal(0);
+        hasTradedThisCycle = false;
 
         // 새 사이클 MDD 초기화
-        cyclePeak = cycleManager.getCycleInitialCapital();
+        cyclePeak = state.cycleCapital;
         cycleMdd = 0;
 
         // 새 사이클 정보 생성
         currentCycleInfo = {
-          cycleNumber: cycleManager.getCycleNumber(),
+          cycleNumber: state.cycleNumber,
           strategy: this.currentStrategyName,
           startDate: currentPrice.date,
           endDate: null,
-          initialCapital: cycleManager.getCycleInitialCapital(),
+          initialCapital: state.cycleCapital,
           finalAsset: null,
           returnRate: null,
           mdd: 0,
@@ -228,7 +231,7 @@ export class RecommendBacktestEngine {
 
       // 첫 매수 전까지 매일 전략 재평가 (전일 종가 기준)
       // (사이클이 시작되었지만 아직 첫 매수가 일어나지 않은 경우)
-      if (!cycleManager.hasTradedThisCycle()) {
+      if (!hasTradedThisCycle) {
         const todayRecommend = await getQuickRecommendation(
           this.ticker,
           prevPrice.date,
@@ -240,14 +243,15 @@ export class RecommendBacktestEngine {
         const todayReason = todayRecommend?.reason ?? "기본 전략";
 
         // 전략이 변경되었으면 업데이트 (cycles 카운트도 조정)
+        // 아직 매수가 없었으므로 사이클 경계와 동일한 상태다 - 전략 교체 허용
         if (todayStrategy !== this.currentStrategyName) {
           // 첫 매수 전이므로, 이전 전략의 cycles를 새 전략으로 이전
           strategyStats[this.currentStrategyName].cycles--;
           strategyStats[todayStrategy].cycles++;
 
           this.currentStrategyName = todayStrategy;
-          this.currentStrategy = getStrategy(todayStrategy);
-          cycleManager.setStrategy(this.currentStrategy);
+          this.currentStrategy = getStrategyParams(todayStrategy);
+          state = { ...state, strategy: this.currentStrategy };
         }
 
         // 현재 사이클 정보 업데이트 (아직 매수 전이므로)
@@ -260,77 +264,43 @@ export class RecommendBacktestEngine {
 
       strategyStats[this.currentStrategyName].totalDays++;
 
-      // 경과 일수 증가
-      if (cycleManager.getActiveTiers().length > 0) {
-        cycleManager.incrementDay();
-      }
+      // === 하루 처리: planOrders + settle 합성 ===
+      const orders = planOrders(state, prevPrice.adjClose);
+      const { newState, executions, events } = settle(state, orders, {
+        date: currentPrice.date,
+        close: currentPrice.adjClose,
+      });
 
-      // === 매수/매도 로직 (공유 유틸리티 사용) ===
-
-      // 1. 매수 주문 생성
-      const { buyOrder, buyTrade } = generateBuyOrder(
-        cycleManager,
-        this.currentStrategy,
-        prevPrice.close,
-        currentPrice.close
-      );
-
-      // 2. 손절 조건 확인
-      const tiersAtStopLoss = cycleManager.getTiersAtStopLossDay(i);
-      const stopLossTierNums = new Set(tiersAtStopLoss.map((t) => t.tier));
-
-      // 3. 매도 주문 생성
-      const { sellTrades, sellOrders } = handleSellOrders(
-        cycleManager,
-        currentPrice.close,
-        stopLossTierNums
-      );
-      trades.push(...sellTrades);
-      orders.push(...sellOrders);
-
-      // 4. 손절 처리
-      if (tiersAtStopLoss.length > 0) {
-        const stopLossTrades = handleStopLoss(cycleManager, tiersAtStopLoss, currentPrice.close);
-        trades.push(...stopLossTrades);
-      }
-
-      // 5. 매수 처리
-      if (buyOrder) {
-        orders.push(buyOrder);
-        if (buyTrade) {
-          cycleManager.activateTier(
-            buyTrade.tier,
-            buyTrade.price,
-            buyTrade.shares,
-            currentPrice.date,
-            i
-          );
-          trades.push(buyTrade);
+      for (const execution of executions) {
+        if (execution.order.type === "BUY") {
+          hasTradedThisCycle = true;
+        }
+        if (execution.profit !== undefined) {
+          realizedProfit = realizedProfit.add(execution.profit);
         }
       }
 
-      // 6. 사이클 완료 체크
-      if (cycleManager.isCycleComplete()) {
-        const cycleProfit = cycleManager.getCash() - cycleManager.getCycleInitialCapital();
+      if (events.some((e) => e.type === "CYCLE_COMPLETED")) {
         completedCycles.push({
-          profit: cycleProfit,
+          profit: realizedProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
           strategy: this.currentStrategyName,
         });
-        cycleManager.endCycle();
-        cycleCompletedToday = true;
+        cycleCompletedToday = true; // 다음 날 새 사이클 시작
       }
 
-      // 일별 스냅샷 생성 - 공유 유틸리티로 기본 스냅샷 생성 후 strategy 추가
-      const baseSnapshot = createSnapshot(
-        currentPrice,
-        cycleManager,
-        trades,
-        orders,
-        adjClosePrices,
-        i
-      );
+      state = newState;
+
+      // 일별 스냅샷 생성
       const snapshot: DailySnapshotWithStrategy = {
-        ...baseSnapshot,
+        ...createSnapshot(
+          currentPrice,
+          state,
+          realizedProfit,
+          toTradeActions(executions),
+          toOrderActions(orders, executions, currentPrice.adjClose),
+          adjClosePrices,
+          i
+        ),
         strategy: this.currentStrategyName,
       };
       dailyHistory.push(snapshot);
@@ -371,8 +341,8 @@ export class RecommendBacktestEngine {
     const backtestDays = prices.length - backtestStartIndex;
     const cagr = calculateCAGR(initialCapital, finalAsset, backtestDays);
 
-    // 잔여 티어
-    const remainingTiers = createRemainingTiers(cycleManager, lastPrice.adjClose);
+    // 잔여 티어 (adjClose 기준 평가)
+    const remainingTiers = createRemainingTiers(state, lastPrice.adjClose);
 
     // 기술적 지표
     const technicalMetrics = calculateTechnicalMetrics(
