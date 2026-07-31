@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
+import { hasDb } from "@/test-utils/db";
 import { db } from "../db-drizzle";
 import { users } from "../schema/auth";
 
@@ -16,7 +17,7 @@ const TEST_USER_ID = randomUUID();
 type TradingModule = typeof import("../trading");
 let tradingModule: TradingModule;
 
-describe("Profit Records DB Functions", () => {
+describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
   let testAccountId: string;
 
   beforeAll(async () => {

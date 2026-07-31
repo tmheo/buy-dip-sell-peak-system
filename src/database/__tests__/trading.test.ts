@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
+import { hasDb } from "@/test-utils/db";
 import type { CreateTradingAccountRequest } from "@/types/trading";
 import { db } from "../db-drizzle";
 import { users } from "../schema/auth";
@@ -37,7 +38,7 @@ let tradingModule: TradingModule;
 // 테스트에서 생성한 계좌 ID 추적 (cleanup용)
 const createdAccountIds: string[] = [];
 
-describe("트레이딩 계좌 CRUD 테스트", () => {
+describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
   beforeAll(async () => {
     // 테스트용 사용자 생성 (foreign key 제약조건 충족)
     await db

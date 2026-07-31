@@ -22,6 +22,7 @@ import type { DailyOrder } from "@/types/trading";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
 import { BacktestEngine } from "@/backtest/engine";
+import { hasDb } from "@/test-utils/db";
 import { db } from "../db-drizzle";
 import { users } from "../schema/auth";
 import { dailyPrices } from "../schema/index";
@@ -165,7 +166,7 @@ function normalize(orders: OrderIntent[], executions: Execution[]): NormalizedOr
   );
 }
 
-describe("실계좌 주문 파이프라인 동등성 (#47)", () => {
+describe.skipIf(!hasDb)("실계좌 주문 파이프라인 동등성 (#47)", () => {
   let tradingModule: typeof import("../trading");
   let accountId: string;
 
