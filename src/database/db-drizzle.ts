@@ -40,6 +40,12 @@ export const db = drizzle(client, { schema });
 export type Database = typeof db;
 
 /**
+ * 쿼리 실행자 타입 (db 또는 트랜잭션 컨텍스트)
+ * CRUD 함수가 트랜잭션 안팎 어디서든 재사용될 수 있게 한다.
+ */
+export type DbExecutor = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
  * 데이터베이스 연결 종료
  * 애플리케이션 종료 시 호출
  */

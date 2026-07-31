@@ -46,9 +46,9 @@ export {
   createDailyOrder,
   updateOrderExecuted,
   getClosingPrice,
+  getPreviousTradingClose,
   deleteDailyOrders,
   generateDailyOrders,
-  getNextBuyTier,
   hasNewerPriceSince,
 
   // Order Execution
