@@ -6,10 +6,10 @@ import Decimal from "decimal.js";
 
 import type { DailyPrice } from "@/types";
 import { getAllPricesByTicker } from "@/database/prices";
-import { setGlobalSimilarityParams, resetGlobalSimilarityParams } from "@/recommend/similarity";
+import type { SimilarityConfig } from "@/recommend/types";
 import { RecommendBacktestEngine, clearRecommendationCache } from "@/backtest-recommend";
 
-import type { OptimizationConfig, BacktestMetrics, SimilarityParams } from "./types";
+import type { OptimizationConfig, BacktestMetrics } from "./types";
 
 /** 가격 데이터 로드 결과 */
 export interface PriceDataResult {
@@ -42,13 +42,13 @@ export function calculateStrategyScore(returnRate: number, mdd: number): number 
 }
 
 /**
- * 커스텀 유사도 파라미터로 백테스트 실행
- * params가 null이면 기본 파라미터(베이스라인)로 실행
+ * 커스텀 유사도 설정으로 백테스트 실행
+ * similarityConfig가 null이면 기본 설정(베이스라인)으로 실행
  * 주의: priceData는 필수 파라미터입니다. loadPriceData()로 미리 로드하세요.
  */
 export async function runBacktestWithParams(
   config: OptimizationConfig,
-  params: SimilarityParams | null,
+  similarityConfig: SimilarityConfig | null,
   priceData: PriceDataResult
 ): Promise<BacktestMetrics> {
   const { ticker, startDate, endDate, initialCapital } = config;
@@ -73,28 +73,18 @@ export async function runBacktestWithParams(
 
   clearRecommendationCache();
 
-  if (params !== null) {
-    setGlobalSimilarityParams(params.weights, params.tolerances);
-  }
+  const engine = new RecommendBacktestEngine(ticker, backtestPrices, backtestDateToIndexMap, {
+    similarityConfig: similarityConfig ?? undefined,
+  });
 
-  try {
-    const engine = new RecommendBacktestEngine(ticker, backtestPrices, backtestDateToIndexMap, {
-      skipDbCache: params !== null,
-    });
+  const result = await engine.run({ ticker, startDate, endDate, initialCapital }, startIndex);
+  const strategyScore = calculateStrategyScore(result.returnRate, result.mdd);
 
-    const result = await engine.run({ ticker, startDate, endDate, initialCapital }, startIndex);
-    const strategyScore = calculateStrategyScore(result.returnRate, result.mdd);
-
-    return {
-      returnRate: result.returnRate,
-      mdd: result.mdd,
-      strategyScore,
-      totalCycles: result.totalCycles,
-      winRate: result.winRate,
-    };
-  } finally {
-    if (params !== null) {
-      resetGlobalSimilarityParams();
-    }
-  }
+  return {
+    returnRate: result.returnRate,
+    mdd: result.mdd,
+    strategyScore,
+    totalCycles: result.totalCycles,
+    winRate: result.winRate,
+  };
 }

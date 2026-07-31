@@ -1,52 +1,11 @@
 /**
  * 유사도 파라미터 최적화 모듈 타입 정의
  * SPEC-PERF-001
+ *
+ * 가중치·허용오차 타입(MetricWeights, MetricTolerances, SimilarityConfig)은
+ * `@/recommend/types` 소유다 (import 방향: optimize → recommend).
  */
-
-// ============================================================
-// 기본 타입 정의
-// ============================================================
-
-/**
- * 메트릭 가중치 튜플 (5개 지표)
- * 순서: [maSlope, disparity, rsi14, roc12, volatility20]
- * 모든 가중치의 합은 1.0이 되어야 함
- */
-export type MetricWeights = [number, number, number, number, number];
-
-/**
- * 메트릭 허용오차 튜플 (5개 지표)
- * 순서: [maSlope, disparity, rsi14, roc12, volatility20]
- * 각 지표별 유사도 계산 시 사용되는 허용 범위
- */
-export type MetricTolerances = [number, number, number, number, number];
-
-// ============================================================
-// 유사도 계산 관련 인터페이스
-// ============================================================
-
-/**
- * 유사도 계산 옵션 인터페이스 (선택적 파라미터)
- * calculateExponentialSimilarity 함수의 선택적 파라미터로 사용
- * 지정하지 않으면 기본값(METRIC_WEIGHTS, METRIC_TOLERANCES) 사용
- */
-export interface SimilarityOptions {
-  /** 메트릭 가중치 (선택적) */
-  weights?: MetricWeights;
-  /** 메트릭 허용오차 (선택적) */
-  tolerances?: MetricTolerances;
-}
-
-/**
- * 유사도 파라미터 인터페이스 (필수 파라미터)
- * 최적화 과정에서 사용되는 파라미터 조합
- */
-export interface SimilarityParams {
-  /** 메트릭 가중치 (필수) */
-  weights: MetricWeights;
-  /** 메트릭 허용오차 (필수) */
-  tolerances: MetricTolerances;
-}
+import type { SimilarityConfig } from "@/recommend/types";
 
 // ============================================================
 // 최적화 설정 인터페이스
@@ -105,8 +64,8 @@ export interface BacktestMetrics {
 export interface RankedCandidate {
   /** 순위 (1부터 시작) */
   rank: number;
-  /** 유사도 파라미터 */
-  params: SimilarityParams;
+  /** 유사도 config */
+  params: SimilarityConfig;
   /** 백테스트 결과 메트릭 */
   metrics: BacktestMetrics;
   /** 베이스라인 대비 개선 정보 */

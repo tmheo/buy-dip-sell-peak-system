@@ -17,9 +17,12 @@ export type {
   TechnicalMetrics,
   Strategy,
   DowngradeInfo,
+  MetricWeights,
+  MetricTolerances,
+  SimilarityConfig,
 } from "./types";
 
-// 유사도 계산 함수 및 파라미터 관리 내보내기
+// 유사도 계산 함수 내보내기
 export {
   ANALYSIS_PERIOD_DAYS,
   PERFORMANCE_PERIOD_DAYS,
@@ -27,14 +30,12 @@ export {
   MIN_PERIOD_GAP_DAYS,
   METRIC_WEIGHTS,
   METRIC_TOLERANCES,
+  DEFAULT_SIMILARITY_CONFIG,
   calculateExponentialSimilarity,
   calculateEuclideanSimilarity,
   createMetricsVector,
   findSimilarPeriods,
   findSimilarPeriodsWithDates,
-  setGlobalSimilarityParams,
-  resetGlobalSimilarityParams,
-  getCurrentSimilarityParams,
 } from "./similarity";
 
 // 점수 계산 함수 내보내기

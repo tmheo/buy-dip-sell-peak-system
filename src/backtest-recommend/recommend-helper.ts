@@ -19,7 +19,12 @@ import {
   findSimilarPeriodsWithDates,
 } from "@/recommend/similarity";
 import { calculateAllStrategyScores, getRecommendedStrategy } from "@/recommend/score";
-import type { HistoricalMetrics, SimilarPeriod, PeriodBacktestResult } from "@/recommend/types";
+import type {
+  HistoricalMetrics,
+  SimilarPeriod,
+  PeriodBacktestResult,
+  SimilarityConfig,
+} from "@/recommend/types";
 import {
   BacktestEngine,
   applySOXLDowngrade,
@@ -31,10 +36,14 @@ import type { QuickRecommendResult } from "./types";
 
 /** getQuickRecommendation 옵션 */
 export interface QuickRecommendationOptions {
-  /** DB에 캐시 저장 여부 (기본값: true) */
+  /** DB에 캐시 저장 여부 (기본값: true) - 일괄 저장 스크립트가 개별 저장을 끌 때 사용 */
   persistToDb?: boolean;
-  /** DB 캐시 조회 건너뛰기 (기본값: false) - 커스텀 파라미터 백테스트 시 사용 */
-  skipDbCache?: boolean;
+  /**
+   * 커스텀 유사도 설정 (가중치·허용오차, 기본값: DEFAULT_SIMILARITY_CONFIG)
+   * 지정하면 추천 캐시(메모리·DB)의 조회·저장을 전부 건너뛰어
+   * 기본 설정의 추천 결과와 섞이는 일이 구조적으로 불가능하다
+   */
+  similarityConfig?: SimilarityConfig;
 }
 
 /** 백테스트용 lookback 일수 */
@@ -73,7 +82,7 @@ function createDefaultMetrics(): TechnicalMetrics {
  * @param referenceDate - 기준일
  * @param allPrices - 전체 가격 데이터 (성능 최적화를 위해 캐시된 데이터 사용)
  * @param dateToIndexMap - 날짜-인덱스 맵 (O(1) 조회용)
- * @param options - 옵션 (persistToDb: DB 캐시 저장 여부, 기본값 true)
+ * @param options - 옵션 (similarityConfig: 커스텀 유사도 설정, 지정 시 캐시 전체 우회)
  * @returns 추천 전략 정보 또는 null (데이터 부족 시)
  */
 export async function getQuickRecommendation(
@@ -83,18 +92,20 @@ export async function getQuickRecommendation(
   dateToIndexMap: Map<string, number>,
   options: QuickRecommendationOptions = {}
 ): Promise<QuickRecommendResult | null> {
-  const { persistToDb = true, skipDbCache = false } = options;
-  // 0. 메모이제이션 캐시 확인 (skipDbCache가 true면 건너뜀)
+  const { persistToDb = true, similarityConfig } = options;
+  // 커스텀 유사도 설정이면 추천 캐시(메모리·DB)를 조회도 저장도 하지 않는다
+  const useCache = similarityConfig === undefined;
+  // 0. 메모이제이션 캐시 확인
   const cacheKey = `${ticker}:${referenceDate}`;
-  if (!skipDbCache) {
+  if (useCache) {
     const memoryCached = recommendationCache.get(cacheKey);
     if (memoryCached) {
       return memoryCached;
     }
   }
 
-  // 0-1. DB 캐시 확인 (skipDbCache가 true면 건너뜀)
-  if (!skipDbCache) {
+  // 0-1. DB 캐시 확인
+  if (useCache) {
     const dbCached = await getCachedRecommendation(ticker, referenceDate);
     if (dbCached) {
       const result: QuickRecommendResult = {
@@ -196,6 +207,7 @@ export async function getQuickRecommendation(
   // 6. 유사 구간 검색
   const similarPeriodsRaw = findSimilarPeriodsWithDates(referenceMetrics, historicalMetrics, 3, {
     filterGoldenCross: referenceMetrics.isGoldenCross,
+    similarityConfig,
   });
 
   // 7. 유사 구간별 백테스트 (성능 최적화)
@@ -300,11 +312,13 @@ export async function getQuickRecommendation(
     metrics: referenceMetrics,
   };
 
-  // 인메모리 캐시에 저장
-  recommendationCache.set(cacheKey, result);
+  // 캐시에 저장 (커스텀 유사도 설정 결과는 캐시를 오염시키지 않도록 제외)
+  if (useCache) {
+    recommendationCache.set(cacheKey, result);
+  }
 
   // DB 캐시에 저장 (persistToDb가 true일 때만)
-  if (persistToDb) {
+  if (useCache && persistToDb) {
     await cacheRecommendation({
       ticker,
       date: referenceDate,

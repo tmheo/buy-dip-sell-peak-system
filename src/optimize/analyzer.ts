@@ -4,12 +4,13 @@
  */
 import Decimal from "decimal.js";
 
+import type { SimilarityConfig } from "@/recommend/types";
+
 import type {
   BacktestMetrics,
   RankedCandidate,
   OptimizationResult,
   OptimizationSummary,
-  SimilarityParams,
 } from "./types";
 
 /** 정밀한 차이 계산 (소수점 6자리 반올림) */
@@ -23,7 +24,7 @@ function calculateImprovement(current: number, baseline: number): number {
  */
 export function createRankedCandidate(
   rank: number,
-  params: SimilarityParams,
+  params: SimilarityConfig,
   metrics: BacktestMetrics,
   baseline: BacktestMetrics
 ): RankedCandidate {
@@ -90,7 +91,7 @@ function createDummyCandidate(baseline: BacktestMetrics): RankedCandidate {
  */
 export function analyzeResults(
   baseline: BacktestMetrics,
-  candidates: Array<{ params: SimilarityParams; metrics: BacktestMetrics }>,
+  candidates: Array<{ params: SimilarityConfig; metrics: BacktestMetrics }>,
   executionTimeMs: number = 0
 ): OptimizationResult {
   if (candidates.length === 0) {

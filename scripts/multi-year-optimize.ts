@@ -9,7 +9,8 @@ import {
   type PriceDataResult,
 } from "../src/optimize/backtest-runner";
 import { generateRandomParams, generateVariations } from "../src/optimize/param-generator";
-import type { OptimizationConfig, SimilarityParams, BacktestMetrics } from "../src/optimize/types";
+import type { SimilarityConfig } from "../src/recommend/types";
+import type { OptimizationConfig, BacktestMetrics } from "../src/optimize/types";
 import { METRIC_WEIGHTS, METRIC_TOLERANCES } from "../src/recommend/similarity";
 
 // ============================================================
@@ -51,7 +52,7 @@ interface YearResult {
 }
 
 interface MultiYearResult {
-  params: SimilarityParams;
+  params: SimilarityConfig;
   yearResults: YearResult[];
   combinedScore: number;
   avgReturnRate: number;
@@ -85,7 +86,7 @@ function formatScore(score: number): string {
  * 5개년 백테스트 실행 및 통합 점수 계산
  */
 async function runMultiYearBacktest(
-  params: SimilarityParams | null,
+  params: SimilarityConfig | null,
   priceData: PriceDataResult
 ): Promise<MultiYearResult> {
   const yearResults: YearResult[] = [];

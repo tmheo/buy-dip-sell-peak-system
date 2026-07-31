@@ -5,9 +5,15 @@
 import Decimal from "decimal.js";
 
 import type { TechnicalMetrics } from "@/backtest/types";
-import type { SimilarityOptions, MetricWeights, MetricTolerances } from "@/optimize/types";
 
-import type { MetricsVector, HistoricalMetrics, SimilarPeriod } from "./types";
+import type {
+  MetricsVector,
+  HistoricalMetrics,
+  SimilarPeriod,
+  MetricWeights,
+  MetricTolerances,
+  SimilarityConfig,
+} from "./types";
 
 /** 분석 구간 길이 (거래일 기준) */
 export const ANALYSIS_PERIOD_DAYS = 20;
@@ -33,55 +39,11 @@ export const METRIC_WEIGHTS: MetricWeights = [0.3997, 0.0189, 0.3317, 0.0317, 0.
  */
 export const METRIC_TOLERANCES: MetricTolerances = [17.65, 75.8, 11.81, 20.17, 48.11];
 
-// ============================================================
-// 글로벌 유사도 파라미터 관리
-// ============================================================
-
-/** 현재 활성 가중치 (글로벌 상태) */
-let currentWeights: MetricWeights = METRIC_WEIGHTS;
-
-/** 현재 활성 허용오차 (글로벌 상태) */
-let currentTolerances: MetricTolerances = METRIC_TOLERANCES;
-
-/**
- * 글로벌 유사도 파라미터 설정
- * 최적화 실행 시 커스텀 파라미터를 글로벌로 설정
- *
- * @param weights - 메트릭 가중치 (5개)
- * @param tolerances - 메트릭 허용오차 (5개)
- */
-export function setGlobalSimilarityParams(
-  weights: MetricWeights,
-  tolerances: MetricTolerances
-): void {
-  currentWeights = weights;
-  currentTolerances = tolerances;
-}
-
-/**
- * 글로벌 유사도 파라미터 초기화
- * 기본값(METRIC_WEIGHTS, METRIC_TOLERANCES)으로 복원
- */
-export function resetGlobalSimilarityParams(): void {
-  currentWeights = METRIC_WEIGHTS;
-  currentTolerances = METRIC_TOLERANCES;
-}
-
-/**
- * 현재 유사도 파라미터 조회
- * 글로벌 상태로 설정된 현재 파라미터 반환
- *
- * @returns 현재 가중치와 허용오차
- */
-export function getCurrentSimilarityParams(): {
-  weights: MetricWeights;
-  tolerances: MetricTolerances;
-} {
-  return {
-    weights: currentWeights,
-    tolerances: currentTolerances,
-  };
-}
+/** 기본 유사도 설정 (5개년 미세 조정을 거친 가중치·허용오차) */
+export const DEFAULT_SIMILARITY_CONFIG: SimilarityConfig = {
+  weights: METRIC_WEIGHTS,
+  tolerances: METRIC_TOLERANCES,
+};
 
 /**
  * 지수 감쇠 기반 유사도 계산
@@ -89,18 +51,15 @@ export function getCurrentSimilarityParams(): {
  *
  * @param vectorA - 첫 번째 메트릭 벡터 (5개 지표)
  * @param vectorB - 두 번째 메트릭 벡터 (5개 지표)
- * @param options - 선택적 파라미터 (weights, tolerances)
- *                  지정하지 않으면 글로벌 파라미터 사용
+ * @param config - 가중치·허용오차 (기본값: DEFAULT_SIMILARITY_CONFIG)
  * @returns 유사도 점수 (0-100 범위)
  */
 export function calculateExponentialSimilarity(
   vectorA: number[],
   vectorB: number[],
-  options?: SimilarityOptions
+  config: SimilarityConfig = DEFAULT_SIMILARITY_CONFIG
 ): number {
-  // 파라미터 결정: options > 글로벌 상태
-  const weights = options?.weights ?? currentWeights;
-  const tolerances = options?.tolerances ?? currentTolerances;
+  const { weights, tolerances } = config;
 
   const expectedLen = weights.length;
   if (vectorA.length !== expectedLen || vectorB.length !== expectedLen) {
@@ -124,8 +83,12 @@ export function calculateExponentialSimilarity(
 }
 
 /** 유클리드 거리 기반 유사도 계산 (하위 호환성 유지, 0~1 범위 반환) */
-export function calculateEuclideanSimilarity(vectorA: number[], vectorB: number[]): number {
-  const similarity = calculateExponentialSimilarity(vectorA, vectorB);
+export function calculateEuclideanSimilarity(
+  vectorA: number[],
+  vectorB: number[],
+  config: SimilarityConfig = DEFAULT_SIMILARITY_CONFIG
+): number {
+  const similarity = calculateExponentialSimilarity(vectorA, vectorB, config);
   return new Decimal(similarity).div(100).toDecimalPlaces(4, Decimal.ROUND_DOWN).toNumber();
 }
 
@@ -191,6 +154,8 @@ export const MIN_PERIOD_GAP_DAYS = 20;
 export interface SimilarPeriodsOptions {
   /** 정배열/역배열 필터 (true: 정배열만, false: 역배열만, undefined: 필터 없음) */
   filterGoldenCross?: boolean;
+  /** 유사도 가중치·허용오차 (기본값: DEFAULT_SIMILARITY_CONFIG) */
+  similarityConfig?: SimilarityConfig;
 }
 
 /** 유사 구간 검색 결과 */
@@ -210,6 +175,7 @@ export function findSimilarPeriodsWithDates(
 ): SimilarPeriodWithDate[] {
   // 기준 벡터 생성
   const referenceVector = createMetricsVector(referenceMetrics);
+  const similarityConfig = options.similarityConfig ?? DEFAULT_SIMILARITY_CONFIG;
 
   // 정배열/역배열 필터 적용
   let filteredMetrics = allHistoricalMetrics;
@@ -227,7 +193,11 @@ export function findSimilarPeriodsWithDates(
 
   for (const historical of filteredMetrics) {
     const historicalVector = createMetricsVector(historical.metrics);
-    const similarity = calculateEuclideanSimilarity(referenceVector, historicalVector);
+    const similarity = calculateEuclideanSimilarity(
+      referenceVector,
+      historicalVector,
+      similarityConfig
+    );
 
     similarities.push({
       historical,

@@ -9,6 +9,7 @@
 import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
 import type { DailyTechnicalMetrics } from "@/backtest/types";
+import type { SimilarityConfig } from "@/recommend/types";
 import type { Strategy } from "@/types/trading";
 import type { CycleState, StrategyParams } from "@/strategy";
 import { getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
@@ -37,8 +38,11 @@ import { getQuickRecommendation, type QuickRecommendationOptions } from "./recom
 
 /** RecommendBacktestEngine 옵션 */
 export interface RecommendBacktestEngineOptions {
-  /** DB 캐시 조회 건너뛰기 (기본값: false) - 커스텀 유사도 파라미터 사용 시 true */
-  skipDbCache?: boolean;
+  /**
+   * 커스텀 유사도 설정 (가중치·허용오차)
+   * 지정하면 추천 캐시(메모리·DB)를 전부 우회해 기본 설정의 결과와 섞이지 않는다
+   */
+  similarityConfig?: SimilarityConfig;
 }
 
 /**
@@ -65,11 +69,8 @@ export class RecommendBacktestEngine {
     // 초기 전략은 run()에서 설정
     this.currentStrategyName = "Pro2";
     this.currentStrategy = getStrategyParams("Pro2");
-    // 추천 옵션 설정 (커스텀 파라미터 사용 시 DB 캐시 건너뛰기)
-    this.recommendOptions = {
-      persistToDb: !options.skipDbCache, // skipDbCache면 저장도 안 함
-      skipDbCache: options.skipDbCache ?? false,
-    };
+    // 캐시 사용 여부는 커스텀 유사도 설정의 유무로 helper가 스스로 결정한다
+    this.recommendOptions = { similarityConfig: options.similarityConfig };
   }
 
   /**
