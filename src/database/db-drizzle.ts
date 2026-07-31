@@ -59,18 +59,27 @@ function getDb(): Database {
 /**
  * Drizzle ORM 인스턴스 (지연 초기화 프록시)
  * 스키마 정보를 포함하여 관계형 쿼리 지원
+ *
+ * Auth.js DrizzleAdapter처럼 인스턴스 자체를 검사하는 소비자가 있으므로
+ * 실제 인스턴스처럼 보이게 만든다:
+ * - constructor는 bind하지 않고 원본을 돌려준다 (drizzle의 is()가
+ *   constructor 체인의 정적 속성 entityKind로 방언을 판별한다)
+ * - getPrototypeOf 트랩으로 instanceof 검사도 실제 인스턴스와 같게 한다
  */
 export const db: Database = new Proxy({} as Database, {
   get(_target, prop) {
     const instance = getDb();
     const value = Reflect.get(instance, prop, instance) as unknown;
-    if (typeof value === "function") {
+    if (typeof value === "function" && prop !== "constructor") {
       return value.bind(instance);
     }
     return value;
   },
   has(_target, prop) {
     return Reflect.has(getDb(), prop);
+  },
+  getPrototypeOf() {
+    return Object.getPrototypeOf(getDb()) as object | null;
   },
 });
 
