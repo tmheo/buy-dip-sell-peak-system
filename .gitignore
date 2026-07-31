@@ -1,195 +1,41 @@
-# ============================================
-# MoAI-ADK Package Distribution .gitignore
-# ============================================
-# Version: 0.33.0
-# Updated: 2026-01-10
-# Purpose: Essential patterns for user projects
-# ============================================
+# Dependencies
+node_modules/
 
-# ===========================================
-# Go Build Artifacts
-# ===========================================
-bin/
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-cover.out
-cover.html
-cpu.prof
-mem.prof
-
-# ===========================================
-# Build Artifacts & Distribution
-# ===========================================
-build/
+# Build output
+.next/
+out/
 dist/
-*.egg-info/
-*.egg
+*.tsbuildinfo
+next-env.d.ts
 
-# ===========================================
-# Python Cache & Bytecode
-# ===========================================
-__pycache__/
-.pytest_cache/
-*.pyc
-*.pyo
-*.pyd
-.mypy_cache/
-.ruff_cache/
-*.db
-*.sqlite
-*.sqlite3
-*.rdb
-*.dbm
+# Test coverage
+coverage/
 
-# ===========================================
-# Virtual Environments
-# ===========================================
-venv/
-.venv/
-env/
-.env/
-.uv_cache/
-.uv-cache/
-
-# ===========================================
-# Test Coverage
-# ===========================================
-.coverage
-coverage.json
-htmlcov/
-
-# ===========================================
-# IDE & Editors
-# ===========================================
-.vscode/
-.idea/
-*.swp
-*.swo
-*.sw?
-*~
-.cursor/
-*.sublime-project
-*.sublime-workspace
-*.njsproj
-*.sln
-*.suo
-.#*
-
-# ===========================================
-# OS Files
-# ===========================================
-# Mac
-.DS_Store
-.AppleDouble
-.LSOverride
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-
-# Windows
-[Dd]esktop.ini
-Thumbs.db
-ehthumbs.db
-
-# Linux
-.directory
-
-# ===========================================
-# Logs & Temporary Files
-# ===========================================
-*.log
-logs/
-*.tmp
-*.temp
-*.bak
-*.backup
-
-# ===========================================
-# Backups
-# ===========================================
-.moai-backups/
-*.backup/
-*-backup/
-*_backup_*/
-
-# ===========================================
-# Secrets and Credentials (CRITICAL)
-# ===========================================
 # Environment files
 .env
 .env.*
 !.env.example
 
-# Certificate files
-*.pem
-*.p12
-*.pfx
-*.jks
+# Supabase CLI
+supabase/.branches/
+supabase/.temp/
 
-# Private keys (specific patterns to avoid false positives)
-# FIXED: Issue #237 - Replaced overly broad *key* and *secret* patterns
-*-key.*
-*_key.*
-*.key.*
-*-secret-key.*
-*-api-key.*
-api-key-*
-secret-key-*
-private-key*
-*-secret.*
-*_secret.*
-*.secret.*
-secret-*.*
+# Deployment
+.vercel/
 
-# Credential patterns in environment files
-*_secret=*
-*_token=*
-
-# Cloud provider credentials
-.aws/config
-.aws/credentials
-
-# ===========================================
-# Claude Code / MoAI / OMC (全体 ignore)
-# ===========================================
+# Claude Code (local)
 .claude/
-.moai/
-.omc/
 .mcp.json
-CLAUDE.md
 CLAUDE.local.md
 
-# ===========================================
-# Node.js (for docs/Nextra)
-# ===========================================
-node_modules/
-*.tsbuildinfo
-.tscache/
-.next/
-out/
+# IDE
+.vscode/
+.idea/
 
-# ===========================================
-# Build Tools & Frameworks
-# ===========================================
-.turbo/
-.nuxt/
-dist-ssr/
+# OS
+.DS_Store
+Thumbs.db
 
-# ===========================================
-# Deployment & CI/CD
-# ===========================================
-.vercel/
-.netlify/
-.firebase/
-
-# User Custom Patterns (preserved by moai update)
-coverage/
-.moai/cache/
-data/
-HANDOFF.md
+# Logs
+*.log
+logs/
