@@ -6,32 +6,32 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import type { DailyPrice } from "../../types/index.js";
+import type { DailyPrice } from "@/types/index";
 
 // dataFetcher는 fetchAllHistory만 mock하고 normalizePrice 등은 실제 구현을 쓴다
-vi.mock("../dataFetcher.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../dataFetcher.js")>();
+vi.mock("@/services/dataFetcher", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/dataFetcher")>();
   return { ...actual, fetchAllHistory: vi.fn() };
 });
 
-vi.mock("../../database/prices.js", () => ({
+vi.mock("@/database/prices", () => ({
   getAllPricesByTicker: vi.fn(),
   upsertDailyPrices: vi.fn(),
 }));
 
-vi.mock("../../database/metrics.js", () => ({
+vi.mock("@/database/metrics", () => ({
   upsertMetrics: vi.fn(),
 }));
 
-vi.mock("../metricsCalculator.js", () => ({
+vi.mock("@/services/metricsCalculator", () => ({
   calculateMetricsBatch: vi.fn(),
 }));
 
-import { fetchAllHistory } from "../dataFetcher.js";
-import { getAllPricesByTicker, upsertDailyPrices } from "../../database/prices.js";
-import { upsertMetrics } from "../../database/metrics.js";
-import { calculateMetricsBatch } from "../metricsCalculator.js";
-import { diffPriceSnapshots, syncTickerPrices } from "../priceSyncService.js";
+import { fetchAllHistory } from "@/services/dataFetcher";
+import { getAllPricesByTicker, upsertDailyPrices } from "@/database/prices";
+import { upsertMetrics } from "@/database/metrics";
+import { calculateMetricsBatch } from "@/services/metricsCalculator";
+import { diffPriceSnapshots, syncTickerPrices } from "@/services/priceSyncService";
 
 /** 거래일 흉내: 2020-01-01부터 count개 날짜 생성 */
 function makeDates(count: number): string[] {

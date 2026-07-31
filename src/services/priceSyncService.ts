@@ -9,14 +9,14 @@
  * 모든 쓰기(가격·지표)를 건너뛴다. 보정은 SPEC-SPLIT-001 런북(사람)이 수행한다.
  */
 
-import { fetchAllHistory, normalizePrice } from "./dataFetcher.js";
-import { getAllPricesByTicker, upsertDailyPrices } from "../database/prices.js";
-import { upsertMetrics } from "../database/metrics.js";
-import { calculateMetricsBatch } from "./metricsCalculator.js";
+import { fetchAllHistory, normalizePrice } from "@/services/dataFetcher";
+import { getAllPricesByTicker, upsertDailyPrices } from "@/database/prices";
+import { upsertMetrics } from "@/database/metrics";
+import { calculateMetricsBatch } from "@/services/metricsCalculator";
 
-import type { SupportedTicker } from "./dataFetcher.js";
-import type { NewDailyMetric } from "../database/schema/index.js";
-import type { DailyMetricRow, DailyPrice } from "../types/index.js";
+import type { SupportedTicker } from "@/services/dataFetcher";
+import type { NewDailyMetric } from "@/database/schema/index";
+import type { DailyMetricRow, DailyPrice } from "@/types/index";
 
 /** 분할 가드 임계값: 기존 close 대비 소급 변경 비율이 이 값을 넘으면 쓰기를 중단한다 */
 export const CLOSE_GUARD_THRESHOLD = 0.05;
