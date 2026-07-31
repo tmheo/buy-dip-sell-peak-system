@@ -1,7 +1,7 @@
 /**
- * RecommendBacktestEngine 테스트
- * #48: 추천 백테스트 엔진도 src/strategy의 planOrders + settle 합성을 소비한다.
- * #56: 전략 추천은 RecommendationService의 recommendOrDefault를 직접 호출한다.
+ * 추천 백테스트 facade(runRecommendBacktest) 테스트
+ * #64: RecommendBacktestEngine을 삭제하고 BacktestEngine + 추천 provider 조립으로 대체.
+ * 전략 추천은 RecommendationService의 recommendOrDefault를 직접 호출한다 (#56).
  *
  * 추천이 고정이면 일반 백테스트와 동일한 결과가 나와야 한다(동등성).
  * 가격 픽스처는 close와 adjClose를 다르게 두어 adjClose 불변식(#43)을 함께 검증한다.
@@ -13,11 +13,12 @@ import { BacktestEngine } from "@/backtest/engine";
 import { getStrategyParams } from "@/strategy";
 import type { Recommendation } from "@/recommend/types";
 import { DEFAULT_SIMILARITY_CONFIG } from "@/recommend/similarity";
-import { RecommendBacktestEngine } from "../engine";
 import { recommendOrDefault } from "@/recommend/service";
+import { runRecommendBacktest } from "../run";
 
 vi.mock("@/recommend/service", () => ({
   recommendOrDefault: vi.fn(),
+  DEFAULT_STRATEGY: "Pro2",
 }));
 
 const mockedRecommend = vi.mocked(recommendOrDefault);
@@ -64,7 +65,16 @@ const PRICES: DailyPrice[] = [
   createMockPrice("2025-01-10", 107),
 ];
 
-describe("RecommendBacktestEngine", () => {
+function createRequest(initialCapital = 10000) {
+  return {
+    ticker: "SOXL" as const,
+    startDate: PRICES[0].date,
+    endDate: PRICES[PRICES.length - 1].date,
+    initialCapital,
+  };
+}
+
+describe("runRecommendBacktest", () => {
   beforeEach(() => {
     mockedRecommend.mockReset();
   });
@@ -85,16 +95,7 @@ describe("RecommendBacktestEngine", () => {
       0
     );
 
-    const engine = new RecommendBacktestEngine("SOXL", PRICES);
-    const result = await engine.run(
-      {
-        ticker: "SOXL",
-        startDate: PRICES[0].date,
-        endDate: PRICES[PRICES.length - 1].date,
-        initialCapital,
-      },
-      0
-    );
+    const result = await runRecommendBacktest(createRequest(initialCapital), PRICES, 0);
 
     expect(result.finalAsset).toBe(expected.finalAsset);
     expect(result.returnRate).toBe(expected.returnRate);
@@ -122,16 +123,7 @@ describe("RecommendBacktestEngine", () => {
     // 첫 사이클 Pro2, 이후 추천은 Pro3
     mockedRecommend.mockImplementation(async () => recommendation("Pro3"));
 
-    const engine = new RecommendBacktestEngine("SOXL", PRICES);
-    const result = await engine.run(
-      {
-        ticker: "SOXL",
-        startDate: PRICES[0].date,
-        endDate: PRICES[PRICES.length - 1].date,
-        initialCapital: 10000,
-      },
-      0
-    );
+    const result = await runRecommendBacktest(createRequest(), PRICES, 0);
 
     // 모든 사이클이 추천값(Pro3)을 따른다 (첫 사이클도 시작 전 추천을 받는다)
     for (const cycle of result.cycleStrategies) {
@@ -144,16 +136,7 @@ describe("RecommendBacktestEngine", () => {
   it("추천 불가로 기본 전략이 오면 그 전략과 사유로 진행해야 한다", async () => {
     mockedRecommend.mockResolvedValue(recommendation("Pro2", "성과 구간 부족으로 기본 전략 사용"));
 
-    const engine = new RecommendBacktestEngine("SOXL", PRICES);
-    const result = await engine.run(
-      {
-        ticker: "SOXL",
-        startDate: PRICES[0].date,
-        endDate: PRICES[PRICES.length - 1].date,
-        initialCapital: 10000,
-      },
-      0
-    );
+    const result = await runRecommendBacktest(createRequest(), PRICES, 0);
 
     expect(result.cycleStrategies[0].strategy).toBe("Pro2");
     expect(result.cycleStrategies[0].recommendReason).toBe("성과 구간 부족으로 기본 전략 사용");
@@ -163,16 +146,7 @@ describe("RecommendBacktestEngine", () => {
     mockedRecommend.mockResolvedValue(recommendation("Pro2"));
     const similarityConfig = { ...DEFAULT_SIMILARITY_CONFIG };
 
-    const engine = new RecommendBacktestEngine("SOXL", PRICES, { similarityConfig });
-    await engine.run(
-      {
-        ticker: "SOXL",
-        startDate: PRICES[0].date,
-        endDate: PRICES[PRICES.length - 1].date,
-        initialCapital: 10000,
-      },
-      1
-    );
+    await runRecommendBacktest(createRequest(), PRICES, 1, { similarityConfig });
 
     expect(mockedRecommend).toHaveBeenCalledWith(
       "SOXL",
@@ -184,16 +158,7 @@ describe("RecommendBacktestEngine", () => {
   it("같은 기준일에 대한 추천 조회는 한 번만 일어나야 한다 (사이클 완료일 중복 호출 방지)", async () => {
     mockedRecommend.mockResolvedValue(recommendation("Pro2"));
 
-    const engine = new RecommendBacktestEngine("SOXL", PRICES);
-    await engine.run(
-      {
-        ticker: "SOXL",
-        startDate: PRICES[0].date,
-        endDate: PRICES[PRICES.length - 1].date,
-        initialCapital: 10000,
-      },
-      0
-    );
+    await runRecommendBacktest(createRequest(), PRICES, 0);
 
     // 사이클 완료 다음 날은 새 사이클 시작 블록과 첫 매수 전 재평가 블록이
     // 같은 전일 종가 기준일을 쓰므로, 중복 호출이 있으면 날짜별 호출 수가 2가 된다
@@ -209,16 +174,7 @@ describe("RecommendBacktestEngine", () => {
   it("사이클 자본은 실현 손익을 복리로 이월해야 한다", async () => {
     mockedRecommend.mockResolvedValue(recommendation("Pro2"));
 
-    const engine = new RecommendBacktestEngine("SOXL", PRICES);
-    const result = await engine.run(
-      {
-        ticker: "SOXL",
-        startDate: PRICES[0].date,
-        endDate: PRICES[PRICES.length - 1].date,
-        initialCapital: 10000,
-      },
-      0
-    );
+    const result = await runRecommendBacktest(createRequest(), PRICES, 0);
 
     const [first, second] = result.cycleStrategies;
     expect(first.finalAsset).not.toBeNull();

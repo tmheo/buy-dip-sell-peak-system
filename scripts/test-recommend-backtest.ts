@@ -2,8 +2,8 @@
  * 추천 전략 백테스트 결과 확인 스크립트
  */
 import { loadPriceData } from "../src/optimize/backtest-runner";
-import { RecommendBacktestEngine } from "../src/backtest-recommend/engine";
-import type { RecommendBacktestRequest } from "../src/backtest-recommend/types";
+import { runRecommendBacktest } from "../src/backtest-recommend";
+import type { RecommendBacktestRequest } from "../src/backtest-recommend";
 import Decimal from "decimal.js";
 
 import type { DailyPrice } from "../src/types";
@@ -38,10 +38,7 @@ async function main() {
   console.log(`실제 시작일: ${backtestPrices[backtestStartIndex].date}`);
   console.log(`실제 종료일: ${backtestPrices[backtestPrices.length - 1].date}`);
 
-  // 백테스트 엔진 생성 (기본 유사도 설정: 추천 캐시 사용)
-  const engine = new RecommendBacktestEngine(ticker, backtestPrices);
-
-  // 백테스트 요청
+  // 백테스트 요청 (기본 유사도 설정: 메모리 캐시와 추천 기록 사용)
   const request: RecommendBacktestRequest = {
     ticker,
     startDate,
@@ -50,7 +47,7 @@ async function main() {
   };
 
   // 백테스트 실행
-  const result = await engine.run(request, backtestStartIndex);
+  const result = await runRecommendBacktest(request, backtestPrices, backtestStartIndex);
 
   // 결과 출력
   const formatPercent = (v: number) => new Decimal(v).mul(100).toDecimalPlaces(2).toNumber() + "%";

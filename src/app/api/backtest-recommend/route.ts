@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPriceRange } from "@/database/prices";
-import { RecommendBacktestEngine } from "@/backtest-recommend";
+import { runRecommendBacktest } from "@/backtest-recommend";
 import type { RecommendBacktestRequest } from "@/backtest-recommend";
 import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
 
@@ -135,9 +135,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 추천 백테스트 엔진 실행
-    const engine = new RecommendBacktestEngine(validatedRequest.ticker, allPrices);
-
+    // 추천 백테스트 실행
     const backtestRequest: RecommendBacktestRequest = {
       ticker: validatedRequest.ticker,
       startDate: validatedRequest.startDate,
@@ -145,7 +143,7 @@ export async function POST(request: Request) {
       initialCapital: validatedRequest.initialCapital,
     };
 
-    const result = await engine.run(backtestRequest, backtestStartIndex);
+    const result = await runRecommendBacktest(backtestRequest, allPrices, backtestStartIndex);
 
     return NextResponse.json(
       {
