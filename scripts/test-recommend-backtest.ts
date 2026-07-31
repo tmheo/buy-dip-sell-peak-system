@@ -44,10 +44,8 @@ async function main() {
   console.log(`실제 시작일: ${backtestPrices[backtestStartIndex].date}`);
   console.log(`실제 종료일: ${backtestPrices[backtestPrices.length - 1].date}`);
 
-  // 백테스트 엔진 생성 (skipDbCache=false: DB 캐시 사용)
-  const engine = new RecommendBacktestEngine(ticker, backtestPrices, dateToIndexMap, {
-    skipDbCache: false, // DB 캐시 사용
-  });
+  // 백테스트 엔진 생성 (기본 유사도 설정: 추천 캐시 사용)
+  const engine = new RecommendBacktestEngine(ticker, backtestPrices, dateToIndexMap);
 
   // 백테스트 요청
   const request: RecommendBacktestRequest = {

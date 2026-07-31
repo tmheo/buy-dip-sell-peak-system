@@ -5,10 +5,6 @@
 
 // 타입
 export type {
-  MetricWeights,
-  MetricTolerances,
-  SimilarityOptions,
-  SimilarityParams,
   OptimizationConfig,
   BacktestMetrics,
   RankedCandidate,

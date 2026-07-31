@@ -4,6 +4,28 @@
 import type { TechnicalMetrics } from "@/backtest/types";
 import type { Strategy } from "@/types/trading";
 
+/**
+ * 메트릭 가중치 튜플 (5개 지표)
+ * 순서: [maSlope, disparity, rsi14, roc12, volatility20]
+ * 모든 가중치의 합은 1.0이 되어야 함
+ */
+export type MetricWeights = [number, number, number, number, number];
+
+/**
+ * 메트릭 허용오차 튜플 (5개 지표)
+ * 순서: [maSlope, disparity, rsi14, roc12, volatility20]
+ * 각 지표별 유사도 계산 시 사용되는 허용 범위
+ */
+export type MetricTolerances = [number, number, number, number, number];
+
+/** 유사도 계산에 쓰이는 가중치·허용오차 한 벌 */
+export interface SimilarityConfig {
+  /** 메트릭 가중치 */
+  weights: MetricWeights;
+  /** 메트릭 허용오차 */
+  tolerances: MetricTolerances;
+}
+
 /** 추천 요청 인터페이스 */
 export interface RecommendRequest {
   /** 종목 티커 (SOXL | TQQQ) */

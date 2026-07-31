@@ -7,13 +7,9 @@ import * as path from "path";
 import Decimal from "decimal.js";
 
 import { METRIC_WEIGHTS, METRIC_TOLERANCES } from "@/recommend/similarity";
+import type { SimilarityConfig } from "@/recommend/types";
 
-import type {
-  OptimizationConfig,
-  OptimizationResult,
-  SimilarityParams,
-  BacktestMetrics,
-} from "./types";
+import type { OptimizationConfig, OptimizationResult, BacktestMetrics } from "./types";
 import { DEFAULT_OPTIMIZATION_CONFIG } from "./types";
 import { generateRandomParams, generateVariations } from "./param-generator";
 import { loadPriceData, runBacktestWithParams, type PriceDataResult } from "./backtest-runner";
@@ -205,12 +201,12 @@ function logProgress(message: string): void {
 }
 
 /** 백테스트 결과 타입 */
-type BacktestResult = { params: SimilarityParams; metrics: BacktestMetrics };
+type BacktestResult = { params: SimilarityConfig; metrics: BacktestMetrics };
 
 /** 파라미터 배열에 대해 백테스트 실행 (진행 상황 출력 포함) */
 async function runBatchBacktest(
   config: OptimizationConfig,
-  params: SimilarityParams[],
+  params: SimilarityConfig[],
   priceData: PriceDataResult,
   label: string,
   logInterval: number = 10

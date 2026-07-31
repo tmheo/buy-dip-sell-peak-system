@@ -9,7 +9,7 @@ import {
   type PriceDataResult,
 } from "../src/optimize/backtest-runner";
 import { normalizeWeights, validateParams } from "../src/optimize/param-generator";
-import type { SimilarityParams, MetricTolerances } from "../src/optimize/types";
+import type { SimilarityConfig, MetricTolerances } from "../src/recommend/types";
 import { WEIGHT_RANGE, TOLERANCE_RANGES } from "../src/optimize/types";
 import { METRIC_WEIGHTS, METRIC_TOLERANCES } from "../src/recommend/similarity";
 import type { OptimizationConfig } from "../src/optimize/types";
@@ -36,7 +36,7 @@ const TARGETS = [
 ];
 
 // 이전 최적화에서 도출된 Top 3 후보
-const TOP_CANDIDATES: SimilarityParams[] = [
+const TOP_CANDIDATES: SimilarityConfig[] = [
   {
     // #1: 통합점수=0.7992
     weights: [0.3865, 0.0243, 0.3591, 0.0318, 0.1983] as [number, number, number, number, number],
@@ -72,7 +72,7 @@ interface YearResult {
 }
 
 interface MultiYearResult {
-  params: SimilarityParams;
+  params: SimilarityConfig;
   yearResults: YearResult[];
   combinedScore: number;
   avgReturnRate: number;
@@ -117,8 +117,8 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * 더 세밀한 변형 생성 (±5% 범위)
  */
-function generateFineTuneVariations(base: SimilarityParams, count: number): SimilarityParams[] {
-  const variations: SimilarityParams[] = [];
+function generateFineTuneVariations(base: SimilarityConfig, count: number): SimilarityConfig[] {
+  const variations: SimilarityConfig[] = [];
   const maxRetries = count * 10; // 최대 재시도 횟수
   let totalAttempts = 0;
 
@@ -155,7 +155,7 @@ function generateFineTuneVariations(base: SimilarityParams, count: number): Simi
       variedTolerances.push(newTolerance);
     }
 
-    const candidate: SimilarityParams = {
+    const candidate: SimilarityConfig = {
       weights: normalizedWeights,
       tolerances: variedTolerances as MetricTolerances,
     };
@@ -175,7 +175,7 @@ function generateFineTuneVariations(base: SimilarityParams, count: number): Simi
 // ============================================================
 
 async function runMultiYearBacktest(
-  params: SimilarityParams | null,
+  params: SimilarityConfig | null,
   priceData: PriceDataResult,
   parentIndex: number
 ): Promise<MultiYearResult> {

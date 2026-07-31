@@ -14,7 +14,8 @@ import {
   runBacktestWithParams,
   type PriceDataResult,
 } from "../backtest-runner";
-import type { OptimizationConfig, SimilarityParams } from "../types";
+import type { SimilarityConfig } from "@/recommend/types";
+import type { OptimizationConfig } from "../types";
 
 // 테스트용 가격 데이터 캐시
 let soxlPriceData: PriceDataResult;
@@ -186,7 +187,7 @@ describe("runBacktestWithParams", () => {
 
   it("커스텀 파라미터로 백테스트를 실행해야 한다", { timeout: 120000 }, async () => {
     // 기본값과 다른 파라미터
-    const customParams: SimilarityParams = {
+    const customParams: SimilarityConfig = {
       weights: [0.3, 0.45, 0.08, 0.05, 0.12],
       tolerances: [42, 85, 5.2, 35, 32],
     };
@@ -209,7 +210,7 @@ describe("runBacktestWithParams", () => {
       // 2. 크게 다른 커스텀 파라미터
       // 기본값: weights [0.35, 0.4, 0.05, 0.07, 0.13]
       // 기본값: tolerances [36, 90, 4.5, 40, 28]
-      const customParams: SimilarityParams = {
+      const customParams: SimilarityConfig = {
         weights: [0.1, 0.1, 0.3, 0.3, 0.2], // 매우 다른 분배
         tolerances: [80, 50, 15, 80, 60], // 매우 다른 허용오차
       };
@@ -244,31 +245,35 @@ describe("runBacktestWithParams", () => {
     }
   );
 
-  it("try-finally로 항상 파라미터를 복원해야 한다", { timeout: 180000 }, async () => {
-    // 커스텀 파라미터로 실행 후 기본값 복원 확인
-    // (내부 구현 상세를 직접 테스트하기 어려우므로, 연속 실행으로 간접 검증)
-    const customParams: SimilarityParams = {
-      weights: [0.2, 0.2, 0.2, 0.2, 0.2],
-      tolerances: [50, 100, 10, 50, 40],
-    };
+  it(
+    "커스텀 유사도 설정 실행이 이후 베이스라인 결과에 영향을 주지 않아야 한다",
+    { timeout: 180000 },
+    async () => {
+      // 커스텀 설정과 베이스라인을 번갈아 실행해도 베이스라인 결과가 그대로여야 한다
+      // (전역 상태가 없으므로 실행 간 오염이 구조적으로 불가능함을 검증)
+      const customParams: SimilarityConfig = {
+        weights: [0.2, 0.2, 0.2, 0.2, 0.2],
+        tolerances: [50, 100, 10, 50, 40],
+      };
 
-    // 첫 번째 커스텀 실행
-    await runBacktestWithParams(testConfig, customParams, soxlPriceData);
+      // 첫 번째 커스텀 실행
+      await runBacktestWithParams(testConfig, customParams, soxlPriceData);
 
-    // 베이스라인 실행 (기본값 복원 확인)
-    const baseline1 = await runBacktestWithParams(testConfig, null, soxlPriceData);
+      // 베이스라인 실행
+      const baseline1 = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
-    // 두 번째 커스텀 실행
-    await runBacktestWithParams(testConfig, customParams, soxlPriceData);
+      // 두 번째 커스텀 실행
+      await runBacktestWithParams(testConfig, customParams, soxlPriceData);
 
-    // 다시 베이스라인 실행
-    const baseline2 = await runBacktestWithParams(testConfig, null, soxlPriceData);
+      // 다시 베이스라인 실행
+      const baseline2 = await runBacktestWithParams(testConfig, null, soxlPriceData);
 
-    // 두 베이스라인 결과가 동일해야 함 (파라미터가 올바르게 복원됨)
-    expect(baseline1.returnRate).toBe(baseline2.returnRate);
-    expect(baseline1.mdd).toBe(baseline2.mdd);
-    expect(baseline1.strategyScore).toBe(baseline2.strategyScore);
-  });
+      // 두 베이스라인 결과가 동일해야 함 (커스텀 설정 실행의 영향이 없음)
+      expect(baseline1.returnRate).toBe(baseline2.returnRate);
+      expect(baseline1.mdd).toBe(baseline2.mdd);
+      expect(baseline1.strategyScore).toBe(baseline2.strategyScore);
+    }
+  );
 
   it("priceData를 재사용할 수 있어야 한다", { timeout: 30000 }, async () => {
     // 성능 최적화: 미리 로드한 가격 데이터 재사용

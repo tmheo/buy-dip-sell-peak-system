@@ -4,7 +4,7 @@
  */
 import Decimal from "decimal.js";
 
-import type { SimilarityParams, MetricWeights, MetricTolerances } from "./types";
+import type { SimilarityConfig, MetricWeights, MetricTolerances } from "@/recommend/types";
 import { TOLERANCE_RANGES, WEIGHT_RANGE, VARIATION_RANGE } from "./types";
 
 /** 가중치 합 검증 허용 오차 */
@@ -81,7 +81,7 @@ export function normalizeWeights(weights: number[]): MetricWeights {
 }
 
 /** 유사도 파라미터의 유효성 검증 */
-export function validateParams(params: SimilarityParams): boolean {
+export function validateParams(params: SimilarityConfig): boolean {
   const { weights, tolerances } = params;
 
   if (weights.length !== METRIC_COUNT || tolerances.length !== METRIC_COUNT) {
@@ -133,12 +133,12 @@ function generateRandomTolerances(): MetricTolerances {
 }
 
 /** 지정된 개수의 랜덤 파라미터 조합 생성 */
-export function generateRandomParams(count: number): SimilarityParams[] {
-  const params: SimilarityParams[] = [];
+export function generateRandomParams(count: number): SimilarityConfig[] {
+  const params: SimilarityConfig[] = [];
   let retryCount = 0;
 
   while (params.length < count && retryCount < MAX_RETRY_COUNT) {
-    const candidate: SimilarityParams = {
+    const candidate: SimilarityConfig = {
       weights: generateRandomWeights(),
       tolerances: generateRandomTolerances(),
     };
@@ -172,8 +172,8 @@ function varyValue(baseValue: number, min: number, max: number): number {
 }
 
 /** 기존 파라미터를 기반으로 변형 파라미터 생성 (+/-10% 범위) */
-export function generateVariations(base: SimilarityParams, count: number): SimilarityParams[] {
-  const variations: SimilarityParams[] = [];
+export function generateVariations(base: SimilarityConfig, count: number): SimilarityConfig[] {
+  const variations: SimilarityConfig[] = [];
   let retryCount = 0;
 
   while (variations.length < count && retryCount < MAX_RETRY_COUNT) {
@@ -188,7 +188,7 @@ export function generateVariations(base: SimilarityParams, count: number): Simil
       return new Decimal(varied).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
     }) as MetricTolerances;
 
-    const candidate: SimilarityParams = {
+    const candidate: SimilarityConfig = {
       weights: normalizedWeights,
       tolerances: variedTolerances,
     };
