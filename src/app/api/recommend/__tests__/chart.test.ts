@@ -1,6 +1,6 @@
 /**
  * /api/recommend 표시 계층 헬퍼 테스트 (이슈 #57)
- * 차트 데이터(종가·MA20·MA60)와 미래 거래일 placeholder, 화면 응답 변환을 검증한다.
+ * 차트 데이터(종가·MA20·MA60)와 값을 비워 둔 미래 거래일, 화면 응답 변환을 검증한다.
  * 서비스 밖 순수 함수이므로 DB 없이 테스트한다.
  */
 import { describe, it, expect } from "vitest";
@@ -78,7 +78,7 @@ describe("generateChartData", () => {
 });
 
 describe("buildRecommendResult", () => {
-  it("기준일 차트는 분석 구간 + 미래 거래일 placeholder여야 한다", () => {
+  it("기준일 차트는 분석 구간 뒤에 값을 비워 둔 미래 거래일을 붙여야 한다", () => {
     const { prices, referenceDate, recommendation } = detailedRecommendationFixture();
 
     const result = buildRecommendResult(recommendation, prices);
@@ -89,7 +89,7 @@ describe("buildRecommendResult", () => {
     expect(analysisPart[0].date).toBe(recommendation.analysisPeriod!.startDate);
     expect(analysisPart[analysisPart.length - 1].date).toBe(referenceDate);
     expect(analysisPart.every((p) => p.close !== null)).toBe(true);
-    // 기준일 이후는 실제 데이터 유무와 관계없이 항상 placeholder
+    // 기준일 이후는 실제 데이터 유무와 관계없이 항상 값을 비워 둔다
     expect(futurePart.every((p) => p.close === null && p.ma20 === null && p.ma60 === null)).toBe(
       true
     );

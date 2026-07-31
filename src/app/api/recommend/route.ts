@@ -75,20 +75,15 @@ export async function POST(request: Request): Promise<Response> {
 
     // 기준일 결정 (today인 경우 DB의 최신 날짜 사용)
     const latestDate = await getLatestDate(ticker);
-    if (!latestDate) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "No price data available",
-          message: `No price data found for ${ticker}`,
-        },
-        { status: 400 }
-      );
-    }
-    const referenceDate = baseType === "today" ? latestDate : parseResult.data.referenceDate;
+    const referenceDate =
+      baseType === "today" && latestDate ? latestDate : parseResult.data.referenceDate;
 
-    // 전체 가격 데이터는 차트 표시에도 필요하므로 route가 한 번 로드해 서비스에 전달한다
-    const allPrices = await getPriceRange(ticker, PRICE_HISTORY_START, latestDate);
+    // 전체 가격 데이터는 차트 표시에도 필요하므로 route가 한 번 로드해 서비스에 전달한다.
+    // 가격 데이터가 아예 없어도 빈 배열을 넘겨 서비스가 InsufficientData로 판정하게
+    // 한다 (실패 정책 한 벌: route는 매핑만 한다)
+    const allPrices = latestDate
+      ? await getPriceRange(ticker, PRICE_HISTORY_START, latestDate)
+      : [];
 
     // 추천 계산 (화면은 유사 구간·점수 상세가 필요하므로 requireDetail)
     const outcome = await recommend(ticker, referenceDate, {

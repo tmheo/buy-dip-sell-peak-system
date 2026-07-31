@@ -5,6 +5,7 @@
 // 타입 내보내기
 export type {
   Recommendation,
+  RecommendationCacheDetail,
   RecommendOutcome,
   InsufficientReason,
   InsufficientReasonCode,
@@ -47,6 +48,7 @@ export {
   recommend,
   recommendOrDefault,
   clearRecommendationCache,
+  toRecommendationCacheRow,
   DEFAULT_STRATEGY,
   PRICE_HISTORY_START,
   type RecommendOptions,

@@ -8,8 +8,11 @@ import type { Session } from "next-auth";
 
 import { clearRecommendationCache } from "@/recommend";
 import { MIN_PAST_GAP_DAYS } from "@/recommend/similarity";
-import type { HistoricalMetrics } from "@/recommend/types";
-import { createPrices, buildHistoricalMetrics } from "@/recommend/__tests__/fixtures";
+import {
+  createPrices,
+  buildHistoricalMetrics,
+  toMetricsRows,
+} from "@/recommend/__tests__/fixtures";
 
 vi.mock("@/lib/auth/api-auth", () => ({
   requireAuth: vi.fn(),
@@ -53,15 +56,6 @@ function createRequest(body: unknown): Request {
     headers: { "Content-Type": "application/json" },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
-}
-
-/** HistoricalMetrics를 daily_metrics 행 형태로 변환 */
-function toMetricsRows(historicalMetrics: HistoricalMetrics[]) {
-  return historicalMetrics.map((h) => ({
-    ticker: "SOXL",
-    date: h.date,
-    ...h.metrics,
-  }));
 }
 
 /** 추천이 성공할 수 있는 DB 대역 한 벌 구성 */
@@ -128,7 +122,7 @@ describe("POST /api/recommend - 추천 성공", () => {
     expect(["Pro1", "Pro2", "Pro3"]).toContain(body.data.recommendedStrategy.strategy);
     expect(body.data.recommendedStrategy.tierRatios).toHaveLength(6);
     expect(body.data.strategyScores).toHaveLength(3);
-    // 기준일 차트: 분석 구간 20일 + 미래 placeholder 20일
+    // 기준일 차트: 분석 구간 20일 + 값을 비워 둔 미래 20일
     expect(body.data.referenceChartData).toHaveLength(40);
     expect(
       body.data.referenceChartData
@@ -164,13 +158,44 @@ describe("POST /api/recommend - 추천 성공", () => {
 
     expect(second.status).toBe(200);
     expect(mockedGetMetricsRange).toHaveBeenCalledOnce();
-    // 계산 결과는 DB 추천 캐시에도 저장된다
+    // 계산 결과는 상세(detail)와 함께 DB 추천 캐시에도 저장된다
     expect(mockedCacheRecommendation).toHaveBeenCalledOnce();
+    expect(mockedCacheRecommendation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ similarPeriods: expect.any(Array) }),
+      })
+    );
+  });
+
+  it("프로세스 재시작 후에도 상세가 저장된 DB 캐시 행으로 응답해야 한다", async () => {
+    const { referenceDate } = arrangeSuccessDb();
+    const request = { ticker: "SOXL", referenceDate, baseType: "specific" };
+    const first = await POST(createRequest(request));
+    expect(first.status).toBe(200);
+    const persisted = mockedCacheRecommendation.mock.calls[0][0];
+
+    // 프로세스 재시작 재현: 메모리 캐시를 비우고 DB 캐시 행만 남긴다
+    clearRecommendationCache();
+    mockedGetMetricsRange.mockClear();
+    mockedGetCachedRecommendation.mockResolvedValue({
+      id: 1,
+      createdAt: new Date(),
+      ...persisted,
+    } as Awaited<ReturnType<typeof getCachedRecommendation>>);
+
+    const response = await POST(createRequest(request));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.similarPeriods).toHaveLength(3);
+    expect(body.data.referenceChartData).toHaveLength(40);
+    // 전체 재계산 없이 DB 캐시에서 복원됐다
+    expect(mockedGetMetricsRange).not.toHaveBeenCalled();
   });
 });
 
 describe("POST /api/recommend - InsufficientData → 400 매핑", () => {
-  it("가격 데이터가 전혀 없으면 400이어야 한다", async () => {
+  it("가격 데이터가 전혀 없어도 서비스의 판정(PRICE_DATA_NOT_FOUND)으로 매핑해야 한다", async () => {
     mockedGetLatestDate.mockResolvedValue(null);
 
     const response = await POST(
@@ -178,7 +203,11 @@ describe("POST /api/recommend - InsufficientData → 400 매핑", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ success: false });
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: "PRICE_DATA_NOT_FOUND",
+    });
+    expect(mockedGetPriceRange).not.toHaveBeenCalled();
   });
 
   it("DB 지표가 부족하면 재계산 폴백 없이 400과 사유를 반환해야 한다", async () => {

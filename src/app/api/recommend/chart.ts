@@ -1,6 +1,6 @@
 /**
  * /api/recommend 표시 계층 헬퍼 (이슈 #57)
- * 차트 데이터(종가·MA20·MA60)와 미래 거래일 placeholder는 화면 표시 용도이므로
+ * 차트 데이터(종가·MA20·MA60)와 값을 비워 둔 미래 거래일은 화면 표시 용도이므로
  * RecommendationService 밖(route 옆)에 둔다. MA 계산은 기존 지표 모듈을 쓴다.
  */
 import type { DailyPrice } from "@/types";
@@ -50,7 +50,7 @@ export function generateChartData(
 
 /**
  * 서비스 추천(상세 포함)을 화면 응답(RecommendResult)으로 변환
- * 기준일 차트는 분석 구간 + 미래 20 거래일 placeholder다
+ * 기준일 차트는 분석 구간 뒤에 값을 비워 둔 미래 20 거래일을 붙인다
  * (원본 사이트와 동일하게 기준일 이후 실제 데이터가 있어도 표시하지 않는다)
  */
 export function buildRecommendResult(

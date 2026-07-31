@@ -12,6 +12,8 @@
  *
  * 캐시 정책: 커스텀 similarityConfig가 오면 메모리·DB 캐시를 조회도 저장도 하지
  * 않아, 기본 설정의 추천 결과와 섞이는 일이 구조적으로 불가능하다.
+ * DB 캐시는 요약 컬럼과 상세 JSON(detail)을 함께 저장하며, 상세가 필요한
+ * 호출(requireDetail)은 상세가 저장된 행만 적중으로 친다.
  */
 import type { DailyPrice } from "@/types";
 import type { Strategy } from "@/types/trading";
@@ -23,6 +25,7 @@ import {
   getCachedRecommendation,
   cacheRecommendation,
   toRecommendationCacheMetrics,
+  type NewRecommendationCache,
 } from "@/database/recommend-cache";
 
 import { computeRecommendation } from "./core";
@@ -31,6 +34,7 @@ import type {
   HistoricalMetrics,
   InsufficientReasonCode,
   Recommendation,
+  RecommendationCacheDetail,
   RecommendOutcome,
   SimilarityConfig,
 } from "./types";
@@ -51,8 +55,8 @@ export interface RecommendOptions {
   persistCache?: boolean;
   /**
    * 상세 필드(analysisPeriod·similarPeriods·strategyScores·downgradeInfo)가 필요한
-   * 호출자용 (recommend route). DB 캐시는 요약만 저장하므로 조회하지 않고,
-   * 메모리 캐시도 요약만 있으면 적중으로 치지 않는다 (전체 계산 후 전체 값으로 교체)
+   * 호출자용 (recommend route). 요약만 있는 캐시(상세 없는 DB 행·요약 메모리 값)는
+   * 적중으로 치지 않고, 전체를 계산해 상세와 함께 다시 캐시한다
    */
   requireDetail?: boolean;
 }
@@ -159,7 +163,7 @@ async function loadHistoricalMetrics(
   return historicalMetrics;
 }
 
-/** DB 캐시 행을 요약 Recommendation으로 변환 */
+/** DB 캐시 행을 Recommendation으로 변환 (상세 JSON이 저장된 행이면 상세까지 복원) */
 function fromCachedRecommendation(
   referenceDate: string,
   cached: NonNullable<Awaited<ReturnType<typeof getCachedRecommendation>>>
@@ -171,6 +175,27 @@ function fromCachedRecommendation(
     reason: cached.reason ?? "캐시된 추천",
     metrics: toTechnicalMetrics(cached),
     tierRatios: getStrategyTierRatios(strategy),
+    ...(cached.detail ?? {}),
+  };
+}
+
+/** 추천을 DB 캐시 행(요약 컬럼 + 상세 JSON)으로 변환 */
+export function toRecommendationCacheRow(
+  ticker: "SOXL" | "TQQQ",
+  value: Recommendation
+): NewRecommendationCache {
+  const { analysisPeriod, similarPeriods, strategyScores, downgradeInfo } = value;
+  const detail: RecommendationCacheDetail | null =
+    analysisPeriod && similarPeriods && strategyScores
+      ? { analysisPeriod, similarPeriods, strategyScores, downgradeInfo }
+      : null;
+  return {
+    ticker,
+    date: value.referenceDate,
+    strategy: value.strategy,
+    reason: value.reason,
+    detail,
+    ...toRecommendationCacheMetrics(value.metrics),
   };
 }
 
@@ -198,14 +223,12 @@ export async function recommend(
       return { ok: true, value: memoryCached };
     }
 
-    // DB 캐시는 요약만 저장하므로 상세가 필요한 호출에는 적중할 수 없다
-    if (!requireDetail) {
-      const dbCached = await getCachedRecommendation(ticker, referenceDate);
-      if (dbCached) {
-        const value = fromCachedRecommendation(referenceDate, dbCached);
-        setMemoryCache(cacheKey, value);
-        return { ok: true, value };
-      }
+    // 상세가 필요한 호출은 상세 JSON이 저장된 DB 행만 적중으로 친다
+    const dbCached = await getCachedRecommendation(ticker, referenceDate);
+    if (dbCached && !(requireDetail && !dbCached.detail)) {
+      const value = fromCachedRecommendation(referenceDate, dbCached);
+      setMemoryCache(cacheKey, value);
+      return { ok: true, value };
     }
   }
 
@@ -228,13 +251,7 @@ export async function recommend(
   if (outcome.ok && useCache) {
     setMemoryCache(cacheKey, outcome.value);
     if (persistCache) {
-      await cacheRecommendation({
-        ticker,
-        date: referenceDate,
-        strategy: outcome.value.strategy,
-        reason: outcome.value.reason,
-        ...toRecommendationCacheMetrics(outcome.value.metrics),
-      });
+      await cacheRecommendation(toRecommendationCacheRow(ticker, outcome.value));
     }
   }
 
