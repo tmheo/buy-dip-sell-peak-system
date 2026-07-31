@@ -10,7 +10,7 @@ import {
   type NewRecommendationCache,
 } from "@/database/recommend-cache";
 import type { DailyPrice } from "@/types";
-import { getQuickRecommendation, clearRecommendationCache } from "@/backtest-recommend";
+import { recommend, clearRecommendationCache } from "@/recommend/service";
 
 // 설정
 const TICKERS = ["SOXL", "TQQQ"] as const;
@@ -44,12 +44,6 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
 
   console.log(`${ticker}: ${allPrices.length}일 가격 데이터 로드 완료`);
 
-  // 날짜-인덱스 맵 생성
-  const dateToIndexMap = new Map<string, number>();
-  for (let index = 0; index < allPrices.length; index++) {
-    dateToIndexMap.set(allPrices[index].date, index);
-  }
-
   // 인메모리 캐시 초기화
   clearRecommendationCache();
 
@@ -64,18 +58,22 @@ async function precomputeForTicker(ticker: "SOXL" | "TQQQ"): Promise<number> {
   for (let i = startIndex; i < allPrices.length; i++) {
     const referenceDate = allPrices[i].date;
 
-    // 추천 계산 (DB 저장은 bulkSaveRecommendations에서 일괄 처리하므로 persistToDb: false)
-    const result = await getQuickRecommendation(ticker, referenceDate, allPrices, dateToIndexMap, {
-      persistToDb: false,
+    // 추천 계산 (DB 저장은 bulkSaveRecommendations에서 일괄 처리하므로 persistCache: false)
+    // 추천 불가(InsufficientData)인 날짜는 캐시에 저장하지 않는다.
+    // 기본 전략 폴백 결과가 캐시에 들어가면 이후 recommend()가 캐시 적중으로
+    // 추천 성공 취급해 실패 정책과 충돌하기 때문이다.
+    const outcome = await recommend(ticker, referenceDate, {
+      prices: allPrices,
+      persistCache: false,
     });
 
-    if (result) {
+    if (outcome.ok) {
       cacheItems.push({
         ticker,
         date: referenceDate,
-        strategy: result.strategy,
-        reason: result.reason,
-        ...toRecommendationCacheMetrics(result.metrics),
+        strategy: outcome.value.strategy,
+        reason: outcome.value.reason,
+        ...toRecommendationCacheMetrics(outcome.value.metrics),
       });
       cachedCount++;
 

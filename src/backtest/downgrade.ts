@@ -16,8 +16,6 @@ export interface DowngradeResult {
   originalStrategy?: Strategy;
   /** 하향 사유 목록 */
   reasons: string[];
-  /** 다이버전스 조건 발동 여부 (정배열 Pro1 제외 규칙 무시용) */
-  hasDivergenceCondition: boolean;
 }
 
 /** 전략 하향 매핑 */
@@ -31,38 +29,21 @@ const DOWNGRADE_MAP: Record<Strategy, Strategy> = {
 const DIVERGENCE_REASON = "RSI 다이버전스 & 이격도<120";
 
 /**
- * 조건 2 체크: RSI 다이버전스 AND 이격도 < 120 AND 기준일 RSI >= 60
- */
-function checkCondition2(
-  metrics: TechnicalMetrics,
-  prices: number[],
-  referenceDateIndex: number
-): boolean {
-  if (metrics.disparity >= 20 || metrics.rsi14 < 60) {
-    return false;
-  }
-  const divergence = detectBearishDivergence(prices, referenceDateIndex);
-  return divergence.hasBearishDivergence;
-}
-
-/**
  * SOXL 전략 하향 규칙 적용
  *
  * 2가지 조건 중 하나라도 충족 시 전략을 한 단계 하향 (중복 시 1회만):
  * - 조건 1: RSI >= 60 AND 역배열
- * - 조건 2: RSI 다이버전스 AND 이격도<120 AND 기준일 RSI>=60
+ * - 조건 2: 다이버전스 조건 (checkDivergenceCondition으로 호출부가 한 번 계산해 전달)
  *
  * @param strategy - 원본 추천 전략
  * @param metrics - 기준일 기술적 지표
- * @param prices - 전체 가격 배열
- * @param referenceDateIndex - 기준일 인덱스
- * @returns 하향 적용 결과 (다이버전스 조건 발동 여부 포함)
+ * @param hasDivergenceCondition - 다이버전스 조건(조건 2) 발동 여부
+ * @returns 하향 적용 결과
  */
 export function applySOXLDowngrade(
   strategy: Strategy,
   metrics: TechnicalMetrics,
-  prices: number[],
-  referenceDateIndex: number
+  hasDivergenceCondition: boolean
 ): DowngradeResult {
   const reasons: string[] = [];
 
@@ -73,8 +54,7 @@ export function applySOXLDowngrade(
   }
 
   // 조건 2: RSI 다이버전스 AND 이격도<120 AND RSI>=60
-  const isCondition2 = checkCondition2(metrics, prices, referenceDateIndex);
-  if (isCondition2) {
+  if (hasDivergenceCondition) {
     reasons.push(DIVERGENCE_REASON);
   }
 
@@ -84,7 +64,6 @@ export function applySOXLDowngrade(
       strategy,
       applied: false,
       reasons: [],
-      hasDivergenceCondition: false,
     };
   }
 
@@ -97,7 +76,6 @@ export function applySOXLDowngrade(
     applied,
     originalStrategy: applied ? strategy : undefined,
     reasons,
-    hasDivergenceCondition: isCondition2,
   };
 }
 
@@ -116,8 +94,10 @@ export function formatDowngradeReason(baseReason: string, result: DowngradeResul
 }
 
 /**
- * RSI 다이버전스 조건 발동 여부 체크
- * 정배열 시 Pro1 제외 규칙을 무시할지 결정하는 데 사용
+ * RSI 다이버전스 조건(조건 2) 발동 여부 체크
+ * RSI 다이버전스 AND 이격도 < 120 AND 기준일 RSI >= 60
+ * 정배열 시 Pro1 제외 규칙 무시와 전략 하향(조건 2)에 공용으로 쓰이므로
+ * 호출부가 한 번 계산해 전달한다
  *
  * @param metrics - 기준일 기술적 지표
  * @param prices - 전체 가격 배열
@@ -129,5 +109,9 @@ export function checkDivergenceCondition(
   prices: number[],
   referenceDateIndex: number
 ): boolean {
-  return checkCondition2(metrics, prices, referenceDateIndex);
+  if (metrics.disparity >= 20 || metrics.rsi14 < 60) {
+    return false;
+  }
+  const divergence = detectBearishDivergence(prices, referenceDateIndex);
+  return divergence.hasBearishDivergence;
 }
