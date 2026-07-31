@@ -195,13 +195,7 @@ describe("syncTickerPrices", () => {
 
     const summary = await syncTickerPrices("SOXL");
 
-    expect(buildDailyMetricRows).toHaveBeenCalledWith(
-      fetched.map((p) => p.adjClose),
-      fetched.map((p) => p.date),
-      "SOXL",
-      59,
-      99
-    );
+    expect(buildDailyMetricRows).toHaveBeenCalledWith(fetched, "SOXL");
     expect(upsertMetrics).toHaveBeenCalledTimes(1);
     expect(vi.mocked(upsertMetrics).mock.calls[0][0]).toHaveLength(1);
     expect(summary.upsertedMetrics).toBe(1);
@@ -265,13 +259,7 @@ describe("syncTickerPrices", () => {
     expect(summary.dbOnlyDates).toEqual([dbExtra.date]);
     // 지표는 재수집본이 아니라 유지된 날짜를 포함한 DB 시계열로 계산된다
     expect(getAllPricesByTicker).toHaveBeenCalledTimes(2);
-    expect(buildDailyMetricRows).toHaveBeenCalledWith(
-      db.map((p) => p.adjClose),
-      db.map((p) => p.date),
-      "SOXL",
-      59,
-      db.length - 1
-    );
+    expect(buildDailyMetricRows).toHaveBeenCalledWith(db, "SOXL");
   });
 
   it("변경도 신규도 없으면 가격 upsert를 건너뛰지만 지표는 재계산한다", async () => {

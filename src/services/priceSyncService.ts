@@ -21,9 +21,6 @@ import type { DailyMetricRow, DailyPrice } from "@/types/index";
 /** 분할 가드 임계값: 기존 close 대비 소급 변경 비율이 이 값을 넘으면 쓰기를 중단한다 */
 export const CLOSE_GUARD_THRESHOLD = 0.05;
 
-/** MA60 계산에 필요한 최소 데이터 인덱스 (60일 이동평균 기준) */
-const MA60_MIN_INDEX = 59;
-
 /**
  * 전체 히스토리 페치 재시도 설정.
  * 재시도는 페치 단계에만 둔다 - DB 쓰기 이후를 통째로 재시도하면 2회차 diff가
@@ -245,13 +242,7 @@ export async function syncTickerPrices(
   // 지표가 가격 테이블과 같은 시계열 위에서 계산되게 한다.
   const seriesForMetrics =
     diff.dbOnlyDates.length > 0 ? await getAllPricesByTicker(ticker) : fetched;
-  const metrics = buildDailyMetricRows(
-    seriesForMetrics.map((p) => p.adjClose),
-    seriesForMetrics.map((p) => p.date),
-    ticker,
-    MA60_MIN_INDEX,
-    seriesForMetrics.length - 1
-  );
+  const metrics = buildDailyMetricRows(seriesForMetrics, ticker);
   if (metrics.length > 0) {
     await upsertMetrics(convertMetricsToRows(metrics, ticker));
   }

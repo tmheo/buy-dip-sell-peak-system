@@ -190,9 +190,7 @@ async function handleInitMetrics(ticker: SupportedTicker): Promise<void> {
   console.log(`가격 데이터 수: ${prices.length}`);
   console.log("기술적 지표 계산 중...");
 
-  const adjClosePrices = prices.map((p) => p.adjClose);
-  const dates = prices.map((p) => p.date);
-  const metrics = buildDailyMetricRows(adjClosePrices, dates, ticker, 59, prices.length - 1);
+  const metrics = buildDailyMetricRows(prices, ticker);
 
   if (metrics.length > 0) {
     const pgMetrics = convertMetricsToRows(metrics, ticker);
