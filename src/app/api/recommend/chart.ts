@@ -4,7 +4,7 @@
  * RecommendationService 밖(route 옆)에 둔다. MA 계산은 기존 지표 모듈을 쓴다.
  */
 import type { DailyPrice } from "@/types";
-import { calculateSMA } from "@/backtest/metrics";
+import { calculateSMA } from "@/metrics";
 import { buildDateToIndexMap } from "@/utils/date-index";
 import { PERFORMANCE_PERIOD_DAYS } from "@/recommend/similarity";
 import type { ChartDataPoint, Recommendation, RecommendResult } from "@/recommend/types";

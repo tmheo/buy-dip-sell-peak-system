@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { calculateSMA } from "@/backtest/metrics";
+import { calculateSMA } from "@/metrics";
 import { computeRecommendation } from "@/recommend/core";
 import {
   ANALYSIS_PERIOD_DAYS,

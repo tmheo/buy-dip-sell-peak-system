@@ -1,5 +1,10 @@
 # SPEC-PERFORMANCE-001: 추천 API 성능 개선
 
+> **이행 안내 (2026-08-01, #70/#73)**: 이 문서가 설계한 배치 지표 계산(`src/services/metricsCalculator.ts`)은 `src/metrics` 모듈로 통합되어 삭제되었다.
+> 슬라이딩 윈도우 알고리즘은 `src/metrics/indicators.ts`가, DB 적재 정책은 `src/services/metricsRows.ts`가 잇는다.
+> `verify-metrics` CLI는 골든 테스트(`src/metrics/__tests__/golden.test.ts`)로 대체되었다.
+> 아래 본문은 당시 계획의 기록이다.
+
 ## 개요
 
 | 항목 | 내용 |

@@ -3,7 +3,7 @@
  * SPEC-RECOMMEND-002 RSI 다이버전스 + 이격도120+ 하향 조건
  */
 import Decimal from "decimal.js";
-import { calculateRSI } from "./metrics";
+import { calculateRSI } from "@/metrics";
 
 /** 다이버전스 탐지 결과 */
 export interface DivergenceResult {

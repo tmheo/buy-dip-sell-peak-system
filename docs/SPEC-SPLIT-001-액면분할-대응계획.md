@@ -64,8 +64,7 @@ Yahoo Finance는 분할이 발생하면 **과거 전체 `adjClose`(및 `close`)�
 
 ### 2.4 영향 2 - 지표 동결
 
-`calculateMetricsBatch`(`src/services/metricsCalculator.ts`)의 MA20/MA60, RSI14, ROC12,
-변동성, 이격도, 골든크로스가 모두 연속된 `adjClose`를 전제로 한다.
+지표 계산(`src/metrics`의 `computeIndicatorSeries`와 DB 변환 어댑터 `src/services/metricsRows.ts`의 `buildDailyMetricRows`)의 MA20/MA60, RSI14, ROC12, 변동성, 이격도, 골든크로스가 모두 연속된 `adjClose`를 전제로 한다.
 동기화 서비스는 가격 정합과 지표 전체 재계산을 한 실행에서 수행하므로, 가드가 우회 없이
 해제되면(4장 (1)) 분할 반영 가격 위에서 지표가 함께 수렴한다.
 가드 발동 중에는 지표도 갱신되지 않고 동결된다 - 분할 전후 값이 한 시계열에 섞여
@@ -179,7 +178,9 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 
 ### (2) 지표 검증
 - [ ] 지표는 (1)의 동기화에서 이미 전체 재계산되었다.
-- [ ] `npx tsx src/index.ts verify-metrics --ticker SOXL` 로 배치 계산 정합성 확인.
+- [ ] 지표 계산 구현은 `src/metrics` 하나뿐이므로 별도 대조 명령은 없다
+      (`verify-metrics`는 #70에서 삭제, 정합성은 골든 테스트가 매 PR마다 검증한다).
+      필요하면 `npx tsx src/index.ts query --ticker SOXL`로 분할 전후 구간 값을 눈으로 확인한다.
 
 ### (3) 활성 계정별 `tier_holdings` 보정
 - [ ] 보유 티어(`shares > 0`)에 대해서만:
@@ -257,8 +258,8 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 | 데이터 페치 | `src/services/dataFetcher.ts` - `fetchAllHistory`, `normalizePrice` |
 | 동기화 서비스 | `src/services/priceSyncService.ts` - `syncTickerPrices`, `diffPriceSnapshots`(분할 가드 포함) |
 | 가격 적재 | `src/database/prices.ts` - `upsertDailyPrices`(onConflictDoUpdate) |
-| 지표 계산 | `src/services/metricsCalculator.ts` — `calculateMetricsBatch` |
-| CLI | `src/index.ts` - `init`/`update`(`--force` 가드 우회), `init-metrics`, `verify-metrics` |
+| 지표 계산 | `src/metrics` - `computeIndicatorSeries`, DB 변환 어댑터 `src/services/metricsRows.ts` - `buildDailyMetricRows` |
+| CLI | `src/index.ts` - `init`/`update`(`--force` 가드 우회), `init-metrics` |
 | 보유 보정 | `src/database/trading/tier-holdings.ts` — `updateTierHolding`, `getTierHoldings` |
 | 주문 생성/정리 | `src/database/trading/orders.ts` — `generateDailyOrders`, `deleteDailyOrders`, `getClosingPrice`, `calculateSellLimitPrice` |
 | 거래 기록 | `src/database/trading/profits.ts` |
