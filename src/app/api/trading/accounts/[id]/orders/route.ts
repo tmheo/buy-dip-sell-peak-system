@@ -19,7 +19,6 @@ import { getOrCreateDailyOrders, processOrderExecution } from "@/trading";
  * 당일 주문표 조회
  * Query params:
  *   - date: 조회할 날짜 (YYYY-MM-DD, 기본값: 오늘)
- *   - regenerate: true면 기존 주문 삭제 후 재생성
  */
 export async function GET(request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -38,7 +37,6 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // 날짜 파라미터 파싱
   const url = new URL(request.url);
   const dateParam = url.searchParams.get("date");
-  const regenerate = url.searchParams.get("regenerate") === "true";
   const date = dateParam || new Date().toISOString().split("T")[0];
 
   // 날짜 형식 검증
@@ -46,7 +44,7 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  const orders = await getOrCreateDailyOrders(account, date, { regenerate });
+  const orders = await getOrCreateDailyOrders(account, date);
 
   return NextResponse.json({
     date,

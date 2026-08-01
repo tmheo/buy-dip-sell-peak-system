@@ -3,8 +3,7 @@
  *
  * 저장 모듈을 대역으로 바꿔, getOrCreateDailyOrders가 소유하는 판정만 검증한다.
  * - 미체결 주문은 계좌 설정 변경 또는 더 최신 가격 적재 시 재생성한다
- * - 체결된 주문이 하나라도 있으면 재생성하지 않는다
- * - regenerate는 판정 없이 무조건 재생성한다
+ * - 체결된 주문이 하나라도 있으면 재생성하지 않는다 (판정을 건너뛰는 경로는 없다 - #85)
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -172,17 +171,6 @@ describe("getOrCreateDailyOrders - 주문표 신선도 정책", () => {
     expect(orders).toBe(existing);
     expect(mockedHasNewerPriceSince).not.toHaveBeenCalled();
     expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
-  });
-
-  it("regenerate면 판정 없이 삭제하고 재생성한다", async () => {
-    // 삭제 후에는 조회 결과가 비므로, 재조회에서 빈 목록을 돌려준다
-    mockedGetDailyOrders.mockResolvedValue([]);
-
-    const orders = await getOrCreateDailyOrders(createAccount(), DATE, { regenerate: true });
-
-    expect(orders).toEqual(REGENERATED);
-    expect(mockedDeleteDailyOrders).toHaveBeenCalledWith(ACCOUNT_ID, DATE);
-    expect(mockedHasNewerPriceSince).not.toHaveBeenCalled();
   });
 
   it("가격 데이터가 없으면 주문을 만들지 않는다", async () => {
