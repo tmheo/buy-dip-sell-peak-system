@@ -5,17 +5,16 @@
  */
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { getAuthUserId, unauthorizedResponse } from "@/lib/api-utils";
 import { db } from "@/database/db-drizzle";
 import { users } from "@/database/schema/index";
 
 export async function DELETE(): Promise<NextResponse> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return unauthorizedResponse();
   }
 
-  await db.delete(users).where(eq(users.id, session.user.id));
+  await db.delete(users).where(eq(users.id, userId));
   return NextResponse.json({ success: true });
 }

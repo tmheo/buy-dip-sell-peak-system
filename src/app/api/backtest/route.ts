@@ -10,7 +10,7 @@ import { getPriceRange } from "@/database/prices";
 import { BacktestEngine } from "@/backtest";
 import type { BacktestRequest } from "@/backtest";
 import type { Strategy } from "@/types/trading";
-import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
+import { getAuthUserId, unauthorizedResponse } from "@/lib/api-utils";
 
 // 요청 스키마 정의
 const BacktestRequestSchema = z
@@ -44,9 +44,8 @@ const BacktestRequestSchema = z
 export async function POST(request: Request) {
   try {
     // 인증 체크
-    const authResult = await requireAuth();
-    if (isUnauthorized(authResult)) {
-      return authResult;
+    if (!(await getAuthUserId())) {
+      return unauthorizedResponse();
     }
 
     // 요청 본문 파싱

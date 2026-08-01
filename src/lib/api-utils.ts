@@ -1,9 +1,11 @@
 /**
  * API 라우트 공통 유틸리티
- * - 인증 헬퍼
+ * - 인증 헬퍼 (세션 인증, 크론 인증)
  * - 공통 타입
  * - 에러 응답 헬퍼
  */
+
+import { timingSafeEqual } from "crypto";
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
@@ -28,6 +30,39 @@ export interface RouteParams<T = { id: string }> {
 export async function getAuthUserId(): Promise<string | null> {
   const session = await auth();
   return session?.user?.id ?? null;
+}
+
+/**
+ * 크론 요청의 Bearer 토큰을 검증한다.
+ * 타이밍 공격을 막기 위해 timingSafeEqual로 비교하며,
+ * 길이가 다르면 timingSafeEqual이 던지므로 먼저 길이를 확인한다.
+ *
+ * @returns 통과하면 null, 실패하면 그대로 반환할 에러 응답
+ *
+ * @example
+ * const authError = requireCronAuth(request);
+ * if (authError) return authError;
+ */
+export function requireCronAuth(request: Request): NextResponse | null {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error("CRON_SECRET 환경 변수 미설정");
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  const authHeader = request.headers.get("authorization");
+  const expectedToken = `Bearer ${cronSecret}`;
+
+  if (
+    !authHeader ||
+    authHeader.length !== expectedToken.length ||
+    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedToken))
+  ) {
+    console.warn("Cron 인증 실패: 잘못된 토큰");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return null;
 }
 
 /**
