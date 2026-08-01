@@ -15,11 +15,10 @@ import {
   getTradingAccountById,
   getTierHoldings,
   getDailyOrders,
-  generateDailyOrders,
-  processOrderExecution,
   deleteDailyOrders,
   hasNewerPriceSince,
 } from "@/database/trading";
+import { generateDailyOrders, processOrderExecution } from "@/trading";
 
 /**
  * GET /api/trading/accounts/[id]/orders

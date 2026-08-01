@@ -1,30 +1,31 @@
 /**
- * 주문 체결 처리 함수
+ * 실계좌 주문 체결·마감 처리 조율 (#76)
  *
- * #43 이행 3단계: 체결 판정과 상태 전이 규칙은 src/strategy의 settle이 소유한다.
- * 이 모듈은 주문·보유 상태를 조회해 settle에 넘기고, 결과를 트랜잭션으로 저장만 한다.
+ * 체결 판정과 상태 전이 규칙은 src/strategy의 settle이 소유한다.
+ * 이 모듈은 주문·보유 상태를 조회해 settle에 넘기고, 결과를 저장 계층에
+ * 트랜잭션으로 반영한다.
  */
 
-import { eq } from "drizzle-orm";
-
+import {
+  completeCycleAndIncrement,
+  createProfitRecord,
+  getClosingPrice,
+  getDailyOrders,
+  getPreviousTradingClose,
+  getTierHoldings,
+  getTradingAccountByIdWithoutOwnerCheck,
+  runInTransaction,
+  updateAccountLastProcessedDate,
+  updateOrderExecuted,
+  updateTierHolding,
+  type DbExecutor,
+} from "@/database/trading";
+import { getPreviousTradingDate } from "@/lib/date";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { calculateSellLimitPrice, getStrategyParams, settle } from "@/strategy";
-import type { DailyOrder, Ticker, Strategy } from "@/types/trading";
-import { getPreviousTradingDate } from "@/lib/date";
+import type { DailyOrder, Ticker, Strategy, TradingAccount } from "@/types/trading";
 
-import { db, type DbExecutor } from "../db-drizzle";
-import { tradingAccounts } from "../schema/index";
-
-import { getTierHoldings, updateTierHolding } from "./tier-holdings";
-import {
-  getDailyOrders,
-  getClosingPrice,
-  getPreviousTradingClose,
-  toStrategyHoldings,
-  updateOrderExecuted,
-  generateDailyOrders,
-} from "./orders";
-import { createProfitRecord } from "./profits";
+import { generateDailyOrders, toStrategyHoldings } from "./orders";
 
 export interface ExecutionResult {
   orderId: string;
@@ -34,46 +35,6 @@ export interface ExecutionResult {
   limitPrice: number;
   closePrice: number;
   shares: number;
-}
-
-/**
- * 계좌의 전략 조회 (내부 헬퍼)
- */
-export async function getAccountStrategy(accountId: string): Promise<Strategy> {
-  return (await getAccountRow(accountId)).strategy;
-}
-
-/**
- * 사이클 완료 시 cycleNumber 증가
- * 모든 티어가 비었을 때 호출되어 다음 사이클을 준비
- *
- * @param accountId - 계좌 ID
- * @param executor - 쿼리 실행자 (트랜잭션 컨텍스트 전달용)
- * @returns 업데이트된 cycleNumber, 계좌가 없으면 null
- */
-export async function completeCycleAndIncrement(
-  accountId: string,
-  executor: DbExecutor = db
-): Promise<number | null> {
-  // 1. 현재 cycle_number 조회
-  const rows = await executor
-    .select({ cycleNumber: tradingAccounts.cycleNumber })
-    .from(tradingAccounts)
-    .where(eq(tradingAccounts.id, accountId))
-    .limit(1);
-
-  if (!rows[0]) {
-    return null;
-  }
-
-  // 2. cycle_number 증가
-  const newCycleNumber = rows[0].cycleNumber + 1;
-  await executor
-    .update(tradingAccounts)
-    .set({ cycleNumber: newCycleNumber, updatedAt: new Date() })
-    .where(eq(tradingAccounts.id, accountId));
-
-  return newCycleNumber;
 }
 
 /**
@@ -132,7 +93,7 @@ export async function processOrderExecution(
     return orders.map((order) => toExecutionResult(order, order.executed, closePrice));
   }
 
-  const account = await getAccountRow(accountId);
+  const account = await requireAccount(accountId);
   const state: CycleState = {
     strategy: getStrategyParams(account.strategy),
     cycleCapital: account.seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
@@ -145,7 +106,7 @@ export async function processOrderExecution(
   const { executions, events } = settle(state, intents, { date, close: closePrice });
   const executedIntents = new Set(executions.map((execution) => execution.order));
 
-  await db.transaction(async (tx) => {
+  await runInTransaction(async (tx) => {
     for (const execution of executions) {
       const order = orderByIntent.get(execution.order);
       if (!order) {
@@ -249,25 +210,15 @@ function toExecutionResult(
 }
 
 /**
- * 계좌의 체결 처리에 필요한 필드 조회 (내부 헬퍼)
+ * 체결 처리 대상 계좌 조회 (내부 헬퍼)
+ * 소유자 확인은 호출 경로(라우트·스케줄러)가 이미 마쳤다.
  */
-async function getAccountRow(
-  accountId: string
-): Promise<{ strategy: Strategy; seedCapital: number; cycleNumber: number }> {
-  const rows = await db
-    .select({
-      strategy: tradingAccounts.strategy,
-      seedCapital: tradingAccounts.seedCapital,
-      cycleNumber: tradingAccounts.cycleNumber,
-    })
-    .from(tradingAccounts)
-    .where(eq(tradingAccounts.id, accountId))
-    .limit(1);
-
-  if (!rows[0]) {
+async function requireAccount(accountId: string): Promise<TradingAccount> {
+  const account = await getTradingAccountByIdWithoutOwnerCheck(accountId);
+  if (!account) {
     throw new Error(`Account not found: ${accountId}`);
   }
-  return { ...rows[0], strategy: rows[0].strategy as Strategy };
+  return account;
 }
 
 /**
@@ -323,18 +274,6 @@ export function getNextTradingDate(date: string): string {
   }
 
   return d.toISOString().split("T")[0];
-}
-
-/**
- * 마감 처리 완료 거래일을 계좌에 기록
- * 다음 스케줄러 실행이 이 날짜 다음부터 이어받아 증분 처리한다.
- * (updatedAt은 갱신하지 않는다 — 주문 라우트의 설정 변경 감지에 영향을 주지 않기 위함)
- */
-async function updateAccountLastProcessedDate(accountId: string, date: string): Promise<void> {
-  await db
-    .update(tradingAccounts)
-    .set({ lastProcessedDate: date })
-    .where(eq(tradingAccounts.id, accountId));
 }
 
 /**

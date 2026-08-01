@@ -1,22 +1,13 @@
 /**
- * 일일 주문 CRUD 및 주문 생성 함수
+ * 일일 주문표 저장 함수
  *
- * #43 이행 3단계: 주문표 생성 규칙은 src/strategy의 planOrders가 소유하고,
- * 이 모듈은 가격·보유 상태를 조회해 CycleState로 변환하고 결과를 저장만 한다.
+ * 주문표 생성 규칙은 src/strategy의 planOrders가, 그 규칙을 호출하는 조율은
+ * src/trading이 소유한다. 이 모듈은 주문·가격 행의 조회와 저장만 한다.
  */
 
 import { eq, and, desc, asc, lt, gt } from "drizzle-orm";
 
-import type { CycleState, TierHolding as StrategyTierHolding } from "@/strategy";
-import { getStrategyParams, planOrders } from "@/strategy";
-import type {
-  DailyOrder,
-  TierHolding,
-  Ticker,
-  Strategy,
-  OrderType,
-  OrderMethod,
-} from "@/types/trading";
+import type { DailyOrder, Ticker, OrderType, OrderMethod } from "@/types/trading";
 
 import { db, type DbExecutor } from "../db-drizzle";
 import { dailyOrders, dailyPrices } from "../schema/index";
@@ -124,7 +115,7 @@ export async function getPreviousTradingClose(
  * 두 날짜 사이(양 끝 제외)의 실제 거래일 목록 (가격 데이터 행 기준)
  * #41: 평일 근사는 휴장일을 거래일로 세어 백테스트보다 하루 일찍 손절하게 만든다.
  */
-async function listTradingDatesBetween(
+export async function listTradingDatesBetween(
   ticker: Ticker,
   afterDate: string,
   beforeDate: string
@@ -141,44 +132,6 @@ async function listTradingDatesBetween(
     );
 
   return rows.map((row) => row.date);
-}
-
-/**
- * DB 티어 홀딩을 src/strategy의 보유 상태로 변환
- * holdingDays는 기준일 직전 거래일 마감 시점의 보유 거래일 수다
- * (매수 당일 = 0, settle마다 +1 - src/strategy의 손절 카운트 의미).
- * 가장 이른 매수일 이후 거래일 목록을 한 번만 조회하고 티어별 수는 메모리에서 센다.
- *
- * @param ticker - 종목 (거래일 수 계산에 가격 데이터 사용)
- * @param holdings - DB 티어 홀딩 목록 (비활성 티어 포함 가능)
- * @param date - 기준일 (주문 생성일 또는 체결 처리일)
- */
-export async function toStrategyHoldings(
-  ticker: Ticker,
-  holdings: TierHolding[],
-  date: string
-): Promise<StrategyTierHolding[]> {
-  const active = holdings.filter(
-    (holding): holding is TierHolding & { buyPrice: number; buyDate: string } =>
-      holding.shares > 0 && holding.buyPrice !== null && holding.buyDate !== null
-  );
-  if (active.length === 0) {
-    return [];
-  }
-
-  const earliestBuyDate = active.reduce(
-    (min, holding) => (holding.buyDate < min ? holding.buyDate : min),
-    active[0].buyDate
-  );
-  const tradingDates = await listTradingDatesBetween(ticker, earliestBuyDate, date);
-
-  return active.map((holding) => ({
-    tier: holding.tier,
-    buyPrice: holding.buyPrice,
-    shares: holding.shares,
-    buyDate: holding.buyDate,
-    holdingDays: tradingDates.filter((tradingDate) => tradingDate > holding.buyDate).length,
-  }));
 }
 
 /**
@@ -224,34 +177,37 @@ export async function deleteDailyOrders(accountId: string, date: string): Promis
 }
 
 /**
- * 당일 주문 자동 생성
- * 주문표는 src/strategy의 planOrders가 직전 거래일 종가(adjClose) 기준으로 생성하고,
- * 이 함수는 트랜잭션으로 삭제/생성 원자성만 보장한다.
+ * 저장할 주문 하나. 전략의 주문 의도에서 표시용 지정가까지 정해진 상태다
+ * (MOC는 규칙상 지정가가 없지만 limit_price 컬럼이 NOT NULL이라 값이 채워져 있다).
  */
-export async function generateDailyOrders(
+export interface NewDailyOrder {
+  tier: number;
+  type: OrderType;
+  orderMethod: OrderMethod;
+  limitPrice: number;
+  shares: number;
+}
+
+/**
+ * 특정 날짜의 주문표를 통째로 교체
+ * 기존 주문 삭제와 새 주문 삽입을 한 트랜잭션으로 묶어 원자성을 보장한다.
+ * 무엇을 주문할지는 조율 계층(src/trading)이 정하고, 이 함수는 저장만 한다.
+ *
+ * @param accountId - 계좌 ID
+ * @param date - 주문 기준일
+ * @param orders - 저장할 주문 목록 (미체결 상태로 삽입된다)
+ * @returns 생성된 주문 목록
+ * @throws 해당 날짜에 체결된 주문이 있으면 에러
+ */
+export async function replaceDailyOrders(
   accountId: string,
   date: string,
-  ticker: Ticker,
-  strategy: Strategy,
-  seedCapital: number,
-  holdings: TierHolding[]
+  orders: NewDailyOrder[]
 ): Promise<DailyOrder[]> {
-  const prevClose = await getPreviousTradingClose(ticker, date);
-  if (!prevClose) {
-    return []; // 가격 데이터 없으면 주문 생성 불가
-  }
-
-  const state: CycleState = {
-    strategy: getStrategyParams(strategy),
-    cycleCapital: seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
-    holdings: await toStrategyHoldings(ticker, holdings, date),
-    cycleNumber: 0, // planOrders는 사용하지 않는다 (settle의 사이클 완료 통지용 필드)
-  };
-  const intents = planOrders(state, prevClose.adjClose);
-
   return db.transaction(async (tx) => {
-    // 체결된 주문이 있는 날짜는 재생성 불가 - 삭제 후 미체결로 되살리면
-    // 재체결 처리로 홀딩·수익 기록이 중복 반영된다
+    // 체결된 주문이 있는 날짜는 교체 불가 - 삭제 후 미체결로 되살리면
+    // 재체결 처리로 홀딩·수익 기록이 중복 반영된다.
+    // 조율 계층의 판단이 아니라 저장 자체의 불변식이므로 여기서 막는다.
     const executedRows = await tx
       .select({ id: dailyOrders.id })
       .from(dailyOrders)
@@ -272,19 +228,17 @@ export async function generateDailyOrders(
       .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));
 
     const createdOrders: DailyOrder[] = [];
-    for (const intent of intents) {
+    for (const order of orders) {
       const result = await tx
         .insert(dailyOrders)
         .values({
           accountId,
           date,
-          tier: intent.tier,
-          type: intent.type,
-          orderMethod: intent.orderMethod,
-          // MOC는 규칙상 지정가가 없다. limit_price 컬럼이 NOT NULL이라
-          // 표시용으로 직전 거래일 종가를 저장한다 (체결 판정에는 쓰이지 않는다).
-          limitPrice: intent.limitPrice ?? prevClose.adjClose,
-          shares: intent.shares,
+          tier: order.tier,
+          type: order.type,
+          orderMethod: order.orderMethod,
+          limitPrice: order.limitPrice,
+          shares: order.shares,
           executed: false,
         })
         .returning();

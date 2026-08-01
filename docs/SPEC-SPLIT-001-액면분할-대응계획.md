@@ -76,7 +76,7 @@ Yahoo Finance는 분할이 발생하면 **과거 전체 `adjClose`(및 `close`)�
 목표가를 재계산한다:
 
 ```typescript
-// src/database/trading/orders.ts:230 (generateDailyOrders, 일반 매도 LOC)
+// src/trading/orders.ts (generateDailyOrders, 일반 매도 LOC)
 const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 ```
 
@@ -90,7 +90,7 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 `getClosingPrice`는 `adjClose`를 사용한다:
 
 ```typescript
-// src/database/trading/orders.ts:96
+// src/database/trading/orders.ts (getClosingPrice)
 .select({ adjClose: dailyPrices.adjClose })
 ```
 
@@ -197,7 +197,7 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 
 ### (5) `daily_orders` 정리
 - [ ] 분할일 전후의 미체결 주문 삭제: `deleteDailyOrders(accountId, date)`
-      (`src/database/trading/orders.ts:141`).
+      (`src/database/trading/orders.ts`).
 - [ ] **부분 체결 주문 확인**: 분할 시점에 일부만 체결된 매수/매도 주문이 있었다면, 체결된 수량이
       `tier_holdings`에 올바르게 반영되었는지 확인하고 **분할 비율(`× R`)로 보정**한다. 단순
       삭제만으로는 체결 이력과 실제 보유 수량 간 불일치가 남을 수 있다.
@@ -261,6 +261,7 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 | 지표 계산 | `src/metrics` - `computeIndicatorSeries`, DB 변환 어댑터 `src/services/metricsRows.ts` - `buildDailyMetricRows` |
 | CLI | `src/index.ts` - `init`/`update`(`--force` 가드 우회), `init-metrics` |
 | 보유 보정 | `src/database/trading/tier-holdings.ts` — `updateTierHolding`, `getTierHoldings` |
-| 주문 생성/정리 | `src/database/trading/orders.ts` — `generateDailyOrders`, `deleteDailyOrders`, `getClosingPrice`, `calculateSellLimitPrice` |
+| 주문 생성 조율 | `src/trading/orders.ts` - `generateDailyOrders`, `calculateSellLimitPrice` |
+| 주문 저장/정리 | `src/database/trading/orders.ts` - `deleteDailyOrders`, `replaceDailyOrders`, `getClosingPrice` |
 | 거래 기록 | `src/database/trading/profits.ts` |
 | 전략 상수 | `src/types/trading.ts` — `SELL_THRESHOLDS`, `STOP_LOSS_DAYS` 등 |
