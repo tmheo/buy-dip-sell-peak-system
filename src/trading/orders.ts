@@ -106,22 +106,17 @@ export async function generateDailyOrders(
  * 스케줄러(processDailyClose)가 담당하므로, 여기서는 조회와 해당 날짜 주문 생성만
  * 수행해 응답 속도를 확보한다 (REQ-001).
  *
+ * 재생성 여부는 아래 신선도 판정이 전적으로 결정한다. 판정을 건너뛰는 수동 경로는
+ * 두지 않는다 (#85) - 체결 기록까지 지워 홀딩·수익이 중복 반영되는 통로였고,
+ * 계좌 설정 변경과 뒤늦게 적재된 종가는 판정이 이미 자동으로 잡아낸다.
+ *
  * @param account - 소유자 확인을 마친 계좌
  * @param date - 주문표 날짜 (YYYY-MM-DD)
- * @param options.regenerate - true면 기존 주문을 지우고 무조건 다시 생성한다
  */
 export async function getOrCreateDailyOrders(
   account: TradingAccount,
-  date: string,
-  options: { regenerate?: boolean } = {}
+  date: string
 ): Promise<DailyOrder[]> {
-  // 알려진 결함(#85): 이 삭제는 체결 여부를 묻지 않는다. 체결된 주문이 있는 날짜에
-  // regenerate를 주면 체결 기록이 지워져, replaceDailyOrders의 가드가 빈 테이블을 보고
-  // 통과시킨다. #80은 동작 불변이 완료 기준이라 그대로 옮겼고, 수정은 #85에서 한다.
-  if (options.regenerate) {
-    await deleteDailyOrders(account.id, date);
-  }
-
   // 기존 주문 조회 (체결 처리로 업데이트된 holdings 기반)
   let orders = await getDailyOrders(account.id, date);
 
