@@ -6,7 +6,10 @@
  * 거래일 단위 마감 처리 자체는 processHistoricalOrders가 소유한다.
  */
 
-import { getActiveTradingAccounts, getAllTradingAccounts } from "@/database/trading";
+import {
+  getActiveTradingAccounts,
+  getTradingAccountByIdWithoutOwnerCheck,
+} from "@/database/trading";
 
 import { processHistoricalOrders } from "./execution";
 
@@ -74,10 +77,12 @@ export async function processDailyClose(
 
   let accounts;
   if (accountId) {
-    accounts = (await getAllTradingAccounts()).filter((account) => account.id === accountId);
-    if (accounts.length === 0) {
+    // 소유자 확인은 크론 인증이 대신한다 - 스케줄러는 사용자 세션 없이 돈다.
+    const account = await getTradingAccountByIdWithoutOwnerCheck(accountId);
+    if (!account) {
       return { status: "account-not-found", accountId };
     }
+    accounts = [account];
   } else {
     const activeSince = new Date(startTime - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
     accounts = await getActiveTradingAccounts(activeSince);

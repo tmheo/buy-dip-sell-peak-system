@@ -13,20 +13,23 @@ import type { TradingAccount } from "@/types/trading";
 
 vi.mock("@/database/trading", () => ({
   getActiveTradingAccounts: vi.fn(),
-  getAllTradingAccounts: vi.fn(),
+  getTradingAccountByIdWithoutOwnerCheck: vi.fn(),
 }));
 
 vi.mock("../execution", () => ({
   processHistoricalOrders: vi.fn(),
 }));
 
-import { getActiveTradingAccounts, getAllTradingAccounts } from "@/database/trading";
+import {
+  getActiveTradingAccounts,
+  getTradingAccountByIdWithoutOwnerCheck,
+} from "@/database/trading";
 
 import { processHistoricalOrders } from "../execution";
 import { processDailyClose } from "../scheduler";
 
 const mockedGetActiveTradingAccounts = vi.mocked(getActiveTradingAccounts);
-const mockedGetAllTradingAccounts = vi.mocked(getAllTradingAccounts);
+const mockedGetTradingAccountById = vi.mocked(getTradingAccountByIdWithoutOwnerCheck);
 const mockedProcessHistoricalOrders = vi.mocked(processHistoricalOrders);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -39,10 +42,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const TIME_BUDGET_MS = 50_000;
 const ACTIVE_WINDOW_DAYS = 14;
 
-/** 고정 기준 시각 (2026-07-15T00:00:00Z). Date.now를 이 값부터 진행시킨다. */
+/**
+ * 고정 기준 시각 (2026-07-15T00:00:00Z). 가짜 시계를 이 값에서 시작해 앞으로만 옮긴다.
+ * Date.now뿐 아니라 new Date()도 함께 고정해야 마감 기준일(today)까지 검증할 수 있다.
+ */
 const START_TIME = Date.UTC(2026, 6, 15);
+const TODAY = "2026-07-15";
 
 let clock: number;
+
+/** 가짜 시계를 elapsedMs만큼 앞으로 옮긴다. */
+function advanceClock(elapsedMs: number): void {
+  clock += elapsedMs;
+  vi.setSystemTime(clock);
+}
 
 function createAccount(id: string): TradingAccount {
   return {
@@ -64,7 +77,7 @@ function createAccount(id: string): TradingAccount {
 /** 한 계좌 처리에 elapsedMs가 걸리도록 가짜 시계를 진행시킨다. */
 function takesTime(elapsedMs: number) {
   return async () => {
-    clock += elapsedMs;
+    advanceClock(elapsedMs);
     return [];
   };
 }
@@ -72,13 +85,15 @@ function takesTime(elapsedMs: number) {
 beforeEach(() => {
   vi.clearAllMocks();
   clock = START_TIME;
-  vi.spyOn(Date, "now").mockImplementation(() => clock);
+  // shouldAdvanceTime을 끄지 않으면 대기 중에 시계가 저절로 흘러 예산 판정이 흔들린다
+  vi.useFakeTimers({ now: START_TIME, shouldAdvanceTime: false });
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
   mockedProcessHistoricalOrders.mockResolvedValue([]);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -91,26 +106,23 @@ describe("processDailyClose - 활성 계좌 판정", () => {
     expect(mockedGetActiveTradingAccounts).toHaveBeenCalledWith(
       new Date(START_TIME - ACTIVE_WINDOW_DAYS * DAY_MS)
     );
-    expect(mockedGetAllTradingAccounts).not.toHaveBeenCalled();
+    expect(mockedGetTradingAccountById).not.toHaveBeenCalled();
   });
 
   it("accountId를 지정하면 활동 여부와 무관하게 그 계좌만 처리한다", async () => {
-    mockedGetAllTradingAccounts.mockResolvedValue([
-      createAccount("a"),
-      createAccount("b"),
-      createAccount("c"),
-    ]);
+    mockedGetTradingAccountById.mockResolvedValue(createAccount("b"));
 
     const outcome = await processDailyClose({ accountId: "b" });
 
     expect(outcome).toMatchObject({ status: "completed", accountCount: 1, processedCount: 1 });
+    expect(mockedGetTradingAccountById).toHaveBeenCalledWith("b");
     expect(mockedGetActiveTradingAccounts).not.toHaveBeenCalled();
     expect(mockedProcessHistoricalOrders).toHaveBeenCalledOnce();
     expect(mockedProcessHistoricalOrders.mock.calls[0][0]).toBe("b");
   });
 
   it("지정한 accountId의 계좌가 없으면 아무것도 처리하지 않고 알린다", async () => {
-    mockedGetAllTradingAccounts.mockResolvedValue([createAccount("a")]);
+    mockedGetTradingAccountById.mockResolvedValue(null);
 
     const outcome = await processDailyClose({ accountId: "missing" });
 
@@ -185,7 +197,7 @@ describe("processDailyClose - 시간 예산", () => {
   it("실패로 예산을 다 쓴 경우에도 남은 계좌를 미처리로 남긴다", async () => {
     mockedGetActiveTradingAccounts.mockResolvedValue([createAccount("a"), createAccount("b")]);
     mockedProcessHistoricalOrders.mockImplementation(async () => {
-      clock += TIME_BUDGET_MS;
+      advanceClock(TIME_BUDGET_MS);
       throw new Error("느린 실패");
     });
 
@@ -199,12 +211,30 @@ describe("processDailyClose - 시간 예산", () => {
 
     await processDailyClose();
 
-    const [, cycleStartDate, lastProcessedDate, , ticker, strategy, seedCapital, deadline] =
-      mockedProcessHistoricalOrders.mock.calls[0];
+    const [
+      accountId,
+      cycleStartDate,
+      lastProcessedDate,
+      today,
+      ticker,
+      strategy,
+      seedCapital,
+      deadline,
+    ] = mockedProcessHistoricalOrders.mock.calls[0];
     expect(deadline).toBe(START_TIME + TIME_BUDGET_MS);
-    expect({ cycleStartDate, lastProcessedDate, ticker, strategy, seedCapital }).toEqual({
+    expect({
+      accountId,
+      cycleStartDate,
+      lastProcessedDate,
+      today,
+      ticker,
+      strategy,
+      seedCapital,
+    }).toEqual({
+      accountId: "a",
       cycleStartDate: "2026-07-01",
       lastProcessedDate: "2026-07-13",
+      today: TODAY,
       ticker: "SOXL",
       strategy: "Pro2",
       seedCapital: 100_000,

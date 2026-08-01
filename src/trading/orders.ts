@@ -115,6 +115,9 @@ export async function getOrCreateDailyOrders(
   date: string,
   options: { regenerate?: boolean } = {}
 ): Promise<DailyOrder[]> {
+  // 알려진 결함(#85): 이 삭제는 체결 여부를 묻지 않는다. 체결된 주문이 있는 날짜에
+  // regenerate를 주면 체결 기록이 지워져, replaceDailyOrders의 가드가 빈 테이블을 보고
+  // 통과시킨다. #80은 동작 불변이 완료 기준이라 그대로 옮겼고, 수정은 #85에서 한다.
   if (options.regenerate) {
     await deleteDailyOrders(account.id, date);
   }
