@@ -17,6 +17,8 @@ vi.mock("@/database/db-drizzle", () => ({
   },
 }));
 
+import { eq } from "drizzle-orm";
+
 import { mockLoggedIn, mockLoggedOut } from "@/lib/__tests__/auth-mock";
 import { db } from "@/database/db-drizzle";
 import { users } from "@/database/schema/index";
@@ -46,6 +48,7 @@ describe("DELETE /api/user/delete", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
     expect(db.delete).toHaveBeenCalledWith(users);
-    expect(deleteWhere).toHaveBeenCalledTimes(1);
+    // 삭제 조건이 로그인한 사용자로 한정되는지 - 다른 사용자를 지우는 회귀를 잡는다
+    expect(deleteWhere).toHaveBeenCalledWith(eq(users.id, "user-1"));
   });
 });

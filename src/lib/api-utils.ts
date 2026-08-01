@@ -35,7 +35,9 @@ export async function getAuthUserId(): Promise<string | null> {
 /**
  * 크론 요청의 Bearer 토큰을 검증한다.
  * 타이밍 공격을 막기 위해 timingSafeEqual로 비교하며,
- * 길이가 다르면 timingSafeEqual이 던지므로 먼저 길이를 확인한다.
+ * 바이트 길이가 다르면 timingSafeEqual이 던지므로 먼저 길이를 확인한다.
+ * 글자 수가 아니라 바이트 수로 재는 것이 중요하다 - 비 ASCII 문자가 섞인 헤더는
+ * 글자 수가 같아도 바이트 수가 달라 예외로 터진다.
  *
  * @returns 통과하면 null, 실패하면 그대로 반환할 에러 응답
  *
@@ -50,14 +52,10 @@ export function requireCronAuth(request: Request): NextResponse | null {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
-  const authHeader = request.headers.get("authorization");
-  const expectedToken = `Bearer ${cronSecret}`;
+  const received = Buffer.from(request.headers.get("authorization") ?? "");
+  const expected = Buffer.from(`Bearer ${cronSecret}`);
 
-  if (
-    !authHeader ||
-    authHeader.length !== expectedToken.length ||
-    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedToken))
-  ) {
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
     console.warn("Cron 인증 실패: 잘못된 토큰");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

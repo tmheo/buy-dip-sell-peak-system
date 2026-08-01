@@ -82,4 +82,13 @@ describe("requireCronAuth", () => {
     expect(response).not.toBeNull();
     expect(response!.status).toBe(401);
   });
+
+  it("글자 수는 같지만 바이트 수가 다른 토큰도 예외 없이 401을 반환해야 한다", async () => {
+    // "tést-secret-token"은 올바른 토큰과 글자 수가 같지만 UTF-8 바이트 수가 하나 더 많다
+    const response = requireCronAuth(createCronRequest("Bearer tést-secret-token"));
+
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(401);
+    await expect(response!.json()).resolves.toEqual({ error: "Unauthorized" });
+  });
 });
