@@ -2,13 +2,11 @@
  * Cron 엔드포인트: 활성 계좌 일일 마감 처리
  * GET /api/cron/process-daily-orders
  *
- * 최근 조회된 활성 계좌에 대해 미처리 거래일(lastProcessedDate 이후)의
- * 주문 생성 및 체결 처리를 수행하여 holdings/수익 기록을 갱신합니다.
- * 아무도 조회하지 않는 계좌는 처리하지 않아 불필요한 계산을 건너뜁니다.
+ * 어느 계좌를 얼마나 처리할지에 대한 스케줄러 정책(활성 계좌 판정, 시간 예산,
+ * 계좌별 실패 격리, 시간 초과 시 이월)은 src/trading의 processDailyClose가 소유한다.
+ * 이 라우트는 인증, 파라미터 파싱, 응답 매핑만 한다.
  *
  * 가격 데이터가 선행되어야 하므로 update-prices cron 직후 실행됩니다.
- * processHistoricalOrders는 증분 처리되며 거래일 단위로 진행 상태를
- * 영속화하므로, 시간 예산 초과로 중단되어도 다음 실행이 이어받습니다.
  *
  * Query params:
  *   - accountId: 지정 시 활동 여부와 무관하게 해당 계좌만 처리
@@ -19,24 +17,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCronAuth } from "@/lib/api-utils";
-import { getActiveTradingAccounts, getAllTradingAccounts } from "@/database/trading";
-import { processHistoricalOrders } from "@/trading";
+import { processDailyClose } from "@/trading";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-/**
- * 처리 시간 예산 (ms). Vercel 함수 제한(maxDuration 60초)보다 짧게 잡아
- * FUNCTION_INVOCATION_TIMEOUT(504) 대신 정상 응답으로 종료하고,
- * 남은 작업은 다음 실행이 이어받도록 한다.
- */
-const TIME_BUDGET_MS = 50_000;
-
-/**
- * 활성 계좌 판정 기간 (일). 이 기간 내에 계좌 상세 화면이 조회된 계좌만
- * 스케줄러가 처리한다.
- */
-const ACTIVE_WINDOW_DAYS = 14;
 
 /** GET /api/cron/process-daily-orders */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -45,77 +29,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return authError;
   }
 
-  const accountIdFilter = request.nextUrl.searchParams.get("accountId");
+  const accountId = request.nextUrl.searchParams.get("accountId");
+  const outcome = await processDailyClose({ accountId });
 
-  console.log(
-    accountIdFilter
-      ? `=== 일일 마감 처리 시작 (계좌 ${accountIdFilter} 한정) ===`
-      : "=== 일일 마감 처리 시작 ==="
-  );
-  const startTime = Date.now();
-  const deadline = startTime + TIME_BUDGET_MS;
-  const today = new Date().toISOString().split("T")[0];
-
-  // accountId 지정 시: 활동 여부와 무관하게 해당 계좌만 처리 (수동 override)
-  // 미지정 시: 최근 조회된 활성 계좌만 처리 (방치된 계좌는 건너뜀)
-  let accounts;
-  if (accountIdFilter) {
-    accounts = (await getAllTradingAccounts()).filter((account) => account.id === accountIdFilter);
-    if (accounts.length === 0) {
-      return NextResponse.json({ error: `Account not found: ${accountIdFilter}` }, { status: 404 });
-    }
-  } else {
-    const activeSince = new Date(startTime - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-    accounts = await getActiveTradingAccounts(activeSince);
+  if (outcome.status === "account-not-found") {
+    return NextResponse.json({ error: `Account not found: ${outcome.accountId}` }, { status: 404 });
   }
-  const results: Array<{ accountId: string; executed: number; error?: string }> = [];
-  let skipped = 0;
-
-  // 한 계좌의 실패가 다른 계좌 처리를 막지 않도록 개별 try/catch
-  for (const account of accounts) {
-    // 시간 예산 초과 시 남은 계좌는 다음 실행으로 미룬다 (lastProcessedDate로 자가 복구)
-    if (Date.now() >= deadline) {
-      skipped = accounts.length - results.length;
-      break;
-    }
-
-    try {
-      const executed = await processHistoricalOrders(
-        account.id,
-        account.cycleStartDate,
-        account.lastProcessedDate,
-        today,
-        account.ticker,
-        account.strategy,
-        account.seedCapital,
-        deadline
-      );
-      results.push({ accountId: account.id, executed: executed.length });
-    } catch (error) {
-      console.error(`[${account.id}] 마감 처리 실패:`, error);
-      results.push({
-        accountId: account.id,
-        executed: 0,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-
-  const elapsed = Date.now() - startTime;
-  const failed = results.filter((r) => r.error).length;
-  console.log(
-    `=== 일일 마감 처리 완료 (${elapsed}ms, 계좌 ${accounts.length}개, ` +
-      `처리 ${results.length}개, 미처리 ${skipped}개, 실패 ${failed}개) ===`
-  );
 
   return NextResponse.json(
     {
-      success: failed === 0,
+      success: outcome.failedCount === 0,
       processedAt: new Date().toISOString(),
-      accountCount: accounts.length,
-      processedCount: results.length,
-      skippedCount: skipped,
-      results,
+      accountCount: outcome.accountCount,
+      processedCount: outcome.processedCount,
+      skippedCount: outcome.skippedCount,
+      results: outcome.results,
     },
     { status: 200 }
   );
