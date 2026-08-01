@@ -23,9 +23,9 @@ import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
 import { BacktestEngine } from "@/backtest/engine";
 import { hasDb } from "@/test-utils/db";
-import { db } from "../db-drizzle";
-import { users } from "../schema/auth";
-import { dailyPrices } from "../schema/index";
+import { db } from "@/database/db-drizzle";
+import { users } from "@/database/schema/auth";
+import { dailyPrices } from "@/database/schema/index";
 
 const TEST_USER_ID = randomUUID();
 const TICKER = "TQQQ"; // 상장(2010-02-11) 이전 날짜를 사용해 실제 시세와 충돌하지 않게 함
@@ -167,7 +167,8 @@ function normalize(orders: OrderIntent[], executions: Execution[]): NormalizedOr
 }
 
 describe.skipIf(!hasDb)("실계좌 주문 파이프라인 동등성 (#47)", () => {
-  let tradingModule: typeof import("../trading");
+  let tradingModule: typeof import("@/database/trading");
+  let trading: typeof import("..");
   let accountId: string;
 
   beforeAll(async () => {
@@ -180,7 +181,8 @@ describe.skipIf(!hasDb)("실계좌 주문 파이프라인 동등성 (#47)", () =
     await deleteSeriesPriceRows();
     await db.insert(dailyPrices).values(SERIES.map(toPriceRow));
 
-    tradingModule = await import("../trading");
+    tradingModule = await import("@/database/trading");
+    trading = await import("..");
 
     const account = await tradingModule.createTradingAccount(TEST_USER_ID, {
       name: "동등성 테스트 계좌",
@@ -192,7 +194,7 @@ describe.skipIf(!hasDb)("실계좌 주문 파이프라인 동등성 (#47)", () =
     accountId = account.id;
 
     // 사이클 시작일부터 전일(07-21)까지 실계좌 마감 처리
-    await tradingModule.processHistoricalOrders(
+    await trading.processHistoricalOrders(
       accountId,
       CYCLE_START_DATE,
       null,

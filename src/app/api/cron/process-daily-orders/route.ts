@@ -19,11 +19,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCronAuth } from "@/lib/api-utils";
-import {
-  getActiveTradingAccounts,
-  getAllTradingAccounts,
-  processHistoricalOrders,
-} from "@/database/trading";
+import { getActiveTradingAccounts, getAllTradingAccounts } from "@/database/trading";
+import { processHistoricalOrders } from "@/trading";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;

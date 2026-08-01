@@ -4,7 +4,7 @@
 
 import { eq, and, desc, gte } from "drizzle-orm";
 
-import { db } from "../db-drizzle";
+import { db, type DbExecutor } from "../db-drizzle";
 import { tradingAccounts, tierHoldings } from "../schema/index";
 
 import type {
@@ -123,6 +123,19 @@ export async function getTradingAccountById(
 }
 
 /**
+ * 소유자 확인 없이 계좌를 id로 조회 (내부 처리 전용)
+ * 마감 처리·체결 처리처럼 이미 소유자 확인을 마쳤거나 스케줄러가 부르는 경로에서 쓴다.
+ * 사용자 요청 경로는 반드시 getTradingAccountById를 써서 소유자를 확인한다.
+ */
+export async function getTradingAccountByIdWithoutOwnerCheck(
+  id: string
+): Promise<TradingAccount | null> {
+  const rows = await db.select().from(tradingAccounts).where(eq(tradingAccounts.id, id)).limit(1);
+
+  return rows[0] ? mapDrizzleTradingAccount(rows[0]) : null;
+}
+
+/**
  * 계좌 상세 조회 (holdings 포함)
  */
 export async function getTradingAccountWithHoldings(
@@ -201,4 +214,52 @@ export async function deleteTradingAccount(id: string, userId: string): Promise<
     .returning();
 
   return result.length > 0;
+}
+
+/**
+ * 사이클 완료 시 cycleNumber 증가
+ * 모든 티어가 비었을 때 호출되어 다음 사이클을 준비
+ *
+ * @param accountId - 계좌 ID
+ * @param executor - 쿼리 실행자 (트랜잭션 컨텍스트 전달용)
+ * @returns 업데이트된 cycleNumber, 계좌가 없으면 null
+ */
+export async function completeCycleAndIncrement(
+  accountId: string,
+  executor: DbExecutor = db
+): Promise<number | null> {
+  // 1. 현재 cycle_number 조회
+  const rows = await executor
+    .select({ cycleNumber: tradingAccounts.cycleNumber })
+    .from(tradingAccounts)
+    .where(eq(tradingAccounts.id, accountId))
+    .limit(1);
+
+  if (!rows[0]) {
+    return null;
+  }
+
+  // 2. cycle_number 증가
+  const newCycleNumber = rows[0].cycleNumber + 1;
+  await executor
+    .update(tradingAccounts)
+    .set({ cycleNumber: newCycleNumber, updatedAt: new Date() })
+    .where(eq(tradingAccounts.id, accountId));
+
+  return newCycleNumber;
+}
+
+/**
+ * 마감 처리 완료 거래일을 계좌에 기록
+ * 다음 스케줄러 실행이 이 날짜 다음부터 이어받아 증분 처리한다.
+ * (updatedAt은 갱신하지 않는다 - 주문 라우트의 설정 변경 감지에 영향을 주지 않기 위함)
+ */
+export async function updateAccountLastProcessedDate(
+  accountId: string,
+  date: string
+): Promise<void> {
+  await db
+    .update(tradingAccounts)
+    .set({ lastProcessedDate: date })
+    .where(eq(tradingAccounts.id, accountId));
 }

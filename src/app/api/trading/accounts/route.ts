@@ -16,8 +16,8 @@ import {
   getTradingAccountsByUserId,
   getTierHoldings,
   getTotalShares,
-  processHistoricalOrders,
 } from "@/database/trading";
+import { processHistoricalOrders } from "@/trading";
 import { CreateTradingAccountSchema } from "@/lib/validations/trading";
 
 /**
