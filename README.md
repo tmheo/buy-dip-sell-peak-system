@@ -296,9 +296,7 @@ src/
 │   └── trading-core.ts              # 공통 트레이딩 유틸리티 (가격 계산, 체결 판정)
 ├── lib/
 │   ├── date.ts                      # 날짜 유틸리티 함수
-│   ├── api-utils.ts                 # API 라우트 공통 유틸리티 (인증, 에러 응답)
-│   ├── auth/
-│   │   └── api-auth.ts              # API 인증 유틸리티 (requireAuth, isUnauthorized)
+│   ├── api-utils.ts                 # API 라우트 공통 유틸리티 (세션·크론 인증, 에러 응답)
 │   └── validations/
 │       └── trading.ts               # 트레이딩 입력값 검증 스키마 (Zod)
 ├── components/

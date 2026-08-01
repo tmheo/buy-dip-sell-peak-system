@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
+import { getAuthUserId, unauthorizedResponse } from "@/lib/api-utils";
 import { getPriceRange, getLatestDate } from "@/database/prices";
 import { recommend, PRICE_HISTORY_START } from "@/recommend";
 
@@ -45,9 +45,8 @@ const RecommendRequestSchema = z
 export async function POST(request: Request): Promise<Response> {
   try {
     // 인증 체크
-    const authResult = await requireAuth();
-    if (isUnauthorized(authResult)) {
-      return authResult;
+    if (!(await getAuthUserId())) {
+      return unauthorizedResponse();
     }
 
     // 요청 본문 파싱

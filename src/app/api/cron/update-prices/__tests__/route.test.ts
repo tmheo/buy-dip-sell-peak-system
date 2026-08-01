@@ -11,6 +11,11 @@ import { GET } from "../route";
 
 // --- Mock 설정 ---
 
+// route가 api-utils를 거쳐 세션 인증 모듈을 끌어오므로 next-auth ESM 호환성을 위해 대역으로 바꾼다
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
 vi.mock("@/services/priceSyncService", () => ({
   syncTickerPrices: vi.fn(),
 }));

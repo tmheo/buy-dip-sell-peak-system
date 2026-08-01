@@ -11,17 +11,12 @@ vi.mock("@/auth", () => ({
   auth: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/api-auth", () => ({
-  requireAuth: vi.fn().mockResolvedValue({ user: { id: "test-user" } }),
-  // isUnauthorized는 타입 가드 함수이므로 실제 구현 사용
-  isUnauthorized: (result: unknown) => result instanceof Response,
-}));
-
 // Mock 데이터베이스 함수
 vi.mock("@/database/prices", () => ({
   getPriceRange: vi.fn(),
 }));
 
+import { mockLoggedIn, mockLoggedOut } from "@/lib/__tests__/auth-mock";
 import { getPriceRange } from "@/database/prices";
 
 // Mock 가격 데이터 생성 (Drizzle 반환 타입과 호환)
@@ -51,10 +46,35 @@ function createMockPrices(count: number, startPrice: number = 100): DailyPrice[]
 describe("POST /api/backtest", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoggedIn("test-user");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe("인증", () => {
+    it("로그인하지 않은 요청은 401을 반환해야 한다", async () => {
+      mockLoggedOut();
+
+      const request = new Request("http://localhost/api/backtest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: "SOXL",
+          strategy: "Pro2",
+          startDate: "2025-01-02",
+          endDate: "2025-01-11",
+          initialCapital: 10000,
+        }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "Unauthorized" });
+      expect(getPriceRange).not.toHaveBeenCalled();
+    });
   });
 
   describe("유효한 요청", () => {

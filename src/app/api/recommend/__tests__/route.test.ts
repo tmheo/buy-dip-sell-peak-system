@@ -4,7 +4,6 @@
  * 축소됐다. DB·인증만 대역으로 바꾸고 실제 서비스·코어 파이프라인을 통과시킨다.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Session } from "next-auth";
 
 import { clearRecommendationCache } from "@/recommend";
 import { MIN_PAST_GAP_DAYS } from "@/recommend/similarity";
@@ -14,9 +13,8 @@ import {
   toMetricsRows,
 } from "@/recommend/__tests__/fixtures";
 
-vi.mock("@/lib/auth/api-auth", () => ({
-  requireAuth: vi.fn(),
-  isUnauthorized: (result: unknown) => result instanceof Response,
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
 }));
 
 vi.mock("@/database/prices", () => ({
@@ -34,14 +32,12 @@ vi.mock("@/database/recommend-cache", () => ({
   toRecommendationCacheMetrics: vi.fn(() => ({})),
 }));
 
-import { requireAuth } from "@/lib/auth/api-auth";
+import { mockLoggedIn, mockLoggedOut } from "@/lib/__tests__/auth-mock";
 import { getPriceRange, getLatestDate } from "@/database/prices";
 import { getMetricsRange } from "@/database/metrics";
 import { getCachedRecommendation, cacheRecommendation } from "@/database/recommend-cache";
 
 import { POST } from "../route";
-
-const mockedRequireAuth = vi.mocked(requireAuth);
 const mockedGetPriceRange = vi.mocked(getPriceRange);
 const mockedGetLatestDate = vi.mocked(getLatestDate);
 const mockedGetMetricsRange = vi.mocked(getMetricsRange);
@@ -74,14 +70,14 @@ function arrangeSuccessDb() {
 beforeEach(() => {
   vi.clearAllMocks();
   clearRecommendationCache();
-  mockedRequireAuth.mockResolvedValue({ user: { id: "user-1" } } as Session);
+  mockLoggedIn("user-1");
   mockedGetCachedRecommendation.mockResolvedValue(null);
   mockedCacheRecommendation.mockResolvedValue(undefined);
 });
 
 describe("POST /api/recommend - 인증과 요청 검증", () => {
   it("인증 실패 시 401을 그대로 반환해야 한다", async () => {
-    mockedRequireAuth.mockResolvedValue(Response.json({ error: "Unauthorized" }, { status: 401 }));
+    mockLoggedOut();
 
     const response = await POST(
       createRequest({ ticker: "SOXL", referenceDate: "2020-09-01", baseType: "specific" })

@@ -16,9 +16,9 @@
  *
  * 인증: Authorization: Bearer ${CRON_SECRET}
  */
-import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireCronAuth } from "@/lib/api-utils";
 import {
   getActiveTradingAccounts,
   getAllTradingAccounts,
@@ -43,23 +43,9 @@ const ACTIVE_WINDOW_DAYS = 14;
 
 /** GET /api/cron/process-daily-orders */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  // 인증 검증 (타이밍 공격 방지를 위한 timingSafeEqual 사용)
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    console.error("CRON_SECRET 환경 변수 미설정");
-    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get("authorization");
-  const expectedToken = `Bearer ${cronSecret}`;
-
-  if (
-    !authHeader ||
-    authHeader.length !== expectedToken.length ||
-    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedToken))
-  ) {
-    console.warn("Cron 인증 실패: 잘못된 토큰");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authError = requireCronAuth(request);
+  if (authError) {
+    return authError;
   }
 
   const accountIdFilter = request.nextUrl.searchParams.get("accountId");

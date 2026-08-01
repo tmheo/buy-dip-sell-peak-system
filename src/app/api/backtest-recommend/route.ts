@@ -9,7 +9,7 @@ import { z } from "zod";
 import { getPriceRange } from "@/database/prices";
 import { runRecommendBacktest } from "@/backtest-recommend";
 import type { RecommendBacktestRequest } from "@/backtest-recommend";
-import { requireAuth, isUnauthorized } from "@/lib/auth/api-auth";
+import { getAuthUserId, unauthorizedResponse } from "@/lib/api-utils";
 
 // 추천 백테스트용 lookback 시작일 (충분한 과거 데이터 확보)
 const RECOMMEND_LOOKBACK_START = "2010-01-01";
@@ -62,9 +62,8 @@ const RecommendBacktestRequestSchema = z
 export async function POST(request: Request) {
   try {
     // 인증 체크
-    const authResult = await requireAuth();
-    if (isUnauthorized(authResult)) {
-      return authResult;
+    if (!(await getAuthUserId())) {
+      return unauthorizedResponse();
     }
 
     // 요청 본문 파싱
