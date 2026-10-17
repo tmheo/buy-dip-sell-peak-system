@@ -39,7 +39,7 @@ import type {
   SimilarityConfig,
 } from "./types";
 
-/** 기본 전략 (CONTEXT.md): 추천을 계산할 수 없을 때 대신 쓰는 전략 */
+/** 기본 전략 (GLOSSARY.md): 추천을 계산할 수 없을 때 대신 쓰는 전략 */
 export const DEFAULT_STRATEGY: Strategy = "Pro2";
 
 /** 유사 구간 검색용 과거 데이터 시작일 (SOXL/TQQQ 모두 2010년 시작) */

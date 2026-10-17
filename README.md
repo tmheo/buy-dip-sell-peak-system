@@ -29,7 +29,7 @@
 | 문서 | 역할 |
 |------|------|
 | [README.md](./README.md) | 설치, 실행, 시스템 전체 구조 |
-| [CONTEXT.md](./CONTEXT.md) | 도메인 용어의 정본 |
+| [GLOSSARY.md](./GLOSSARY.md) | 도메인 용어의 정본 |
 | [docs/adr/](./docs/adr/) | 되돌리기 어려운 결정과 그 이유 |
 | [docs/agents/](./docs/agents/) | 에이전트용 저장소 규약 (이슈 트래커, 트리아지 라벨) |
 | [docs/](./docs/) | 기능별 PRD·SPEC 문서 |
@@ -97,9 +97,9 @@ http://localhost:3000 에서 웹 UI에 접속할 수 있습니다.
 
 ## 핵심 개념
 
-> 도메인 용어의 정본은 [CONTEXT.md](./CONTEXT.md)입니다.
+> 도메인 용어의 정본은 [GLOSSARY.md](./GLOSSARY.md)입니다.
 > 티어, 사이클, 사이클 자본, 시드 금액, 예수금, 주문표 같은 용어의 정확한 정의와 쓰지 말아야 할 표현이 거기 있습니다.
-> 아래는 요약이며, 뜻이 갈리면 CONTEXT.md를 따릅니다.
+> 아래는 요약이며, 뜻이 갈리면 GLOSSARY.md를 따릅니다.
 > 되돌리기 어려운 판단은 [docs/adr/](./docs/adr/)에 결정 기록으로 남깁니다.
 
 ### 떨사오팔 전략
@@ -275,7 +275,7 @@ npx tsx src/optimize/cli.ts --ticker SOXL --start 2025-01-01 --end 2025-12-31
 테스트는 각 모듈 옆의 `__tests__/`에 둡니다 (아래 트리에서는 생략).
 
 ```
-CONTEXT.md                           # 도메인 용어집 (용어의 정본)
+GLOSSARY.md                           # 도메인 용어집 (용어의 정본)
 auth.ts                              # NextAuth.js 설정 (providers, adapter)
 
 docs/

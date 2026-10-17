@@ -270,7 +270,7 @@ export class BacktestEngine {
       }
 
       // 첫 매수 전까지 매일 전략 재평가 (전일 종가 기준)
-      // 아직 보유가 없으므로 사이클 경계와 동일 상태다 - 전략 교체 허용 (CONTEXT.md 사이클 정의)
+      // 아직 보유가 없으므로 사이클 경계와 동일 상태다 - 전략 교체 허용 (GLOSSARY.md 사이클 정의)
       if (!hasTradedThisCycle) {
         if (provider) {
           const decision = prevDateDecision ?? (await provider(prevPrice.date, state.cycleNumber));
