@@ -197,3 +197,14 @@ export interface CashBreakdown {
   // 예비 티어는 기본 티어 1-6이 모두 보유된 뒤에만 매수된다.
   reserveTierAmount: number | null;
 }
+
+/**
+ * 예수금이 모자라 매수 주문을 내지 않는 티어 (#98)
+ * 매수할 티어가 있지만 예수금으로 1주도 살 수 없는 날, 화면이 그 이유를 보이는 데 쓴다.
+ */
+export interface UnaffordableBuy {
+  // 매수 차례인 티어 번호 (1-7)
+  tier: number;
+  // 그날의 예수금
+  availableCash: number;
+}

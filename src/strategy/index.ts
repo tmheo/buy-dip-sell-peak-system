@@ -9,6 +9,8 @@
  * 가격 불변식: 입력되는 모든 가격은 분할·배당 조정된 연속 시계열(adjClose)이어야 한다.
  */
 export { planOrders } from "./plan-orders";
+// 매수 주문이 없는 날의 이유(예수금 부족)를 화면에 알릴 때 쓴다 (#98)
+export { unaffordableBuy } from "./plan-orders";
 export { settle } from "./settle";
 export { startNextCycle } from "./cycle";
 export { PRO_STRATEGIES, getStrategyParams } from "./params";
@@ -28,5 +30,6 @@ export type {
   SettleResult,
   StrategyParams,
   TierHolding,
+  UnaffordableBuy,
 } from "./types";
 export { BASE_TIER_COUNT, MAX_TIER_NUMBER, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";
