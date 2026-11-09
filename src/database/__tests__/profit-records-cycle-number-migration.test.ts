@@ -66,7 +66,9 @@ describe.skipIf(!hasDb)("profit_records.cycle_number 마이그레이션", () => 
       | { ok: false; error: string }
       | undefined;
     try {
-      await sql.begin(async (tx) => {
+      await sql.begin(async (transaction) => {
+        // postgres-js의 TransactionSql 타입은 Omit 때문에 호출 시그니처를 잃는다 - 런타임은 Sql과 같다
+        const tx = transaction as unknown as postgres.Sql;
         for (const table of ["trading_accounts", "tier_holdings", "profit_records"]) {
           await tx.unsafe(
             `CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`
