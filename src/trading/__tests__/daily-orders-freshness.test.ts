@@ -18,6 +18,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { DailyOrder, TierHolding, TradingAccount } from "@/types/trading";
 
 vi.mock("@/database/trading", () => ({
+  getCycleRealizedPnl: vi.fn(),
   getDailyOrders: vi.fn(),
   getTierHoldings: vi.fn(),
   getPreviousTradingClose: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("@/database/trading", () => ({
 }));
 
 import {
+  getCycleRealizedPnl,
   getDailyOrders,
   getTierHoldings,
   getPreviousTradingClose,
@@ -36,6 +38,7 @@ import {
 
 import { getFreshDailyOrders } from "../orders";
 
+const mockedGetCycleRealizedPnl = vi.mocked(getCycleRealizedPnl);
 const mockedGetDailyOrders = vi.mocked(getDailyOrders);
 const mockedGetTierHoldings = vi.mocked(getTierHoldings);
 const mockedGetPreviousTradingClose = vi.mocked(getPreviousTradingClose);
@@ -138,6 +141,7 @@ beforeEach(() => {
     createHolding({ tier: 2 }),
   ]);
   mockedListTradingDatesBetween.mockResolvedValue(TRADING_DATES_SINCE_TIER1_BUY);
+  mockedGetCycleRealizedPnl.mockResolvedValue(0); // 이번 사이클에 아직 매도 기록이 없다
   mockedGetPreviousTradingClose.mockResolvedValue({ date: "2026-07-14", adjClose: 50 });
   mockedReplaceDailyOrders.mockResolvedValue(REGENERATED);
 });
@@ -199,8 +203,8 @@ describe("getFreshDailyOrders - 계좌 설정 변경", () => {
 
   it("사이클 시작일 변경처럼 주문 내용이 그대로인 설정 변경은 교체하지 않는다", async () => {
     // 수정 시각 비교는 없어졌다 - 설정이 바뀌어도 다시 만든 주문이 같으면 신선하다.
-    // 사이클 시작일은 아직 주문 계산의 입력이 아니다. 사이클 안 실현손익(ADR-0003)이
-    // 입력에 들어오면 시작일 변경이 주문 내용을 바꾸고, 그때는 같은 비교가 낡음으로 잡는다.
+    // 사이클 시작일은 주문 계산의 입력이 아니다. 사이클 안 실현손익(ADR-0003)도
+    // 시작일이 아니라 수익 기록의 사이클 번호로 묶는다 (#97).
     const existing = storedOrders(FRESH_ROWS);
     mockedGetDailyOrders.mockResolvedValue(existing);
     const account = createAccount({
@@ -240,6 +244,30 @@ describe("getFreshDailyOrders - 가격 기록과 보유 상태 변화", () => {
       { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 300 },
       { tier: 1, type: "SELL", orderMethod: "MOC", limitPrice: 50, shares: 208 },
     ]);
+  });
+});
+
+describe("getFreshDailyOrders - 이번 사이클 실현손익 (ADR-0003)", () => {
+  it("이번 사이클 순실현손실이 생기면 줄어든 예수금으로 다시 만든다", async () => {
+    // 손실이 기록되기 전에 만든 주문표(티어 2 매수 300주)가 저장돼 있다
+    mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
+    // 이번 사이클에 앞서 손절한 티어들의 순실현손실 -$80,016
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    // 계좌 현금 = 100,000 - 9,984(티어 1) - 80,016 = $10,000 → 예수금 $10,000
+    // 티어 2 금액 min(15,000, 10,000) = 10,000 → floor(10,000 ÷ 49.99) = 200주
+    await expectReplacedWith(createAccount(), [
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+      { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 48.72, shares: 208 },
+    ]);
+  });
+
+  it("이번 사이클 실현이익은 예수금을 늘리지 않아 주문표를 그대로 둔다", async () => {
+    const existing = storedOrders(FRESH_ROWS);
+    mockedGetDailyOrders.mockResolvedValue(existing);
+    mockedGetCycleRealizedPnl.mockResolvedValue(5_000);
+
+    await expectKept(createAccount(), existing);
   });
 });
 

@@ -11,6 +11,7 @@
 import Decimal from "decimal.js";
 
 import {
+  getCycleRealizedPnl,
   getDailyOrders,
   getPreviousTradingClose,
   getTierHoldings,
@@ -68,14 +69,17 @@ async function toStrategyHoldings(
  * @param date - 기준일 (주문표 날짜 또는 체결 처리일)
  */
 export async function loadCycleState(account: TradingAccount, date: string): Promise<CycleState> {
-  const holdings = await getTierHoldings(account.id);
+  const [holdings, realizedPnl] = await Promise.all([
+    getTierHoldings(account.id),
+    // 이번 사이클 실현손익: 계좌의 지금 사이클 번호로 묶인 수익 기록의 손익 합 (ADR-0003)
+    getCycleRealizedPnl(account.id, account.cycleNumber),
+  ]);
   return {
     strategy: getStrategyParams(account.strategy),
     cycleCapital: account.seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
     holdings: await toStrategyHoldings(account.ticker, holdings, date),
     cycleNumber: account.cycleNumber,
-    // TODO(#97): 현재 사이클의 실현손익(profit_records)을 더한다 - 그 전까지는 ADR-0001 동작
-    realizedPnl: 0,
+    realizedPnl,
   };
 }
 

@@ -18,6 +18,7 @@ vi.mock("@/database/trading", () => ({
   completeCycleAndIncrement: vi.fn(),
   createProfitRecord: vi.fn(),
   getClosingPrice: vi.fn(),
+  getCycleRealizedPnl: vi.fn(),
   getDailyOrders: vi.fn(),
   getPreviousTradingClose: vi.fn(),
   getTierHoldings: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("@/database/trading", () => ({
 
 import {
   getClosingPrice,
+  getCycleRealizedPnl,
   getDailyOrders,
   getPreviousTradingClose,
   getTierHoldings,
@@ -83,6 +85,7 @@ beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.mocked(getTradingAccountByIdWithoutOwnerCheck).mockResolvedValue(ACCOUNT);
   vi.mocked(getClosingPrice).mockResolvedValue(49);
+  vi.mocked(getCycleRealizedPnl).mockResolvedValue(0);
   vi.mocked(getDailyOrders).mockResolvedValue([STALE_ORDER]);
   vi.mocked(getPreviousTradingClose).mockResolvedValue({ date: "2026-07-14", adjClose: 50 });
   vi.mocked(hasExecutedOrdersAfter).mockResolvedValue(false);
