@@ -8,6 +8,7 @@
 import Decimal from "decimal.js";
 import { floorToDecimal } from "@/utils/decimal";
 import type { CycleState, TierHolding } from "./types";
+import { experiment } from "./experiment";
 import { BASE_TIER_COUNT, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";
 
 // =====================================================
@@ -113,9 +114,40 @@ function totalInvested(holdings: TierHolding[]): Decimal {
  * @returns 예수금 (소수점 2자리 내림, 음수면 0)
  */
 export function availableCash(state: CycleState): number {
+  const remaining = new Decimal(state.cycleCapital)
+    .sub(totalInvested(state.holdings))
+    .sub(lossDeduction(state));
+  if (remaining.lte(0)) return 0;
+  return remaining.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+}
+
+/**
+ * #88 실험: 현행 예수금 (실현손익 무시). 계좌 현금 = 이 값 + 사이클 내 실현손익.
+ */
+export function baseAvailableCash(state: CycleState): number {
   const remaining = new Decimal(state.cycleCapital).sub(totalInvested(state.holdings));
   if (remaining.lte(0)) return 0;
   return remaining.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+}
+
+/**
+ * #88 실험: 변형별 예수금 차감액 (양수)
+ * - current: 0
+ * - A_i, A_ii: 사이클 내 실현손익 합이 마이너스일 때 그 절댓값
+ * - B_i: 손실 난 매도의 손실 합
+ */
+export function lossDeduction(state: CycleState): Decimal {
+  switch (experiment.variant) {
+    case "current":
+      return new Decimal(0);
+    case "A_i":
+    case "A_ii": {
+      const net = new Decimal(state.realizedNet ?? 0);
+      return net.lt(0) ? net.neg() : new Decimal(0);
+    }
+    case "B_i":
+      return new Decimal(state.realizedLoss ?? 0);
+  }
 }
 
 /**
@@ -162,9 +194,11 @@ export function tierAmount(state: CycleState, tier: number): number {
   }
 
   const ratio = new Decimal(state.strategy.tierRatios[tier - 1]);
-  const nominal = new Decimal(state.cycleCapital)
-    .mul(ratio)
-    .toDecimalPlaces(2, Decimal.ROUND_DOWN)
-    .toNumber();
+  // #88 실험 A_ii: 아직 사지 않은 기본 티어는 (사이클 자본 - 순손실) × 비율로 줄인다
+  const base =
+    experiment.variant === "A_ii"
+      ? new Decimal(state.cycleCapital).sub(lossDeduction(state))
+      : new Decimal(state.cycleCapital);
+  const nominal = base.mul(ratio).toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
   return Math.min(nominal, cash);
 }

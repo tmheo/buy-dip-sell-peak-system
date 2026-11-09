@@ -7,7 +7,7 @@
 import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
-import { availableCash } from "@/strategy";
+import { baseAvailableCash } from "@/strategy";
 import { calculateSMA } from "@/metrics";
 import type { DailySnapshot, OrderAction, RemainingTier, TradeAction } from "./types";
 
@@ -18,7 +18,7 @@ import type { DailySnapshot, OrderAction, RemainingTier, TradeAction } from "./t
  * 예수금 공식(사이클 자본 - Σ 활성 티어 투자원금)은 src/strategy가 소유한다.
  */
 export function cashBalance(state: CycleState, realizedProfit: Decimal): Decimal {
-  return new Decimal(availableCash(state)).add(realizedProfit);
+  return new Decimal(baseAvailableCash(state)).add(realizedProfit);
 }
 
 /**

@@ -77,6 +77,10 @@ export interface CycleState {
   holdings: TierHolding[];
   // 사이클 번호
   cycleNumber: number;
+  // #88 실험: 사이클 내 실현손익 합계 (이익과 손실 상계)
+  realizedNet?: number;
+  // #88 실험: 사이클 내 손실 난 매도의 손실 합계 (양수, 이익은 상계하지 않음)
+  realizedLoss?: number;
 }
 
 // ============================================================

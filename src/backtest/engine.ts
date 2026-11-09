@@ -30,7 +30,14 @@ import type {
 } from "./types";
 import type { Strategy } from "@/types/trading";
 import type { CycleState, StrategyParams } from "@/strategy";
-import { getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
+import {
+  baseAvailableCash,
+  getStrategyParams,
+  planOrders,
+  resetStats,
+  settle,
+  startNextCycle,
+} from "@/strategy";
 import {
   cashBalance,
   createRemainingTiers,
@@ -139,6 +146,7 @@ export class BacktestEngine {
       initialReason = "초기 전략 유지";
     }
 
+    const stats = resetStats();
     let state: CycleState = {
       strategy: currentStrategy,
       cycleCapital: request.initialCapital,
@@ -293,19 +301,53 @@ export class BacktestEngine {
 
       // === 하루 처리: planOrders + settle 합성 ===
       const orders = planOrders(state, prevPrice.adjClose);
-      const { newState, executions, events } = settle(state, orders, {
+      const settled = settle(state, orders, {
         date: currentPrice.date,
         close: currentPrice.adjClose,
       });
+      const { executions, events } = settled;
 
+      // #88 계측: 주문 시점(전일 마감) 계좌 현금 = 현행 예수금 + 사이클 내 실현손익
+      const accountCash = new Decimal(baseAvailableCash(state)).add(realizedProfit);
+      const buyOrder = orders.find((o) => o.type === "BUY");
+      if (buyOrder && buyOrder.type === "BUY") {
+        const orderAmount = new Decimal(buyOrder.limitPrice).mul(buyOrder.shares);
+        const excess = orderAmount.sub(accountCash);
+        if (excess.gt(0)) {
+          stats.ordersOverCash++;
+          if (executions.some((e) => e.order.type === "BUY")) {
+            stats.executedOverCash++;
+          }
+          const excessPct = excess.div(state.cycleCapital).toNumber();
+          if (excessPct > stats.maxExcessPct) stats.maxExcessPct = excessPct;
+          if (excess.gt(stats.maxExcess)) {
+            stats.maxExcess = excess.toDecimalPlaces(2).toNumber();
+            stats.maxExcessDate = currentPrice.date;
+          }
+        }
+      }
+
+      let realizedNet = new Decimal(state.realizedNet ?? 0);
+      let realizedLoss = new Decimal(state.realizedLoss ?? 0);
       for (const execution of executions) {
         if (execution.order.type === "BUY") {
           hasTradedThisCycle = true;
         }
+        if (execution.order.type === "SELL" && execution.order.orderMethod === "MOC") {
+          stats.stopLossCount++;
+          if ((execution.profit ?? 0) < 0) stats.stopLossLossCount++;
+        }
         if (execution.profit !== undefined) {
           realizedProfit = realizedProfit.add(execution.profit);
+          realizedNet = realizedNet.add(execution.profit);
+          if (execution.profit < 0) realizedLoss = realizedLoss.sub(execution.profit);
         }
       }
+      const newState: CycleState = {
+        ...settled.newState,
+        realizedNet: realizedNet.toNumber(),
+        realizedLoss: realizedLoss.toNumber(),
+      };
 
       // 고정 모드: 첫 매수로 사이클 시작 시점이 확정되면 시작 지표를 계산한다
       if (hasTradedThisCycle) {
@@ -313,6 +355,7 @@ export class BacktestEngine {
       }
 
       if (events.some((e) => e.type === "CYCLE_COMPLETED")) {
+        if (realizedProfit.lt(0)) stats.losingCycles++;
         completedCycles.push({
           profit: realizedProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
           strategy: currentStrategyName,
