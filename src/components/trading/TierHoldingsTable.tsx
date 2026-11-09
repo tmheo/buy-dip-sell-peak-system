@@ -4,30 +4,21 @@
  * 티어별 보유 현황 테이블 컴포넌트
  *
  * 아직 안 산 티어의 할당 시드는 실제로 살 금액이고, 예수금 때문에 비율대로 못 사는 티어에는
- * "예수금 부족으로 축소"를 붙인다 (ADR-0003, #93). 데스크톱 표와 휴대폰 카드가 같은 정보를 보인다.
+ * "예수금 부족으로 축소"를 붙인다 (#98, ADR-0003, 결정은 #93). 데스크톱 표와 휴대폰 카드가 같은
+ * 정보를 보인다.
  */
 
 import type React from "react";
 import type { TierHolding, Strategy } from "@/types/trading";
-import { RESERVE_TIER_NUMBER, type CashBreakdown } from "@/strategy";
+import type { CashBreakdown } from "@/strategy";
 import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
+import { formatCurrency, getTierLabel } from "./format";
 import { buildTierRows, type TierRow } from "./tier-rows";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
-  seedCapital: number;
   strategy: Strategy;
   cash: CashBreakdown;
-}
-
-function formatCurrency(value: number | null): string {
-  if (value === null) return "-";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 function formatDate(date: string | null): string {
@@ -46,11 +37,6 @@ function calculateHoldingDays(buyDate: string | null): string {
   // 거래일(영업일) 기준으로 보유 기간 계산 (주말 제외, 매수일 포함)
   const tradingDays = calculateTradingDays(buyDate, getTodayTradingDate());
   return `${tradingDays}일`;
-}
-
-function getTierLabel(tier: number): string {
-  if (tier === RESERVE_TIER_NUMBER) return "예비";
-  return `${tier}`;
 }
 
 /** 축소 표시 배지. 표와 카드가 같은 문구를 쓴다. */
@@ -73,11 +59,10 @@ function AllocatedSeed({ row }: { row: TierRow }): React.ReactElement {
 
 export default function TierHoldingsTable({
   holdings,
-  seedCapital,
   strategy,
   cash,
 }: TierHoldingsTableProps): React.ReactElement {
-  const tierData = buildTierRows(holdings, seedCapital, strategy, cash);
+  const tierData = buildTierRows(holdings, strategy, cash);
 
   return (
     <div className="card bg-dark border-secondary mb-4">
@@ -200,7 +185,7 @@ export default function TierHoldingsTable({
           })}
         </div>
       </div>
-      {cash.netRealizedLoss > 0 && (
+      {cash.isCashReduced && (
         <div className="card-footer border-secondary">
           <small className="text-secondary" style={{ wordBreak: "keep-all" }}>
             * 이번 사이클 순실현손실 {formatCurrency(cash.netRealizedLoss)}만큼 예수금이 줄어,

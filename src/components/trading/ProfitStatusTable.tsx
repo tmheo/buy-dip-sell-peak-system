@@ -8,25 +8,10 @@
 import type React from "react";
 import { useState, useEffect, useCallback } from "react";
 import type { ProfitStatusResponse, MonthlyProfitSummary, ProfitRecord } from "@/types/trading";
+import { formatCurrency, formatPercent } from "./format";
 
 interface ProfitStatusTableProps {
   accountId: string;
-}
-
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-function formatCurrency(value: number): string {
-  return currencyFormatter.format(value);
-}
-
-function formatPercent(value: number): string {
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}%`;
 }
 
 function formatDate(dateStr: string): string {

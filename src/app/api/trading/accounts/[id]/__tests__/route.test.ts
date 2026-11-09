@@ -106,16 +106,21 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     expect(body.cashBreakdown).toEqual({
       availableCash: 1_500,
       accountCash: 1_500,
+      // 예수금 계산식: 시드 10,000 - 투자 중 1,000(티어 1) - 순실현손실 7,500 = 1,500
+      cycleCapital: 10_000,
+      investedAmount: 1_000,
       netRealizedLoss: 7_500,
-      // 아직 안 산 기본 티어: 실제 금액 min(10,000 × 비율, 1,500)과 비율대로의 금액
-      baseTiers: [
-        { tier: 2, amount: 1_500, nominalAmount: 1_500 },
-        { tier: 3, amount: 1_500, nominalAmount: 2_000 },
-        { tier: 4, amount: 1_500, nominalAmount: 2_500 },
-        { tier: 5, amount: 1_500, nominalAmount: 2_000 },
-        { tier: 6, amount: 1_000, nominalAmount: 1_000 },
+      isCashReduced: true,
+      // 할당 시드: 보유 중인 티어 1은 비율대로, 아직 안 산 티어는 min(10,000 × 비율, 1,500)
+      tiers: [
+        { tier: 1, amount: 1_000, nominalAmount: 1_000, isReduced: false },
+        { tier: 2, amount: 1_500, nominalAmount: 1_500, isReduced: false },
+        { tier: 3, amount: 1_500, nominalAmount: 2_000, isReduced: true },
+        { tier: 4, amount: 1_500, nominalAmount: 2_500, isReduced: true },
+        { tier: 5, amount: 1_500, nominalAmount: 2_000, isReduced: true },
+        { tier: 6, amount: 1_000, nominalAmount: 1_000, isReduced: false },
+        { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
-      reserveTierAmount: 1_500,
     });
   });
 
@@ -208,7 +213,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
       expect(tier1.shares).toBe(10);
       expect(body.cashBreakdown.netRealizedLoss).toBe(0);
       expect(body.cashBreakdown.availableCash).toBe(9_000);
-      expect(body.cashBreakdown.baseTiers.map((t: { tier: number }) => t.tier)).not.toContain(1);
+      expect(body.cashBreakdown.investedAmount).toBe(1_000);
     } finally {
       await otherClient.end();
     }

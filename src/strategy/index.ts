@@ -20,7 +20,6 @@ export { accountCash, availableCash, cashBreakdown } from "./calculations";
 // 매도 지정가 파생 계산. sellTargetPrice DB 컬럼(표시용 캐시)을 채울 때 사용한다 (#43).
 export { calculateSellLimitPrice } from "./calculations";
 export type {
-  BaseTierCash,
   CashBreakdown,
   CycleState,
   CycleEvent,
@@ -31,6 +30,7 @@ export type {
   ReducedBuy,
   SettleResult,
   StrategyParams,
+  TierCash,
   TierHolding,
   UnaffordableBuy,
 } from "./types";

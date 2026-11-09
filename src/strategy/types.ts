@@ -169,19 +169,23 @@ export interface SettleResult {
 // ============================================================
 
 /**
- * 아직 사지 않은 기본 티어의 금액
+ * 티어의 할당 시드 (#98)
+ * 화면의 보유 현황이 티어별로 보이는 금액이다. 규칙은 calculations.ts의 cashBreakdown 참고.
  */
-export interface BaseTierCash {
-  // 티어 번호 (1-6)
+export interface TierCash {
+  // 티어 번호 (1-7)
   tier: number;
-  // 지금 사면 쓰일 실제 금액: min(사이클 자본 × 비율, 예수금)
+  // 할당 시드: 보유 중인 기본 티어는 사이클 자본 × 비율, 아직 안 산 기본 티어는
+  // min(사이클 자본 × 비율, 예수금), 예비 티어는 기본 티어 1-6이 모두 보유 중이면 예수금 전액, 아니면 0
   amount: number;
-  // 비율대로의 금액: 사이클 자본 × 비율
-  nominalAmount: number;
+  // 비율대로의 금액: 사이클 자본 × 비율. 예비 티어는 비율이 없어 null
+  nominalAmount: number | null;
+  // 예수금 때문에 비율대로의 금액보다 덜 사는지 (아직 안 산 기본 티어만 true일 수 있다)
+  isReduced: boolean;
 }
 
 /**
- * 현금 내역 (ADR-0003)
+ * 현금 내역 (ADR-0003, #98)
  * 화면이 예수금과 티어 금액을 직접 계산하지 않도록 규칙 모듈이 한 번에 내준다.
  */
 export interface CashBreakdown {
@@ -189,13 +193,16 @@ export interface CashBreakdown {
   availableCash: number;
   // 계좌 현금 (공식은 calculations.ts의 accountCash, ADR-0003)
   accountCash: number;
+  // 예수금 계산식의 시드: 사이클 자본 (실계좌는 시드 금액)
+  cycleCapital: number;
+  // 예수금 계산식의 투자 중: Σ 활성 티어 매수금액 (매수가 × 수량)
+  investedAmount: number;
   // 이번 사이클 순실현손실 (양수, 손실이 없으면 0)
   netRealizedLoss: number;
-  // 아직 사지 않은 기본 티어(1-6)별 금액, 티어 번호 순
-  baseTiers: BaseTierCash[];
-  // 예비 티어를 사면 쓰일 금액(예수금 전액). 이미 보유 중이면 null.
-  // 예비 티어는 기본 티어 1-6이 모두 보유된 뒤에만 매수된다.
-  reserveTierAmount: number | null;
+  // 예수금이 이번 사이클 순실현손실로 줄었는지. 실현손익의 합이 0 이상이면 false
+  isCashReduced: boolean;
+  // 티어 1-7의 할당 시드, 티어 번호 순
+  tiers: TierCash[];
 }
 
 /**

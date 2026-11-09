@@ -153,6 +153,12 @@ export async function getPreviousTradingClose(
   return rows[0] ?? null;
 }
 
+/** 저장된 가장 최근 종가(adjClose)와 그 거래일 (YYYY-MM-DD) (#98) */
+export interface LatestClose {
+  date: string;
+  adjClose: number;
+}
+
 /**
  * 저장된 가장 최근 종가(adjClose)와 그 거래일 조회 (#98)
  * 계좌 화면의 평가금(가장 최근 종가 × 보유 수량)에 쓴다. 가격 행이 하나도 없으면 null.
@@ -160,7 +166,7 @@ export async function getPreviousTradingClose(
 export async function getLatestClose(
   ticker: Ticker,
   executor: DbExecutor = db
-): Promise<{ date: string; adjClose: number } | null> {
+): Promise<LatestClose | null> {
   const rows = await executor
     .select({ date: dailyPrices.date, adjClose: dailyPrices.adjClose })
     .from(dailyPrices)

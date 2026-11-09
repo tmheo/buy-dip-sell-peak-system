@@ -7,7 +7,7 @@
  */
 import Decimal from "decimal.js";
 import { floorToDecimal } from "@/utils/decimal";
-import type { BaseTierCash, CashBreakdown, CycleState, TierHolding } from "./types";
+import type { CashBreakdown, CycleState, TierCash, TierHolding } from "./types";
 import { BASE_TIER_COUNT, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";
 
 // =====================================================
@@ -145,6 +145,18 @@ export function availableCash(state: CycleState): number {
 }
 
 /**
+ * 비어 있는 가장 낮은 기본 티어 (내부 헬퍼)
+ * 없으면(기본 티어 1-6이 모두 보유 중이면) null - 예비 티어는 이때만 매수 차례가 되고,
+ * 화면의 할당 시드도 이때만 있다.
+ */
+function lowestEmptyBaseTier(heldTiers: Set<number>): number | null {
+  for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {
+    if (!heldTiers.has(tier)) return tier;
+  }
+  return null;
+}
+
+/**
  * 다음 매수 티어 번호 결정 (티어 고정 방식)
  * 티어 1-6 중 가장 낮은 빈 티어를 반환한다.
  * 티어 1-6이 모두 활성화되고 예수금이 있으면 예비 티어(7)를 반환한다.
@@ -155,10 +167,9 @@ export function availableCash(state: CycleState): number {
 export function nextBuyTier(state: CycleState): number | null {
   const heldTiers = new Set(state.holdings.map((h) => h.tier));
 
-  for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {
-    if (!heldTiers.has(tier)) {
-      return tier;
-    }
+  const emptyBaseTier = lowestEmptyBaseTier(heldTiers);
+  if (emptyBaseTier !== null) {
+    return emptyBaseTier;
   }
 
   if (!heldTiers.has(RESERVE_TIER_NUMBER) && availableCash(state) > 0) {
@@ -203,31 +214,44 @@ export function nominalTierAmount(state: CycleState, tier: number): number {
 }
 
 /**
- * 화면용 현금 내역 (ADR-0003)
- * 예수금, 계좌 현금, 이번 사이클 순실현손실과 아직 사지 않은 티어의 금액을 함께 낸다.
+ * 화면용 현금 내역 (ADR-0003, #98)
+ * 예수금과 그 계산식의 항목(사이클 자본, 투자 중, 이번 사이클 순실현손실), 계좌 현금,
+ * 티어 1-7의 할당 시드를 함께 낸다. 화면은 이 값을 보이기만 하고 규칙을 다시 계산하지 않는다.
+ *
+ * 할당 시드:
+ * - 보유 중인 기본 티어: 비율대로의 금액 (사이클 자본 × 비율)
+ * - 아직 안 산 기본 티어: 지금 사면 쓰일 금액 min(사이클 자본 × 비율, 예수금).
+ *   비율대로의 금액보다 작으면 예수금 때문에 축소된 것이다.
+ * - 예비 티어: 기본 티어 1-6이 모두 보유 중이면 예수금 전액, 아니면 0
  *
  * @param state - 사이클 상태
  * @returns 현금 내역
  */
 export function cashBreakdown(state: CycleState): CashBreakdown {
   const heldTiers = new Set(state.holdings.map((h) => h.tier));
-  const baseTiers: BaseTierCash[] = [];
-  for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {
-    if (heldTiers.has(tier)) continue;
-    baseTiers.push({
-      tier,
-      amount: tierAmount(state, tier),
-      nominalAmount: nominalTierAmount(state, tier),
-    });
-  }
+  const cash = availableCash(state);
 
+  const tiers: TierCash[] = [];
+  for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {
+    const nominalAmount = nominalTierAmount(state, tier);
+    const amount = heldTiers.has(tier) ? nominalAmount : tierAmount(state, tier);
+    tiers.push({ tier, amount, nominalAmount, isReduced: amount < nominalAmount });
+  }
+  tiers.push({
+    tier: RESERVE_TIER_NUMBER,
+    amount: lowestEmptyBaseTier(heldTiers) === null ? cash : 0,
+    nominalAmount: null,
+    isReduced: false,
+  });
+
+  const netRealizedLoss = Math.max(0, -state.realizedPnl);
   return {
-    availableCash: availableCash(state),
+    availableCash: cash,
     accountCash: accountCash(state),
-    netRealizedLoss: Math.max(0, -state.realizedPnl),
-    baseTiers,
-    reserveTierAmount: heldTiers.has(RESERVE_TIER_NUMBER)
-      ? null
-      : tierAmount(state, RESERVE_TIER_NUMBER),
+    cycleCapital: state.cycleCapital,
+    investedAmount: totalInvested(state.holdings).toNumber(),
+    netRealizedLoss,
+    isCashReduced: netRealizedLoss > 0,
+    tiers,
   };
 }

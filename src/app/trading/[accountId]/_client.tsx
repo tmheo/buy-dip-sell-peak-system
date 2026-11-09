@@ -14,7 +14,8 @@ import AssetSummary from "@/components/trading/AssetSummary";
 import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
 import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
-import { calculateAssetValues, type LatestClose } from "@/components/trading/asset-values";
+import { calculateAssetValues } from "@/components/trading/asset-values";
+import type { LatestClose } from "@/database/trading";
 import type { CashBreakdown, UnaffordableBuy } from "@/strategy";
 import type { TradingAccountWithHoldings, DailyOrder } from "@/types/trading";
 
@@ -177,7 +178,7 @@ export default function TradingDetailClient({
   }
 
   const { account, cash, latestClose } = detail;
-  const assetValues = calculateAssetValues(account.holdings, cash, latestClose);
+  const assetValues = calculateAssetValues(account.totalShares, cash, latestClose);
 
   return (
     <div className="container py-4">
@@ -195,19 +196,13 @@ export default function TradingDetailClient({
       <AssetSummary
         ticker={account.ticker}
         totalShares={account.totalShares}
-        seedCapital={account.seedCapital}
         values={assetValues}
         cash={cash}
         priceDate={latestClose?.date ?? null}
       />
 
       {/* Holdings Section */}
-      <TierHoldingsTable
-        holdings={account.holdings}
-        seedCapital={account.seedCapital}
-        strategy={account.strategy}
-        cash={cash}
-      />
+      <TierHoldingsTable holdings={account.holdings} strategy={account.strategy} cash={cash} />
 
       {/* Daily Orders Section */}
       {ordersError && (

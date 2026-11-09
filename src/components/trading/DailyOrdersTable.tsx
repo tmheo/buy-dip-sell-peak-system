@@ -3,33 +3,20 @@
 /**
  * 오늘의 주문표 테이블 컴포넌트
  *
- * 예수금으로 1주도 살 수 없어 매수 주문이 없는 날에는 그 티어 줄에 이유를 보인다 (#93).
+ * 예수금으로 1주도 살 수 없어 매수 주문이 없는 날에는 그 티어 줄에 이유를 보인다 (#98, 결정은 #93).
  * 그날인지는 주문 조회 응답(unaffordableBuy)이 알려 준다 - 화면이 규칙을 다시 계산하지 않는다.
  */
 
 import type React from "react";
 import type { UnaffordableBuy } from "@/strategy";
 import type { DailyOrder } from "@/types/trading";
+import { formatCurrency, getTierLabel } from "./format";
 
 interface DailyOrdersTableProps {
   orders: DailyOrder[];
   ticker: string;
   date: string;
   unaffordableBuy: UnaffordableBuy | null;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function getTierLabel(tier: number): string {
-  if (tier === 7) return "예비";
-  return `${tier}`;
 }
 
 export default function DailyOrdersTable({

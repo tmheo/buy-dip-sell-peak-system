@@ -4,37 +4,23 @@
  * 자산 현황 섹션 컴포넌트
  *
  * 총자산은 계좌 현금 + 평가금이고, 평가금은 저장된 가장 최근 종가 기준이다 (#98).
- * 예수금이 이번 사이클 순실현손실로 줄었을 때만 예수금 칸에 계산식을 펼친다 (ADR-0003, #93).
+ * 예수금이 이번 사이클 순실현손실로 줄었을 때만 예수금 칸에 계산식을 펼친다 (#98, ADR-0003,
+ * 결정은 #93). 계산식의 항목은 모두 계좌 상세 응답(cashBreakdown)의 값이다.
  */
 
 import type React from "react";
 import type { CashBreakdown } from "@/strategy";
 import InvestmentRatioBar from "./InvestmentRatioBar";
 import type { AssetValues } from "./asset-values";
+import { formatCurrency, formatPercent } from "./format";
 
 interface AssetSummaryProps {
   ticker: string;
   totalShares: number;
-  seedCapital: number;
   values: AssetValues;
   cash: CashBreakdown;
   // 평가금에 쓴 종가의 거래일 (YYYY-MM-DD). 저장된 종가가 없으면 null
   priceDate: string | null;
-}
-
-function formatCurrency(value: number | null): string {
-  if (value === null) return "-";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatPercent(value: number): string {
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}%`;
 }
 
 /** YYYY-MM-DD → "4월 6일" */
@@ -63,15 +49,14 @@ function FormulaRow({
 export default function AssetSummary({
   ticker,
   totalShares,
-  seedCapital,
   values,
   cash,
   priceDate,
 }: AssetSummaryProps): React.ReactElement {
-  const { totalAssets, stockValue, profitRate, cashRatio, stockRatio, investedAmount } = values;
+  const { totalAssets, stockValue, profitRate, cashRatio, stockRatio } = values;
   const profitClass = (profitRate ?? 0) >= 0 ? "text-success" : "text-danger";
   // 실현손익 합이 0 이상이면 예수금은 줄지 않는다 - 숫자 하나만 보인다
-  const isCashReduced = cash.netRealizedLoss > 0;
+  const { isCashReduced } = cash;
 
   return (
     <div className="card bg-dark border-secondary mb-4">
@@ -116,8 +101,8 @@ export default function AssetSummary({
               </div>
               {isCashReduced && (
                 <div className="border-top border-secondary pt-2">
-                  <FormulaRow label="시드" value={formatCurrency(seedCapital)} />
-                  <FormulaRow label="− 투자 중" value={formatCurrency(investedAmount)} />
+                  <FormulaRow label="시드" value={formatCurrency(cash.cycleCapital)} />
+                  <FormulaRow label="− 투자 중" value={formatCurrency(cash.investedAmount)} />
                   <FormulaRow
                     label="− 이번 사이클 순실현손실"
                     value={formatCurrency(cash.netRealizedLoss)}

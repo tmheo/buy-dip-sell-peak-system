@@ -1,16 +1,15 @@
 /**
  * 보유 현황 티어 줄 테스트 (#98)
  *
- * 아직 안 산 티어의 할당 시드는 실제로 살 금액(계좌 상세 응답 cashBreakdown의 baseTiers)이고,
- * 비율대로 못 사는 티어에는 "예수금 부족으로 축소"를 붙인다.
- * 예비 티어는 기본 티어 1-6이 다 찼을 때 예수금 전액이다.
+ * 티어별 할당 시드와 축소 여부는 계좌 상세 응답 cashBreakdown의 tiers가 정한다 - 화면은
+ * 그 값을 티어 줄에 옮기기만 하고, 예비 티어를 살 차례인지 같은 규칙을 다시 따지지 않는다.
  *
  * 기준 시나리오 (Pro2, 시드 $10,000, 비율 10/15/20/25/20/10%):
  * 티어 1-5 보유, 이번 사이클 순실현손실 $400 → 예수금 $600, 티어 6은 $1,000 대신 $600
  */
 import { describe, it, expect } from "vitest";
 import { buildTierRows } from "../tier-rows";
-import type { CashBreakdown } from "@/strategy";
+import type { CashBreakdown, TierCash } from "@/strategy";
 import type { TierHolding } from "@/types/trading";
 
 function holding(tier: number, shares: number): TierHolding {
@@ -35,92 +34,76 @@ const TIERS_1_TO_5 = [
   holding(5, 20),
 ];
 
+/** Pro2 시드 $10,000의 비율대로의 금액 (티어 1-6) */
+const NOMINAL = [1_000, 1_500, 2_000, 2_500, 2_000, 1_000];
+
+/** 티어 1-7의 할당 시드. overrides로 티어별 값을 바꾼다 */
+function tiers(overrides: Partial<Record<number, Partial<TierCash>>> = {}): TierCash[] {
+  return [1, 2, 3, 4, 5, 6, 7].map((tier) => ({
+    tier,
+    amount: tier === 7 ? 0 : NOMINAL[tier - 1],
+    nominalAmount: tier === 7 ? null : NOMINAL[tier - 1],
+    isReduced: false,
+    ...overrides[tier],
+  }));
+}
+
+/** 기준 시나리오의 현금 내역: 티어 1-5 보유(투자 중 $9,000), 순실현손실 $400 → 예수금 $600 */
+function reducedCash(overrides: Partial<CashBreakdown> = {}): CashBreakdown {
+  return {
+    availableCash: 600,
+    accountCash: 600,
+    cycleCapital: 10_000,
+    investedAmount: 9_000,
+    netRealizedLoss: 400,
+    isCashReduced: true,
+    tiers: tiers({ 6: { amount: 600, isReduced: true } }),
+    ...overrides,
+  };
+}
+
 describe("buildTierRows", () => {
   it("예수금 때문에 비율대로 못 사는 티어는 실제 금액과 축소 표시를 보인다", () => {
-    const cash: CashBreakdown = {
-      availableCash: 600,
-      accountCash: 600,
-      netRealizedLoss: 400,
-      baseTiers: [{ tier: 6, amount: 600, nominalAmount: 1_000 }],
-      reserveTierAmount: 600,
-    };
+    const rows = buildTierRows([...TIERS_1_TO_5, holding(6, 0)], "Pro2", reducedCash());
 
-    const rows = buildTierRows([...TIERS_1_TO_5, holding(6, 0)], 10_000, "Pro2", cash);
-
-    const tier6 = rows.find((row) => row.tier === 6);
-    expect(tier6?.allocatedSeed).toBe(600);
-    expect(tier6?.reducedFrom).toBe(1_000);
+    expect(rows.find((row) => row.tier === 6)).toMatchObject({
+      allocatedSeed: 600,
+      reducedFrom: 1_000,
+      hasShares: false,
+    });
   });
 
   it("비율대로 살 수 있는 티어는 축소 표시가 없다", () => {
-    const cash: CashBreakdown = {
-      availableCash: 7_500,
-      accountCash: 7_500,
-      netRealizedLoss: 0,
-      baseTiers: [
-        { tier: 3, amount: 2_000, nominalAmount: 2_000 },
-        { tier: 4, amount: 2_500, nominalAmount: 2_500 },
-      ],
-      reserveTierAmount: 7_500,
-    };
-
-    const rows = buildTierRows([holding(1, 10), holding(2, 15)], 10_000, "Pro2", cash);
-
-    expect(rows.find((row) => row.tier === 3)).toMatchObject({
-      allocatedSeed: 2_000,
-      reducedFrom: null,
-    });
-    expect(rows.find((row) => row.tier === 4)).toMatchObject({
-      allocatedSeed: 2_500,
-      reducedFrom: null,
-    });
-  });
-
-  it("보유 중인 티어의 할당 시드는 시드 × 비율이다", () => {
-    const cash: CashBreakdown = {
-      availableCash: 600,
-      accountCash: 600,
-      netRealizedLoss: 400,
-      baseTiers: [{ tier: 6, amount: 600, nominalAmount: 1_000 }],
-      reserveTierAmount: 600,
-    };
-
-    const rows = buildTierRows(TIERS_1_TO_5, 10_000, "Pro2", cash);
+    const rows = buildTierRows([...TIERS_1_TO_5, holding(6, 0)], "Pro2", reducedCash());
 
     expect(rows.find((row) => row.tier === 4)).toMatchObject({
       allocatedSeed: 2_500,
       reducedFrom: null,
       hasShares: true,
+      ratioPercent: 25,
     });
   });
 
-  it("예비 티어는 기본 티어가 다 찼을 때만 예수금 전액을 할당한다", () => {
-    const partial: CashBreakdown = {
-      availableCash: 600,
-      accountCash: 600,
-      netRealizedLoss: 400,
-      baseTiers: [{ tier: 6, amount: 600, nominalAmount: 1_000 }],
-      reserveTierAmount: 600,
-    };
-    // 티어 6을 $100 × 5주로 산 뒤: 예수금 = 10,000 - 9,500 - 400 = $100
-    const full: CashBreakdown = {
-      ...partial,
+  it("예비 티어의 할당 시드는 응답이 정한 금액을 그대로 쓰고 비율은 0이다", () => {
+    const full = reducedCash({
       availableCash: 100,
       accountCash: 100,
-      baseTiers: [],
-      reserveTierAmount: 100,
-    };
-
-    const before = buildTierRows(TIERS_1_TO_5, 10_000, "Pro2", partial);
-    const after = buildTierRows([...TIERS_1_TO_5, holding(6, 5)], 10_000, "Pro2", full);
-
-    expect(before.find((row) => row.tier === 7)).toMatchObject({
-      allocatedSeed: 0,
-      isReserveTier: true,
+      tiers: tiers({ 7: { amount: 100 } }),
     });
-    expect(after.find((row) => row.tier === 7)).toMatchObject({
+
+    const rows = buildTierRows([...TIERS_1_TO_5, holding(6, 5)], "Pro2", full);
+
+    expect(rows.find((row) => row.tier === 7)).toMatchObject({
       allocatedSeed: 100,
       reducedFrom: null,
+      isReserveTier: true,
+      ratioPercent: 0,
     });
+  });
+
+  it("티어 1-7을 순서대로 한 줄씩 낸다", () => {
+    const rows = buildTierRows(TIERS_1_TO_5, "Pro2", reducedCash());
+
+    expect(rows.map((row) => row.tier)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 });
