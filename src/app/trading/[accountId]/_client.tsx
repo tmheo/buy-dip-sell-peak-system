@@ -14,6 +14,7 @@ import AssetSummary from "@/components/trading/AssetSummary";
 import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
 import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
+import type { CashBreakdown } from "@/strategy";
 import type { TradingAccountWithHoldings, DailyOrder } from "@/types/trading";
 
 interface TradingDetailClientProps {
@@ -22,6 +23,7 @@ interface TradingDetailClientProps {
 
 interface AccountResponse {
   account: TradingAccountWithHoldings;
+  cashBreakdown: CashBreakdown;
 }
 
 interface OrdersResponse {
@@ -48,9 +50,14 @@ interface AssetValues {
 /**
  * 자산 가치 계산
  * - 투자 금액은 보유 수량 × 매수가의 합계
+ * - 예수금은 직접 계산하지 않고 계좌 상세 응답의 값을 쓴다. 이번 사이클 순실현손실이
+ *   빠진 값이라(ADR-0003) 주문표의 매수 금액과 같은 규칙을 따른다.
  * - 현재가 데이터가 없으므로 매수가를 기준으로 평가 (수익률 0%)
  */
-function calculateAssetValues(account: TradingAccountWithHoldings): AssetValues {
+function calculateAssetValues(
+  account: TradingAccountWithHoldings,
+  cash: CashBreakdown
+): AssetValues {
   const investedAmount = account.holdings.reduce((sum, holding) => {
     if (holding.shares > 0 && holding.buyPrice) {
       return sum + holding.shares * holding.buyPrice;
@@ -58,7 +65,7 @@ function calculateAssetValues(account: TradingAccountWithHoldings): AssetValues 
     return sum;
   }, 0);
 
-  const cashBalance = account.seedCapital - investedAmount;
+  const cashBalance = cash.availableCash;
 
   return {
     totalAssets: cashBalance + investedAmount,
@@ -74,6 +81,7 @@ export default function TradingDetailClient({
 }: TradingDetailClientProps): React.ReactElement {
   const router = useRouter();
   const [account, setAccount] = useState<TradingAccountWithHoldings | null>(null);
+  const [cash, setCash] = useState<CashBreakdown | null>(null);
   const [orders, setOrders] = useState<DailyOrder[]>([]);
   const [orderDate, setOrderDate] = useState<string>(getTodayLocal());
   const [isLoading, setIsLoading] = useState(true);
@@ -117,6 +125,7 @@ export default function TradingDetailClient({
 
       const accountData: AccountResponse = await accountRes.json();
       setAccount(accountData.account);
+      setCash(accountData.cashBreakdown);
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
@@ -183,7 +192,7 @@ export default function TradingDetailClient({
     );
   }
 
-  if (!account) {
+  if (!account || !cash) {
     return (
       <div className="container py-4">
         <div className="card bg-dark border-secondary">
@@ -198,7 +207,7 @@ export default function TradingDetailClient({
     );
   }
 
-  const assetValues = calculateAssetValues(account);
+  const assetValues = calculateAssetValues(account, cash);
 
   return (
     <div className="container py-4">

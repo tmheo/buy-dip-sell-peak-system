@@ -1,6 +1,6 @@
 /**
  * 트레이딩 계좌 상세 API (PRD-TRADING-001)
- * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings 포함)
+ * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 예수금 내역 포함)
  * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만)
  * DELETE /api/trading/accounts/[id] - 계좌 삭제
  */
@@ -21,10 +21,16 @@ import {
   markAccountViewed,
 } from "@/database/trading";
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
+import { cashBreakdown } from "@/strategy";
+import { loadCycleState } from "@/trading";
 
 /**
  * GET /api/trading/accounts/[id]
  * 특정 계좌 상세 조회 (holdings 포함)
+ *
+ * 예수금 내역(cashBreakdown)을 함께 돌려준다. 예수금은 이번 사이클 실현손익을 입력으로
+ * 받는 파생값이라(ADR-0003) 화면이 보유 티어만으로 다시 계산하면 주문표와 어긋난다.
+ * 주문표와 같은 사이클 상태(loadCycleState)에서 읽어 같은 규칙으로 계산한다.
  */
 export async function GET(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -47,7 +53,10 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
     console.warn(`[${id}] 조회 시각 갱신 실패:`, error);
   }
 
-  return NextResponse.json({ account });
+  const today = new Date().toISOString().split("T")[0];
+  const state = await loadCycleState(account, today);
+
+  return NextResponse.json({ account, cashBreakdown: cashBreakdown(state) });
 }
 
 /**
