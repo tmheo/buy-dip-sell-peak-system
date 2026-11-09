@@ -9,6 +9,7 @@ import type { CycleState, StrategyParams } from "./types";
 /**
  * 새 사이클 시작
  * CYCLE_COMPLETED 이벤트를 받은 호출자가 다음 사이클 자본을 공급하며 호출한다.
+ * 이번 사이클 실현손익은 0으로 되돌린다 (ADR-0003).
  *
  * @param state - 완료된 사이클의 상태 (보유 티어가 없어야 한다)
  * @param cycleCapital - 새 사이클 자본
@@ -32,5 +33,7 @@ export function startNextCycle(
     cycleCapital,
     holdings: [],
     cycleNumber: state.cycleNumber + 1,
+    // 실현손익은 호출자가 다음 사이클 자본에 반영한다 - 새 사이클은 0에서 시작
+    realizedPnl: 0,
   };
 }

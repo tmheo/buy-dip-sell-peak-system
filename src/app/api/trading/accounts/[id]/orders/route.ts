@@ -12,6 +12,7 @@ import {
   type RouteParams,
 } from "@/lib/api-utils";
 import { getTradingAccountById } from "@/database/trading";
+import { getTodayTradingDate } from "@/lib/date";
 import { getFreshDailyOrders, processOrderExecution } from "@/trading";
 
 /**
@@ -37,7 +38,7 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
   // 날짜 파라미터 파싱
   const url = new URL(request.url);
   const dateParam = url.searchParams.get("date");
-  const date = dateParam || new Date().toISOString().split("T")[0];
+  const date = dateParam || getTodayTradingDate();
 
   // 날짜 형식 검증
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {

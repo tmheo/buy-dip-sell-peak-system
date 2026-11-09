@@ -20,6 +20,24 @@ export function getTodayDate(): string {
 }
 
 /**
+ * Date 객체를 UTC 기준 YYYY-MM-DD 형식 문자열로 변환
+ */
+export function formatUtcDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * 실계좌 거래일 기준의 오늘 (UTC 기준, YYYY-MM-DD)
+ * 주문표 조회·계좌 상세·일일 마감이 모두 이 날짜를 오늘로 본다.
+ * 로컬 타임존 기준인 getTodayDate와 다르다.
+ *
+ * @param now - 기준 시각 (기본값: 현재 시각)
+ */
+export function getTodayTradingDate(now: Date = new Date()): string {
+  return formatUtcDate(now);
+}
+
+/**
  * 현재 연도의 1월 1일을 YYYY-MM-DD 형식으로 반환
  */
 export function getYearStartDate(): string {
@@ -43,7 +61,7 @@ export function getPreviousTradingDate(date: string): string {
   if (day === 0) dt.setUTCDate(dt.getUTCDate() - 2); // 일요일 -> 금요일
   if (day === 6) dt.setUTCDate(dt.getUTCDate() - 1); // 토요일 -> 금요일
 
-  return dt.toISOString().slice(0, 10);
+  return formatUtcDate(dt);
 }
 
 /**

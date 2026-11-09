@@ -33,9 +33,11 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
 
   const executions: Execution[] = [];
 
-  // 1. 매도 체결 (LOC: 종가 >= 지정가, MOC: 무조건) - 티어 제거, 원금 회복 (ADR-0001)
+  // 1. 매도 체결 (LOC: 종가 >= 지정가, MOC: 무조건) - 티어 제거, 티어 매수금액 회복 (ADR-0001),
+  //    손익은 이번 사이클 실현손익에 쌓인다 (ADR-0003)
   const holdingsByTier = new Map(state.holdings.map((h) => [h.tier, h]));
   const soldTiers = new Set<number>();
+  let realizedPnl = new Decimal(state.realizedPnl);
   for (const order of orders) {
     if (order.type !== "SELL") continue;
     const executed = order.orderMethod === "MOC" || shouldExecuteSell(bar.close, order.limitPrice);
@@ -46,15 +48,17 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
       throw new Error(`Tier ${order.tier} is not held`);
     }
     soldTiers.add(order.tier);
+    const profit = new Decimal(bar.close)
+      .sub(holding.buyPrice)
+      .mul(order.shares)
+      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+      .toNumber();
+    realizedPnl = realizedPnl.add(profit);
     executions.push({
       order,
       price: bar.close,
       amount: executedAmount(bar.close, order.shares),
-      profit: new Decimal(bar.close)
-        .sub(holding.buyPrice)
-        .mul(order.shares)
-        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-        .toNumber(),
+      profit,
     });
   }
 
@@ -64,10 +68,17 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
     .map((h) => ({ ...h, holdingDays: h.holdingDays + 1 }));
 
   // 2. 매수 체결 (종가 <= 지정가) - 매도와 동시에 제출된 주문이므로 티어는 이미 결정됨
+  //    현금 검사는 당일 매도 손익까지 반영한 상태로 한다. 전날 상태로 만든 매수 주문은
+  //    언제나 통과한다: 당일 매도는 예수금을 줄이지 않고(티어 매수금액 회복분 ≥ 0, 계좌 현금은
+  //    매도 대금만큼 증가), 체결가는 지정가 이하다. 이 검사는 주문표 오염 방어선이다.
   const buyOrder = orders.find((o): o is Extract<OrderIntent, { type: "BUY" }> => o.type === "BUY");
   if (buyOrder && shouldExecuteBuy(bar.close, buyOrder.limitPrice)) {
     const cost = new Decimal(bar.close).mul(buyOrder.shares);
-    const cashAfterSells = availableCash({ ...state, holdings: remainingHoldings });
+    const cashAfterSells = availableCash({
+      ...state,
+      holdings: remainingHoldings,
+      realizedPnl: realizedPnl.toNumber(),
+    });
     if (cost.gt(cashAfterSells)) {
       throw new Error("Insufficient cash for buy execution");
     }
@@ -93,7 +104,7 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
   }
 
   return {
-    newState: { ...state, holdings: remainingHoldings },
+    newState: { ...state, holdings: remainingHoldings, realizedPnl: realizedPnl.toNumber() },
     executions,
     events,
   };
@@ -110,7 +121,8 @@ function executedAmount(price: number, shares: number): number {
  * 주문표와 상태의 정합성 검증
  */
 function validateOrders(state: CycleState, orders: OrderIntent[]): void {
-  const heldTiers = new Set(state.holdings.map((h) => h.tier));
+  const heldShares = new Map(state.holdings.map((h) => [h.tier, h.shares]));
+  const heldTiers = new Set(heldShares.keys());
 
   const buyOrders = orders.filter((o) => o.type === "BUY");
   if (buyOrders.length > 1) {
@@ -122,9 +134,17 @@ function validateOrders(state: CycleState, orders: OrderIntent[]): void {
     }
   }
 
+  // 매도 체결은 티어를 통째로 없애므로 매도 수량은 보유 수량과 같아야 한다
   for (const order of orders) {
-    if (order.type === "SELL" && !heldTiers.has(order.tier)) {
+    if (order.type !== "SELL") continue;
+    const shares = heldShares.get(order.tier);
+    if (shares === undefined) {
       throw new Error(`Tier ${order.tier} is not held`);
+    }
+    if (order.shares !== shares) {
+      throw new Error(
+        `Sell order for tier ${order.tier} has ${order.shares} shares but ${shares} are held`
+      );
     }
   }
 }

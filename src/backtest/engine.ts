@@ -30,14 +30,8 @@ import type {
 } from "./types";
 import type { Strategy } from "@/types/trading";
 import type { CycleState, StrategyParams } from "@/strategy";
-import { getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
-import {
-  cashBalance,
-  createRemainingTiers,
-  createSnapshot,
-  toOrderActions,
-  toTradeActions,
-} from "./snapshot";
+import { accountCash, getStrategyParams, planOrders, settle, startNextCycle } from "@/strategy";
+import { createRemainingTiers, createSnapshot, toOrderActions, toTradeActions } from "./snapshot";
 import {
   calculateMDD,
   calculateWinRate,
@@ -144,10 +138,10 @@ export class BacktestEngine {
       cycleCapital: request.initialCapital,
       holdings: [],
       cycleNumber: 1,
+      realizedPnl: 0,
     };
-    // 사이클 중 실현 손익 누적 (ADR-0001: 예수금이 아닌 현금에만 쌓이고,
-    // 사이클 경계에서 다음 사이클 자본으로 복리 이월된다)
-    let realizedProfit = new Decimal(0);
+    // 사이클 중 실현손익은 state.realizedPnl에 쌓이고(settle), 사이클 경계에서
+    // 다음 사이클 자본으로 복리 이월된다 (ADR-0001, ADR-0003)
     let hasTradedThisCycle = false;
     let cycleCompletedToday = false; // 사이클 완료 플래그 (다음 날 새 사이클 시작)
 
@@ -198,7 +192,6 @@ export class BacktestEngine {
       ...createSnapshot(
         prices[effectiveStartIndex],
         state,
-        realizedProfit,
         [],
         [],
         adjClosePrices,
@@ -218,11 +211,8 @@ export class BacktestEngine {
 
       // 전날 사이클이 완료되었으면 오늘 새 사이클 시작 (실현 손익 복리 이월)
       if (cycleCompletedToday) {
-        // 이전 사이클 마감 (보유 티어가 없으므로 총 자산 = 사이클 자본 + 실현 손익)
-        closeCycleInfo(
-          prevPrice.date,
-          cashBalance(state, realizedProfit).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber()
-        );
+        // 이전 사이클 마감 (보유 티어가 없으므로 총 자산 = 계좌 현금 = 사이클 자본 + 실현손익)
+        closeCycleInfo(prevPrice.date, accountCash(state));
 
         // 새 사이클 전략 결정 (사이클 완료 익일, 전일 종가 기준)
         let newReason = FIXED_STRATEGY_REASON;
@@ -240,10 +230,9 @@ export class BacktestEngine {
 
         state = startNextCycle(
           state,
-          new Decimal(state.cycleCapital).add(realizedProfit).toNumber(),
+          new Decimal(state.cycleCapital).add(state.realizedPnl).toNumber(),
           currentStrategy
         );
-        realizedProfit = new Decimal(0);
         hasTradedThisCycle = false;
 
         // 새 사이클 MDD 초기화
@@ -298,13 +287,8 @@ export class BacktestEngine {
         close: currentPrice.adjClose,
       });
 
-      for (const execution of executions) {
-        if (execution.order.type === "BUY") {
-          hasTradedThisCycle = true;
-        }
-        if (execution.profit !== undefined) {
-          realizedProfit = realizedProfit.add(execution.profit);
-        }
+      if (executions.some((execution) => execution.order.type === "BUY")) {
+        hasTradedThisCycle = true;
       }
 
       // 고정 모드: 첫 매수로 사이클 시작 시점이 확정되면 시작 지표를 계산한다
@@ -314,7 +298,9 @@ export class BacktestEngine {
 
       if (events.some((e) => e.type === "CYCLE_COMPLETED")) {
         completedCycles.push({
-          profit: realizedProfit.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+          profit: new Decimal(newState.realizedPnl)
+            .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+            .toNumber(),
           strategy: currentStrategyName,
         });
         cycleCompletedToday = true; // 다음 날 새 사이클 시작
@@ -326,7 +312,6 @@ export class BacktestEngine {
         ...createSnapshot(
           currentPrice,
           state,
-          realizedProfit,
           toTradeActions(executions),
           toOrderActions(orders, executions, currentPrice.adjClose),
           adjClosePrices,

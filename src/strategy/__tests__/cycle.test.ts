@@ -10,6 +10,7 @@ import { startNextCycle } from "../cycle";
 import { planOrders } from "../plan-orders";
 import { settle } from "../settle";
 import { getStrategyParams } from "../params";
+import { accountCash, availableCash } from "../calculations";
 import { createState } from "./fixtures";
 
 describe("startNextCycle", () => {
@@ -22,7 +23,17 @@ describe("startNextCycle", () => {
       cycleCapital: 10100,
       holdings: [],
       cycleNumber: 3,
+      realizedPnl: 0,
     });
+  });
+
+  it("사이클 경계에서 실현손익을 0으로 되돌려 새 사이클 예수금이 자본 전액이어야 한다 (ADR-0003)", () => {
+    // 순손실 -400으로 끝난 사이클의 다음 사이클 자본은 호출자가 9600으로 공급한다
+    const state = createState({ realizedPnl: -400 });
+    const next = startNextCycle(state, 9600);
+
+    expect(next.realizedPnl).toBe(0);
+    expect(availableCash(next)).toBe(9600);
   });
 
   it("전략 변경은 사이클 경계에서만 허용된다", () => {
@@ -58,10 +69,9 @@ describe("사이클 경계 합성 - 백테스트식 복리", () => {
     result = settle(state, planOrders(state, 99), { date: "2025-01-06", close: 101 });
     expect(result.events).toEqual([{ type: "CYCLE_COMPLETED", cycleNumber: 1 }]);
 
-    // 백테스트 호출자: 종료 현금 = 사이클 자본 + Σ실현손익 (ADR-0001 Consequences)
-    const realizedProfit = result.executions.reduce((sum, e) => sum + (e.profit ?? 0), 0);
-    const nextCapital = state.cycleCapital + realizedProfit;
-    state = startNextCycle(result.newState, nextCapital);
+    // 백테스트 호출자: 종료 현금 = 계좌 현금 = 사이클 자본 + 이번 사이클 실현손익
+    expect(result.newState.realizedPnl).toBe(20);
+    state = startNextCycle(result.newState, accountCash(result.newState));
 
     expect(state.cycleCapital).toBe(10020);
     expect(state.cycleNumber).toBe(2);

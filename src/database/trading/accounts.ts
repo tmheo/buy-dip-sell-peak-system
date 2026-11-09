@@ -111,9 +111,10 @@ export async function markAccountViewed(id: string): Promise<void> {
  */
 export async function getTradingAccountById(
   id: string,
-  userId: string
+  userId: string,
+  executor: DbExecutor = db
 ): Promise<TradingAccount | null> {
-  const rows = await db
+  const rows = await executor
     .select()
     .from(tradingAccounts)
     .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)))
@@ -140,13 +141,14 @@ export async function getTradingAccountByIdWithoutOwnerCheck(
  */
 export async function getTradingAccountWithHoldings(
   id: string,
-  userId: string
+  userId: string,
+  executor: DbExecutor = db
 ): Promise<TradingAccountWithHoldings | null> {
-  const account = await getTradingAccountById(id, userId);
+  const account = await getTradingAccountById(id, userId, executor);
   if (!account) return null;
 
-  const holdings = await getTierHoldings(id);
-  const totalShares = await getTotalShares(id);
+  const holdings = await getTierHoldings(id, executor);
+  const totalShares = await getTotalShares(id, executor);
 
   return {
     ...account,

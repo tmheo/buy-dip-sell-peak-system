@@ -10,6 +10,7 @@ export function createState(overrides: Partial<CycleState> = {}): CycleState {
     cycleCapital: 10000,
     holdings: [],
     cycleNumber: 1,
+    realizedPnl: 0,
     ...overrides,
   };
 }

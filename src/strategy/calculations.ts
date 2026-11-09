@@ -7,7 +7,7 @@
  */
 import Decimal from "decimal.js";
 import { floorToDecimal } from "@/utils/decimal";
-import type { CycleState, TierHolding } from "./types";
+import type { BaseTierCash, CashBreakdown, CycleState, TierHolding } from "./types";
 import { BASE_TIER_COUNT, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";
 
 // =====================================================
@@ -95,7 +95,7 @@ export function shouldExecuteSell(closePrice: number, limitPrice: number): boole
 // =====================================================
 
 /**
- * 활성 티어 투자원금 합계 (Decimal)
+ * 활성 티어 매수금액 합계 (Decimal)
  */
 function totalInvested(holdings: TierHolding[]): Decimal {
   return holdings.reduce(
@@ -105,17 +105,43 @@ function totalInvested(holdings: TierHolding[]): Decimal {
 }
 
 /**
- * 예수금 계산 (ADR-0001)
- * 예수금 = 사이클 자본 - Σ(활성 티어 투자원금)
- * 매도 시 원금은 즉시 회복되고, 실현 수익은 사이클 종료까지 재투자하지 않는다.
+ * 아직 티어에 투자되지 않은 사이클 자본 (Decimal)
+ * 사이클 자본 - Σ(활성 티어 매수금액)
+ */
+function uninvestedCapital(state: CycleState): Decimal {
+  return new Decimal(state.cycleCapital).sub(totalInvested(state.holdings));
+}
+
+/**
+ * 계좌 현금 계산 (ADR-0003)
+ * 계좌 현금 = 사이클 자본 - Σ(활성 티어 매수금액) + 이번 사이클 실현손익
+ * 주문표대로 집행했을 때 증권사 계좌에 실제로 남아 있어야 할 현금이다.
+ * 옛 규칙으로 이미 체결된 매수가 있으면 음수일 수 있다.
+ *
+ * @param state - 사이클 상태
+ * @returns 계좌 현금 (소수점 2자리 내림)
+ */
+export function accountCash(state: CycleState): number {
+  return uninvestedCapital(state)
+    .add(state.realizedPnl)
+    .toDecimalPlaces(2, Decimal.ROUND_DOWN)
+    .toNumber();
+}
+
+/**
+ * 예수금 계산 (ADR-0001, ADR-0003)
+ * 예수금 = max(0, min(사이클 자본 - Σ(활성 티어 매수금액), 계좌 현금))
+ * 매도 시 티어 매수금액은 즉시 회복되고, 실현 수익은 사이클 종료까지 재투자하지 않는다.
+ * 사이클 안 실현손익의 합이 마이너스일 때만 그만큼 빠진다 - 이익은 앞선 손실을 상계한다.
  *
  * @param state - 사이클 상태
  * @returns 예수금 (소수점 2자리 내림, 음수면 0)
  */
 export function availableCash(state: CycleState): number {
-  const remaining = new Decimal(state.cycleCapital).sub(totalInvested(state.holdings));
-  if (remaining.lte(0)) return 0;
-  return remaining.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+  const uninvested = uninvestedCapital(state);
+  const cash = Decimal.min(uninvested, uninvested.add(state.realizedPnl));
+  if (cash.lte(0)) return 0;
+  return cash.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
 }
 
 /**
@@ -146,6 +172,7 @@ export function nextBuyTier(state: CycleState): number | null {
  * 티어 금액 계산
  * 기본 티어(1-6)는 사이클 자본 × 전략 비율, 예비 티어(7)는 잔여 예수금 전액.
  * 기본 티어도 예수금을 초과할 수 없다 (ADR-0001: 실현 수익은 매수 여력에 포함되지 않는다).
+ * 순실현손실로 예수금이 줄면 모자란 몫은 그다음에 사는 티어가 떠안는다 (ADR-0003).
  *
  * @param state - 사이클 상태
  * @param tier - 티어 번호 (1-7)
@@ -161,10 +188,45 @@ export function tierAmount(state: CycleState, tier: number): number {
     throw new Error(`Invalid tier number: ${tier}`);
   }
 
-  const ratio = new Decimal(state.strategy.tierRatios[tier - 1]);
-  const nominal = new Decimal(state.cycleCapital)
-    .mul(ratio)
+  return Math.min(nominalTierAmount(state, tier), cash);
+}
+
+/**
+ * 기본 티어의 비율대로의 금액: 사이클 자본 × 전략 비율 (소수점 2자리 내림)
+ */
+function nominalTierAmount(state: CycleState, tier: number): number {
+  return new Decimal(state.cycleCapital)
+    .mul(state.strategy.tierRatios[tier - 1])
     .toDecimalPlaces(2, Decimal.ROUND_DOWN)
     .toNumber();
-  return Math.min(nominal, cash);
+}
+
+/**
+ * 화면용 현금 내역 (ADR-0003)
+ * 예수금, 계좌 현금, 이번 사이클 순실현손실과 아직 사지 않은 티어의 금액을 함께 낸다.
+ *
+ * @param state - 사이클 상태
+ * @returns 현금 내역
+ */
+export function cashBreakdown(state: CycleState): CashBreakdown {
+  const heldTiers = new Set(state.holdings.map((h) => h.tier));
+  const baseTiers: BaseTierCash[] = [];
+  for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {
+    if (heldTiers.has(tier)) continue;
+    baseTiers.push({
+      tier,
+      amount: tierAmount(state, tier),
+      nominalAmount: nominalTierAmount(state, tier),
+    });
+  }
+
+  return {
+    availableCash: availableCash(state),
+    accountCash: accountCash(state),
+    netRealizedLoss: Math.max(0, -state.realizedPnl),
+    baseTiers,
+    reserveTierAmount: heldTiers.has(RESERVE_TIER_NUMBER)
+      ? null
+      : tierAmount(state, RESERVE_TIER_NUMBER),
+  };
 }

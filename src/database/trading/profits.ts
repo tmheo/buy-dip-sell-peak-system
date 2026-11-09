@@ -3,7 +3,7 @@
  */
 
 import Decimal from "decimal.js";
-import { eq, asc } from "drizzle-orm";
+import { and, asc, eq, sum } from "drizzle-orm";
 
 import { db, type DbExecutor } from "../db-drizzle";
 import { profitRecords } from "../schema/index";
@@ -16,6 +16,8 @@ import type {
   ProfitStatusResponse,
 } from "@/types/trading";
 
+import type { Execution, TierHolding as StrategyTierHolding } from "@/strategy";
+
 import { mapDrizzleProfitRecord } from "./mappers";
 
 export interface ProfitAggregate {
@@ -27,42 +29,57 @@ export interface ProfitAggregate {
 }
 
 /**
+ * 수익 기록 한 건의 출처: 보유 티어 하나와 그 티어를 판 settle의 매도 체결
+ */
+export interface SettledSale {
+  accountId: string;
+  ticker: Ticker;
+  strategy: Strategy;
+  // 체결 시점(사이클 완료 처리 전)의 계좌 사이클 번호
+  cycleNumber: number;
+  // 매도 체결일
+  sellDate: string;
+  // 판 보유 티어 (settle에 넘긴 상태의 것)
+  holding: Pick<StrategyTierHolding, "tier" | "buyDate" | "buyPrice" | "shares">;
+  // settle이 낸 매도 체결
+  execution: Execution;
+}
+
+/**
  * 수익 기록 생성
- * 매도 체결 시 호출되어 수익 기록을 저장
- * Decimal.js로 정밀한 금융 계산 수행
+ * 매도 체결 시 호출되어 수익 기록을 저장한다.
+ * 매도가·매도금액·손익은 체결 판정(src/strategy의 settle)이 낸 체결을 그대로 남긴다 -
+ * 예수금 계산이 보는 실현손익과 기록이 어긋나지 않게 하려는 것이다 (#97).
+ * 매수금액은 보유 티어의 매수가 × 수량이다(가격이 소수 둘째 자리라 정확히 떨어진다).
  */
 export async function createProfitRecord(
-  data: {
-    accountId: string;
-    tier: number;
-    ticker: Ticker;
-    strategy: Strategy;
-    buyDate: string;
-    buyPrice: number;
-    buyQuantity: number;
-    sellDate: string;
-    sellPrice: number;
-  },
+  sale: SettledSale,
   executor: DbExecutor = db
 ): Promise<ProfitRecord> {
-  // Decimal.js로 정밀한 금융 계산
-  const buyAmount = new Decimal(data.buyPrice)
-    .mul(data.buyQuantity)
-    .toDecimalPlaces(2, Decimal.ROUND_DOWN)
-    .toNumber();
+  const { holding, execution } = sale;
+  if (execution.order.type !== "SELL") {
+    throw new Error(`Tier ${execution.order.tier} execution is not a sell`);
+  }
+  if (execution.order.tier !== holding.tier) {
+    throw new Error(
+      `Sell execution for tier ${execution.order.tier} does not match holding tier ${holding.tier}`
+    );
+  }
+  // 매도는 티어를 통째로 없애므로 체결 수량은 보유 수량과 같다. 다르면 매수금액(보유 수량)과
+  // 매도금액·손익(체결 수량)이 서로 다른 주식을 가리킨다.
+  if (execution.order.shares !== holding.shares) {
+    throw new Error(
+      `Sell execution for tier ${holding.tier} has ${execution.order.shares} shares but holding has ${holding.shares}`
+    );
+  }
+  if (execution.profit === undefined) {
+    throw new Error(`Sell execution for tier ${holding.tier} has no profit`);
+  }
 
-  const sellAmount = new Decimal(data.sellPrice)
-    .mul(data.buyQuantity)
-    .toDecimalPlaces(2, Decimal.ROUND_DOWN)
-    .toNumber();
+  const buyAmount = new Decimal(holding.buyPrice).mul(holding.shares);
 
-  const profit = new Decimal(sellAmount)
-    .minus(buyAmount)
-    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-    .toNumber();
-
-  // 수익률 계산: (매도금액 - 매수금액) / 매수금액 * 100
-  const profitRate = new Decimal(profit)
+  // 수익률 계산: 손익 / 매수금액 * 100
+  const profitRate = new Decimal(execution.profit)
     .div(buyAmount)
     .mul(100)
     .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
@@ -71,23 +88,47 @@ export async function createProfitRecord(
   const result = await executor
     .insert(profitRecords)
     .values({
-      accountId: data.accountId,
-      tier: data.tier,
-      ticker: data.ticker,
-      strategy: data.strategy,
-      buyDate: data.buyDate,
-      buyPrice: data.buyPrice,
-      buyQuantity: data.buyQuantity,
-      sellDate: data.sellDate,
-      sellPrice: data.sellPrice,
-      buyAmount,
-      sellAmount,
-      profit,
+      accountId: sale.accountId,
+      cycleNumber: sale.cycleNumber,
+      tier: holding.tier,
+      ticker: sale.ticker,
+      strategy: sale.strategy,
+      buyDate: holding.buyDate,
+      buyPrice: holding.buyPrice,
+      buyQuantity: holding.shares,
+      sellDate: sale.sellDate,
+      sellPrice: execution.price,
+      buyAmount: buyAmount.toNumber(),
+      sellAmount: execution.amount,
+      profit: execution.profit,
       profitRate,
     })
     .returning();
 
   return mapDrizzleProfitRecord(result[0]);
+}
+
+/**
+ * 한 사이클의 실현손익 합계
+ * 그 계좌에서 cycle_number가 주어진 사이클 번호인 수익 기록의 손익을 더한다.
+ * 계좌의 지금 사이클 번호를 넘기면 이번 사이클 실현손익이 된다 (ADR-0003).
+ * 매도 기록이 없으면 0이다.
+ *
+ * 사이클 시작일 이후 매도로 구분하지 않는다 - 사이클이 완료돼도 cycle_start_date는
+ * 바뀌지 않아 앞선 사이클의 손익이 섞인다 (#97).
+ */
+export async function getCycleRealizedPnl(
+  accountId: string,
+  cycleNumber: number,
+  executor: DbExecutor = db
+): Promise<number> {
+  const rows = await executor
+    .select({ total: sum(profitRecords.profit) })
+    .from(profitRecords)
+    .where(and(eq(profitRecords.accountId, accountId), eq(profitRecords.cycleNumber, cycleNumber)));
+
+  // numeric 합계는 문자열로 오고, 기록이 없으면 NULL이다
+  return rows[0]?.total == null ? 0 : Number(rows[0].total);
 }
 
 /**

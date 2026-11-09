@@ -126,6 +126,8 @@ export const profitRecords = pgTable(
     accountId: text("account_id")
       .notNull()
       .references(() => tradingAccounts.id, { onDelete: "cascade" }),
+    // 체결 시점(사이클 완료 처리 전)의 계좌 사이클 번호 - 이번 사이클 실현손익 합산에 쓴다 (#97)
+    cycleNumber: integer("cycle_number").notNull(),
     tier: integer().notNull(), // 1-7
     ticker: text().notNull().$type<AllowedTicker>(),
     strategy: text().notNull().$type<AllowedStrategy>(),
@@ -143,6 +145,7 @@ export const profitRecords = pgTable(
   (table) => [
     index("idx_profit_records_account_id").on(table.accountId),
     index("idx_profit_records_sell_date").on(table.accountId, table.sellDate),
+    index("idx_profit_records_account_cycle").on(table.accountId, table.cycleNumber),
   ]
 );
 

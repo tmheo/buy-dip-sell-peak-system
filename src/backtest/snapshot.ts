@@ -7,19 +7,9 @@
 import Decimal from "decimal.js";
 import type { DailyPrice } from "@/types";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
-import { availableCash } from "@/strategy";
+import { accountCash } from "@/strategy";
 import { calculateSMA } from "@/metrics";
 import type { DailySnapshot, OrderAction, RemainingTier, TradeAction } from "./types";
-
-/**
- * 현금 잔고 계산
- * 현금 = 예수금 + 사이클 중 실현 손익
- * 실현 손익은 현금에는 쌓이지만 매수 여력(예수금)에는 포함되지 않는다 (ADR-0001).
- * 예수금 공식(사이클 자본 - Σ 활성 티어 투자원금)은 src/strategy가 소유한다.
- */
-export function cashBalance(state: CycleState, realizedProfit: Decimal): Decimal {
-  return new Decimal(availableCash(state)).add(realizedProfit);
-}
 
 /**
  * 체결 목록을 스냅샷의 거래 내역으로 변환
@@ -99,12 +89,13 @@ export function toOrderActions(
 /**
  * 일별 스냅샷 생성 (전략 필드는 각 엔진이 채운다)
  * 보유 자산 평가는 adjClose(수정종가)를 사용하여 배당/분할이 반영된 실제 수익률을 계산
+ * 현금은 src/strategy의 accountCash가 내는 계좌 현금이다.
+ * 예수금에 실현손익을 더하면 순실현손실을 두 번 빼게 된다 (ADR-0003).
  * SPEC-METRICS-001: MA20, MA60 계산
  */
 export function createSnapshot(
   price: DailyPrice,
   state: CycleState,
-  realizedProfit: Decimal,
   trades: TradeAction[],
   orders: OrderAction[],
   adjClosePrices: number[],
@@ -118,7 +109,7 @@ export function createSnapshot(
     totalShares += holding.shares;
   }
 
-  const cash = cashBalance(state, realizedProfit).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+  const cash = new Decimal(accountCash(state));
   const totalAsset = cash.add(holdingsValue).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
 
   return {

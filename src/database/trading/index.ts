@@ -10,7 +10,7 @@
 export type { DbExecutor } from "../db-drizzle";
 
 // 트랜잭션
-export { runInTransaction } from "./transaction";
+export { runInReadSnapshot, runInTransaction } from "./transaction";
 
 // Mappers (내부용이지만 필요시 export)
 export {
@@ -56,8 +56,9 @@ export type { NewDailyOrder } from "./orders";
 // Profit Records
 export {
   createProfitRecord,
+  getCycleRealizedPnl,
   getProfitRecords,
   aggregateProfits,
   groupProfitsByMonth,
 } from "./profits";
-export type { ProfitAggregate } from "./profits";
+export type { ProfitAggregate, SettledSale } from "./profits";

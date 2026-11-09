@@ -12,13 +12,13 @@ import {
   RESERVE_TIER_NUMBER,
   getStrategyParams,
 } from "@/strategy";
-import { calculateTradingDays } from "@/lib/date";
+import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
   seedCapital: number;
   strategy: Strategy;
-  cashBalance: number;
+  availableCash: number;
 }
 
 function formatCurrency(value: number | null): string {
@@ -44,11 +44,8 @@ function formatDate(date: string | null): string {
 
 function calculateHoldingDays(buyDate: string | null): string {
   if (!buyDate) return "-";
-  // 오늘 날짜를 YYYY-MM-DD 형식으로
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
   // 거래일(영업일) 기준으로 보유 기간 계산 (주말 제외, 매수일 포함)
-  const tradingDays = calculateTradingDays(buyDate, todayStr);
+  const tradingDays = calculateTradingDays(buyDate, getTodayTradingDate());
   return `${tradingDays}일`;
 }
 
@@ -61,7 +58,7 @@ export default function TierHoldingsTable({
   holdings,
   seedCapital,
   strategy,
-  cashBalance,
+  availableCash,
 }: TierHoldingsTableProps): React.ReactElement {
   // 티어 비율은 src/strategy의 전략 파라미터 표가 단일 소유한다 (#43)
   const ratios = getStrategyParams(strategy).tierRatios;
@@ -83,7 +80,7 @@ export default function TierHoldingsTable({
     const ratioPercent = isReserveTier ? 0 : ratios[tier - 1] * 100;
     const allocatedSeed = isReserveTier
       ? allMainTiersFilled
-        ? cashBalance
+        ? availableCash
         : 0
       : seedCapital * ratios[tier - 1];
     const hasShares = holding && holding.shares > 0;

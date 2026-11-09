@@ -11,11 +11,14 @@
 import Decimal from "decimal.js";
 
 import {
+  getCycleRealizedPnl,
   getDailyOrders,
   getPreviousTradingClose,
   getTierHoldings,
   listTradingDatesBetween,
   replaceDailyOrders,
+  runInReadSnapshot,
+  type DbExecutor,
   type NewDailyOrder,
 } from "@/database/trading";
 import type { CycleState, TierHolding as StrategyTierHolding } from "@/strategy";
@@ -31,7 +34,8 @@ import type { DailyOrder, TierHolding, Ticker, TradingAccount } from "@/types/tr
 async function toStrategyHoldings(
   ticker: Ticker,
   holdings: TierHolding[],
-  date: string
+  date: string,
+  executor: DbExecutor
 ): Promise<StrategyTierHolding[]> {
   const active = holdings.filter(
     (holding): holding is TierHolding & { buyPrice: number; buyDate: string } =>
@@ -45,7 +49,7 @@ async function toStrategyHoldings(
     (min, holding) => (holding.buyDate < min ? holding.buyDate : min),
     active[0].buyDate
   );
-  const tradingDates = await listTradingDatesBetween(ticker, earliestBuyDate, date);
+  const tradingDates = await listTradingDatesBetween(ticker, earliestBuyDate, date, executor);
 
   return active.map((holding) => ({
     tier: holding.tier,
@@ -64,16 +68,34 @@ async function toStrategyHoldings(
  * 지금의 보유 티어로 조립하므로, 지난 날짜도 그 직전 거래일까지 마감이 끝났을 때만
  * 그날의 상태가 된다 - 일일 마감은 거래일을 차례로 처리하므로 이 조건이 지켜진다.
  *
+ * 보유 티어와 이번 사이클 실현손익은 한 시점에서 읽는다. 따로 읽으면 그 사이에 커밋된
+ * 매도가 보유에는 빠지고 실현손익에는 들어가, 판 티어의 손실이 예수금에서 두 번 빠진다.
+ *
  * @param account - 계좌 (종목·시드 금액·전략·사이클 번호)
  * @param date - 기준일 (주문표 날짜 또는 체결 처리일)
+ * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등). 없으면 이 함수의
+ *   읽기만 묶는 읽기 시점을 새로 연다.
  */
-export async function loadCycleState(account: TradingAccount, date: string): Promise<CycleState> {
-  const holdings = await getTierHoldings(account.id);
+export async function loadCycleState(
+  account: TradingAccount,
+  date: string,
+  executor?: DbExecutor
+): Promise<CycleState> {
+  if (!executor) {
+    return runInReadSnapshot((snapshot) => loadCycleState(account, date, snapshot));
+  }
+
+  const [holdings, realizedPnl] = await Promise.all([
+    getTierHoldings(account.id, executor),
+    // 이번 사이클 실현손익: 계좌의 지금 사이클 번호로 묶인 수익 기록의 손익 합 (ADR-0003)
+    getCycleRealizedPnl(account.id, account.cycleNumber, executor),
+  ]);
   return {
     strategy: getStrategyParams(account.strategy),
     cycleCapital: account.seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
-    holdings: await toStrategyHoldings(account.ticker, holdings, date),
+    holdings: await toStrategyHoldings(account.ticker, holdings, date, executor),
     cycleNumber: account.cycleNumber,
+    realizedPnl,
   };
 }
 

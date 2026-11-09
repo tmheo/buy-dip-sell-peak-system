@@ -11,7 +11,7 @@ interface AssetSummaryProps {
   totalAssets: number;
   totalShares: number;
   stockValue: number;
-  cashBalance: number;
+  availableCash: number;
   profitRate: number;
   ticker: string;
 }
@@ -34,11 +34,11 @@ export default function AssetSummary({
   totalAssets,
   totalShares,
   stockValue,
-  cashBalance,
+  availableCash,
   profitRate,
   ticker,
 }: AssetSummaryProps): React.ReactElement {
-  const cashRatioRaw = totalAssets > 0 ? (cashBalance / totalAssets) * 100 : 100;
+  const cashRatioRaw = totalAssets > 0 ? (availableCash / totalAssets) * 100 : 100;
   const stockRatioRaw = totalAssets > 0 ? (stockValue / totalAssets) * 100 : 0;
   const cashRatio = Math.min(100, Math.max(0, cashRatioRaw));
   const stockRatio = Math.min(100, Math.max(0, stockRatioRaw));
@@ -75,7 +75,7 @@ export default function AssetSummary({
           <div className="col-md-6 col-lg-4">
             <div className="p-3 bg-secondary bg-opacity-25 rounded h-100">
               <div className="text-secondary small mb-1">예수금</div>
-              <div className="h4 mb-0 text-light">{formatCurrency(cashBalance)}</div>
+              <div className="h4 mb-0 text-light">{formatCurrency(availableCash)}</div>
             </div>
           </div>
           <div className="col-md-6 col-lg-4">

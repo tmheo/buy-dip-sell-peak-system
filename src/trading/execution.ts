@@ -21,7 +21,7 @@ import {
   updateTierHolding,
   type DbExecutor,
 } from "@/database/trading";
-import { getPreviousTradingDate } from "@/lib/date";
+import { formatUtcDate, getPreviousTradingDate } from "@/lib/date";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { calculateSellLimitPrice, settle } from "@/strategy";
 import type { DailyOrder, Ticker, TradingAccount } from "@/types/trading";
@@ -223,17 +223,19 @@ async function applyExecution(
     throw new Error(`Tier ${order.tier} holding not found for sell execution`);
   }
 
+  // 매도금액과 손익은 settle이 계산한 값을 그대로 남긴다 - 예수금 계산이 읽는
+  // 이번 사이클 실현손익이 체결 판정과 어긋나지 않게 하려는 것이다 (#97).
+  // 사이클 번호는 체결 시점의 것이다. 이 체결로 사이클이 끝나도 번호 증가는
+  // 체결 반영 뒤에 하므로 이 기록은 끝난 사이클에 속한다.
   await createProfitRecord(
     {
       accountId,
-      tier: order.tier,
       ticker,
       strategy: state.strategy.name,
-      buyDate: holding.buyDate,
-      buyPrice: holding.buyPrice,
-      buyQuantity: holding.shares,
+      cycleNumber: state.cycleNumber,
       sellDate: date,
-      sellPrice: price,
+      holding,
+      execution,
     },
     tx
   );
@@ -325,7 +327,7 @@ export function getNextTradingDate(date: string): string {
     d.setDate(d.getDate() + 2); // 토요일 -> 월요일
   }
 
-  return d.toISOString().split("T")[0];
+  return formatUtcDate(d);
 }
 
 /**

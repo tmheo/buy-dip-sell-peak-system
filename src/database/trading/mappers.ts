@@ -72,6 +72,7 @@ export function mapDrizzleProfitRecord(row: DrizzleProfitRecord): ProfitRecord {
   return {
     id: row.id,
     accountId: row.accountId,
+    cycleNumber: row.cycleNumber,
     tier: row.tier,
     ticker: row.ticker as Ticker,
     strategy: row.strategy as Strategy,
