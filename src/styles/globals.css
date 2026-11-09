@@ -475,6 +475,15 @@ body {
     pointer-events: none;
     z-index: 1;
   }
+  /* 스크롤할 내용이 있을 때만 오른쪽 그림자를 보인다.
+     넘치지 않는 표는 스크롤 타임라인이 비활성이라 그림자가 마지막 열을 덮지 않는다. */
+  @supports (animation-timeline: scroll()) {
+    .table-responsive::after {
+      opacity: 0;
+      animation: table-scroll-hint linear both;
+      animation-timeline: scroll(nearest inline);
+    }
+  }
   .table-responsive::-webkit-scrollbar {
     height: 4px;
   }
@@ -483,16 +492,11 @@ body {
     border-radius: 2px;
   }
 
-  /* --- 5. GrandTotalCard 모바일 그리드 --- */
-  .card.bg-secondary .row.text-center > .col {
-    flex: 0 0 50%;
-    max-width: 50%;
-    margin-bottom: 0.5rem;
-  }
-  .card.bg-secondary .row.text-center > .col .small {
+  /* --- 5. GrandTotalCard 모바일 글자 크기 (그리드는 컴포넌트의 col-12/col-6) --- */
+  .card.bg-secondary .row.text-center > [class*="col-"] .small {
     font-size: 0.7rem;
   }
-  .card.bg-secondary .row.text-center > .col .fw-bold {
+  .card.bg-secondary .row.text-center > [class*="col-"] .fw-bold {
     font-size: 0.85rem;
   }
 
@@ -511,5 +515,17 @@ body {
   .card.bg-dark .row.g-1 .col-4 .p-1 {
     padding: 0.25rem !important;
     font-size: 0.65rem;
+  }
+}
+
+/* 표 가로 스크롤 안내 그림자 (모바일 .table-responsive::after)
+   그림자는 스크롤 컨테이너 안의 절대 위치라 내용과 함께 밀려나므로, 스크롤을 시작하면 바로 걷는다. */
+@keyframes table-scroll-hint {
+  from {
+    opacity: 1;
+  }
+  10%,
+  to {
+    opacity: 0;
   }
 }

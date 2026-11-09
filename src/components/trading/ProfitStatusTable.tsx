@@ -66,7 +66,8 @@ function MonthSection({ summary, isExpanded, onToggle }: MonthSectionProps): Rea
 
       {/* Table with detail records and subtotal */}
       <div className="table-responsive">
-        <table className="table table-dark table-striped table-hover mb-0 small">
+        {/* 줄바꿈 없이 내용 폭으로 잡고, 좁은 화면에서는 가로로 스크롤한다 */}
+        <table className="table table-dark table-striped table-hover mb-0 small text-nowrap">
           {/* Header - always visible for column alignment */}
           <thead style={{ visibility: isExpanded ? "visible" : "collapse" }}>
             <tr>
@@ -135,9 +136,7 @@ function MonthSection({ summary, isExpanded, onToggle }: MonthSectionProps): Rea
               ))}
             {/* Subtotal Row - always visible */}
             <tr style={{ backgroundColor: "#3a5a5a" }}>
-              <td className="text-center fw-bold text-info" style={{ whiteSpace: "nowrap" }}>
-                {summary.yearMonth} 소계
-              </td>
+              <td className="text-center fw-bold text-info">{summary.yearMonth} 소계</td>
               <td></td>
               <td></td>
               <td></td>
@@ -168,26 +167,26 @@ function GrandTotalCard({ grandTotal }: GrandTotalCardProps): React.ReactElement
   return (
     <div className="card bg-secondary bg-opacity-25 border-secondary mt-4">
       <div className="card-body py-3">
-        <div className="row text-center">
-          <div className="col-4 col-md">
+        <div className="row text-center gy-2 text-nowrap">
+          <div className="col-12 col-md">
             <div className="text-secondary small">총 거래</div>
             <div className="fw-bold text-light">{grandTotal.totalTrades}건</div>
           </div>
-          <div className="col-4 col-md">
+          <div className="col-6 col-md">
             <div className="text-secondary small">총 매수금액</div>
             <div className="fw-bold text-light">{formatCurrency(grandTotal.totalBuyAmount)}</div>
           </div>
-          <div className="col-4 col-md">
+          <div className="col-6 col-md">
             <div className="text-secondary small">총 매도금액</div>
             <div className="fw-bold text-light">{formatCurrency(grandTotal.totalSellAmount)}</div>
           </div>
-          <div className="col-4 col-md">
+          <div className="col-6 col-md">
             <div className="text-secondary small">총 수익</div>
             <div className={`fw-bold ${getProfitColorClass(grandTotal.totalProfit)}`}>
               {formatCurrency(grandTotal.totalProfit)}
             </div>
           </div>
-          <div className="col-4 col-md">
+          <div className="col-6 col-md">
             <div className="text-secondary small">평균 수익률</div>
             <div className={`fw-bold ${getProfitColorClass(grandTotal.averageProfitRate)}`}>
               {formatPercent(grandTotal.averageProfitRate)}
