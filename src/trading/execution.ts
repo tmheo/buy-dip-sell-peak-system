@@ -317,7 +317,7 @@ export function getNextTradingDate(date: string): string {
  *   중간에 중단(타임아웃 등)되어도 다음 실행이 이어받을 수 있게 한다
  * - deadline이 지정되면 그 시각을 넘기기 전에 루프를 중단 (Vercel 함수 제한 대응)
  *
- * @param account - 계좌 (사이클 시작일·마지막 처리일·종목·시드 금액·전략)
+ * @param account - 계좌 (사이클 시작일·마지막 처리일. 종목·전략 등은 날짜마다 다시 읽는다)
  * @param currentDate - 현재 날짜 (YYYY-MM-DD)
  * @param deadline - 처리를 중단할 시각 (Date.now() 기준 ms, 선택)
  * @returns 전체 체결 결과 목록
@@ -327,7 +327,7 @@ export async function processHistoricalOrders(
   currentDate: string,
   deadline?: number
 ): Promise<ExecutionResult[]> {
-  const { id: accountId, cycleStartDate, lastProcessedDate, ticker } = account;
+  const { id: accountId, cycleStartDate, lastProcessedDate } = account;
   const allResults: ExecutionResult[] = [];
 
   // 처리 시작일: 마지막 처리일의 다음 거래일, 최초 실행이면 사이클 시작일
@@ -341,27 +341,30 @@ export async function processHistoricalOrders(
       break;
     }
 
-    // 1. 해당 날짜의 종가 확인 (없으면 거래일이 아니므로 건너뜀)
-    const closePrice = await getClosingPrice(ticker, processingDate);
+    // 1. 날짜마다 계좌를 한 번 읽고, 그 계좌로 종가 조회와 체결을 모두 한다.
+    //    앞선 날짜의 사이클 완료로 사이클 번호가 바뀌었을 수 있고, 보유가 없으면
+    //    도중에 종목이 바뀔 수도 있다 - 종가와 주문표가 서로 다른 종목에서 오면 안 된다.
+    const current = await requireAccount(accountId);
+
+    // 2. 해당 날짜의 종가 확인 (없으면 거래일이 아니므로 건너뜀)
+    const closePrice = await getClosingPrice(current.ticker, processingDate);
 
     if (closePrice) {
-      // 2. 해당 날짜의 주문 조회
+      // 3. 해당 날짜의 주문 조회
       const stored = await getDailyOrders(accountId, processingDate);
 
-      // 3. 주문표가 없거나 미체결 주문이 있으면 신선도 판정을 거쳐 체결 처리
+      // 4. 주문표가 없거나 미체결 주문이 있으면 신선도 판정을 거쳐 체결 처리
       //    (주문표가 없으면 판정 과정에서 현재 holdings 기준으로 만들어진다)
       if (stored.length === 0 || stored.some((o) => !o.executed)) {
-        // 앞선 날짜의 사이클 완료로 사이클 번호가 바뀌었을 수 있어 계좌를 다시 읽는다
-        const current = await requireAccount(accountId);
         const results = await refreshAndSettle(current, processingDate, closePrice, stored);
         allResults.push(...results);
       }
 
-      // 4. 종가가 있는 거래일을 처리 완료 → 진행 상태 영속화
+      // 5. 종가가 있는 거래일을 처리 완료 → 진행 상태 영속화
       await updateAccountLastProcessedDate(accountId, processingDate);
     }
 
-    // 5. 다음 거래일로 이동
+    // 6. 다음 거래일로 이동
     processingDate = getNextTradingDate(processingDate);
   }
 
