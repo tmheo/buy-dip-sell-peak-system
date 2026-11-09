@@ -56,6 +56,7 @@ export type { NewDailyOrder } from "./orders";
 // Profit Records
 export {
   createProfitRecord,
+  getCycleRealizedPnl,
   getProfitRecords,
   aggregateProfits,
   groupProfitsByMonth,

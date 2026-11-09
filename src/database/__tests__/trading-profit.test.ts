@@ -55,10 +55,11 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
   });
 
   describe("createProfitRecord", () => {
-    it("should create a profit record with correct calculations", async () => {
-      // SPEC: AC-009 Decimal.js 정밀도 검증 (63.72 * 157 = 10,004.04)
+    it("settle이 계산한 매도금액과 손익을 그대로 저장하고 체결 시점 사이클 번호를 남긴다", async () => {
+      // 매수금액은 보유 티어의 매수가 × 수량이다 (63.72 × 157 = 10,004.04)
       const record = await tradingModule.createProfitRecord({
         accountId: testAccountId,
+        cycleNumber: 1,
         tier: 1,
         ticker: "SOXL",
         strategy: "Pro1",
@@ -67,10 +68,13 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         buyQuantity: 157,
         sellDate: "2025-01-03",
         sellPrice: 64.0,
+        sellAmount: 10048.0,
+        profit: 43.96,
       });
 
       expect(record.id).toBeDefined();
       expect(record.accountId).toBe(testAccountId);
+      expect(record.cycleNumber).toBe(1);
       expect(record.tier).toBe(1);
       expect(record.ticker).toBe("SOXL");
       expect(record.strategy).toBe("Pro1");
@@ -79,12 +83,8 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       expect(record.buyQuantity).toBe(157);
       expect(record.sellDate).toBe("2025-01-03");
       expect(record.sellPrice).toBe(64.0);
-
-      // Decimal.js precision: 63.72 * 157 = 10,004.04
       expect(record.buyAmount).toBe(10004.04);
-      // 64.0 * 157 = 10,048.00
       expect(record.sellAmount).toBe(10048.0);
-      // profit: 10048.00 - 10004.04 = 43.96
       expect(record.profit).toBe(43.96);
       // profitRate: 43.96 / 10004.04 * 100 = 0.439...
       expect(record.profitRate).toBeCloseTo(0.44, 1);
@@ -94,6 +94,7 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // SPEC: AC-003 손절 매도 시 음수 수익 기록
       const record = await tradingModule.createProfitRecord({
         accountId: testAccountId,
+        cycleNumber: 1,
         tier: 2,
         ticker: "SOXL",
         strategy: "Pro2",
@@ -102,6 +103,8 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         buyQuantity: 100,
         sellDate: "2025-01-15", // stop-loss after 10+ days
         sellPrice: 90.0, // 10% loss
+        sellAmount: 9000.0,
+        profit: -1000.0,
       });
 
       expect(record.buyAmount).toBe(10000.0);
@@ -114,6 +117,7 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // SPEC: AC-002 다중 티어 동시 매도 시 개별 기록
       const record1 = await tradingModule.createProfitRecord({
         accountId: testAccountId,
+        cycleNumber: 1,
         tier: 3,
         ticker: "SOXL",
         strategy: "Pro1",
@@ -122,10 +126,13 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         buyQuantity: 100,
         sellDate: "2025-01-03",
         sellPrice: 51.0,
+        sellAmount: 5100.0,
+        profit: 100.0,
       });
 
       const record2 = await tradingModule.createProfitRecord({
         accountId: testAccountId,
+        cycleNumber: 1,
         tier: 4,
         ticker: "SOXL",
         strategy: "Pro1",
@@ -134,6 +141,8 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         buyQuantity: 200,
         sellDate: "2025-01-03",
         sellPrice: 51.0,
+        sellAmount: 10200.0,
+        profit: 200.0,
       });
 
       expect(record1.id).not.toBe(record2.id);
@@ -152,6 +161,56 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
     it("should return empty array for non-existent account", async () => {
       const records = await tradingModule.getProfitRecords("non-existent-account");
       expect(records).toEqual([]);
+    });
+  });
+
+  describe("getCycleRealizedPnl", () => {
+    it("그 계좌의 그 사이클에 기록된 손익만 합산한다", async () => {
+      const account = await tradingModule.createTradingAccount(TEST_USER_ID, {
+        name: "사이클 실현손익 테스트 계좌",
+        ticker: "SOXL",
+        seedCapital: 10000,
+        strategy: "Pro3",
+        cycleStartDate: "2025-04-01",
+      });
+      const other = await tradingModule.createTradingAccount(TEST_USER_ID, {
+        name: "다른 계좌",
+        ticker: "SOXL",
+        seedCapital: 10000,
+        strategy: "Pro3",
+        cycleStartDate: "2025-04-01",
+      });
+      const record = (accountId: string, cycleNumber: number, tier: number, profit: number) =>
+        tradingModule.createProfitRecord({
+          accountId,
+          cycleNumber,
+          tier,
+          ticker: "SOXL",
+          strategy: "Pro3",
+          buyDate: "2025-04-01",
+          buyPrice: 10,
+          buyQuantity: 100,
+          sellDate: "2025-04-10",
+          sellPrice: 10 + profit / 100,
+          sellAmount: 1000 + profit,
+          profit,
+        });
+
+      try {
+        await record(account.id, 1, 1, 120.5); // 지난 사이클
+        await record(account.id, 2, 1, 35.25);
+        await record(account.id, 2, 2, -210.1);
+        await record(other.id, 2, 1, 999); // 다른 계좌
+
+        // 이익이 손실을 상계한다: 35.25 - 210.10 = -174.85
+        expect(await tradingModule.getCycleRealizedPnl(account.id, 2)).toBe(-174.85);
+        expect(await tradingModule.getCycleRealizedPnl(account.id, 1)).toBe(120.5);
+        // 아직 매도가 없는 사이클은 0이다
+        expect(await tradingModule.getCycleRealizedPnl(account.id, 3)).toBe(0);
+      } finally {
+        await tradingModule.deleteTradingAccount(account.id, TEST_USER_ID);
+        await tradingModule.deleteTradingAccount(other.id, TEST_USER_ID);
+      }
     });
   });
 
@@ -189,6 +248,7 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // Two trades with different profit rates
       await tradingModule.createProfitRecord({
         accountId: isolatedAccount.id,
+        cycleNumber: 1,
         tier: 1,
         ticker: "TQQQ",
         strategy: "Pro2",
@@ -196,11 +256,14 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         buyPrice: 100.0,
         buyQuantity: 100, // buyAmount: 10000
         sellDate: "2025-03-10",
-        sellPrice: 102.0, // sellAmount: 10200, profit: 200 (2%)
+        sellPrice: 102.0,
+        sellAmount: 10200, // profit: 200 (2%)
+        profit: 200,
       });
 
       await tradingModule.createProfitRecord({
         accountId: isolatedAccount.id,
+        cycleNumber: 1,
         tier: 2,
         ticker: "TQQQ",
         strategy: "Pro2",
@@ -208,7 +271,9 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         buyPrice: 100.0,
         buyQuantity: 100, // buyAmount: 10000
         sellDate: "2025-03-15",
-        sellPrice: 104.0, // sellAmount: 10400, profit: 400 (4%)
+        sellPrice: 104.0,
+        sellAmount: 10400, // profit: 400 (4%)
+        profit: 400,
       });
 
       const result = await tradingModule.groupProfitsByMonth(isolatedAccount.id);
