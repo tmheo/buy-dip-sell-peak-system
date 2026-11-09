@@ -31,14 +31,6 @@ interface OrdersResponse {
   orders: DailyOrder[];
 }
 
-function getTodayLocal(): string {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 interface AssetValues {
   totalAssets: number;
   totalShares: number;
@@ -80,8 +72,8 @@ export default function TradingDetailClient({
   const router = useRouter();
   const [account, setAccount] = useState<TradingAccountWithHoldings | null>(null);
   const [cash, setCash] = useState<CashBreakdown | null>(null);
-  const [orders, setOrders] = useState<DailyOrder[]>([]);
-  const [orderDate, setOrderDate] = useState<string>(getTodayLocal());
+  // 주문표와 그 거래일은 주문 조회 응답에서만 온다 - 조회에 실패하면 둘 다 없다
+  const [dailyOrders, setDailyOrders] = useState<OrdersResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,11 +94,10 @@ export default function TradingDetailClient({
       setOrdersError(null);
       if (ordersResult.status === "fulfilled" && ordersResult.value.ok) {
         const ordersData: OrdersResponse = await ordersResult.value.json();
-        setOrders(ordersData.orders);
-        setOrderDate(ordersData.date);
+        setDailyOrders(ordersData);
       } else {
         setOrdersError("주문 정보를 불러오는데 실패했습니다.");
-        setOrders([]);
+        setDailyOrders(null);
       }
 
       if (accountResult.status === "rejected") {
@@ -243,7 +234,13 @@ export default function TradingDetailClient({
           {ordersError}
         </div>
       )}
-      <DailyOrdersTable orders={orders} ticker={account.ticker} date={orderDate} />
+      {dailyOrders && (
+        <DailyOrdersTable
+          orders={dailyOrders.orders}
+          ticker={account.ticker}
+          date={dailyOrders.date}
+        />
+      )}
 
       {/* Profit Status Section (SPEC-TRADING-002) */}
       <ProfitStatusTable accountId={accountId} />
