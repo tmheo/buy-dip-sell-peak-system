@@ -126,19 +126,44 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
 
   it("평가금 계산에 쓸 저장된 가장 최근 종가와 그 날짜를 돌려줘야 한다 (#98)", async () => {
     mockLoggedIn(OWNER_ID);
-    const latest = await db.execute<{ date: string; adj_close: number }>(
-      sql`select date::text as date, adj_close from daily_prices
-          where ticker = 'SOXL' order by date desc limit 1`
-    );
+    // CI 시험용 DB에는 시세가 없으므로 SOXL 상장(2010-03-11) 이전 날짜에 합성 종가를 넣는다.
+    // 실데이터가 있으면 그쪽이 더 최근이라 응답은 실데이터의 최근 종가와 같아야 한다.
+    const inserted = await db
+      .insert(schema.dailyPrices)
+      .values({
+        ticker: "SOXL",
+        date: "2009-06-03",
+        open: 12.34,
+        high: 12.34,
+        low: 12.34,
+        close: 12.34,
+        adjClose: 12.34,
+        volume: 1000,
+      })
+      .onConflictDoNothing()
+      .returning({ id: schema.dailyPrices.id });
+    const syntheticPriceId = inserted[0]?.id;
 
-    const response = await get(accountId);
+    try {
+      const latest = await db.execute<{ date: string; adj_close: number }>(
+        sql`select date::text as date, adj_close from daily_prices
+            where ticker = 'SOXL' order by date desc limit 1`
+      );
 
-    const body = await response.json();
-    expect(latest.length).toBe(1);
-    expect(body.latestClose).toEqual({
-      date: latest[0].date,
-      adjClose: Number(latest[0].adj_close),
-    });
+      const response = await get(accountId);
+
+      const body = await response.json();
+      expect(latest.length).toBe(1);
+      expect(body.latestClose).toEqual({
+        date: latest[0].date,
+        adjClose: Number(latest[0].adj_close),
+      });
+    } finally {
+      // 삽입이 건너뛰어졌다면(같은 행이 이미 있음) 기존 데이터를 보존한다
+      if (syntheticPriceId !== undefined) {
+        await db.delete(schema.dailyPrices).where(eq(schema.dailyPrices.id, syntheticPriceId));
+      }
+    }
   });
 
   it("읽는 도중 매도가 커밋돼도 보유 티어와 예수금 내역은 같은 시점의 것이어야 한다", async () => {
