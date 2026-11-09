@@ -1,6 +1,6 @@
 /**
  * 트레이딩 계좌 상세 API (PRD-TRADING-001)
- * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 예수금 내역 포함)
+ * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 예수금 내역, 가장 최근 종가 포함)
  * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만)
  * DELETE /api/trading/accounts/[id] - 계좌 삭제
  */
@@ -16,6 +16,7 @@ import {
 } from "@/lib/api-utils";
 import {
   getTradingAccountWithHoldings,
+  getLatestClose,
   updateTradingAccount,
   deleteTradingAccount,
   markAccountViewed,
@@ -33,6 +34,9 @@ import { loadCycleState } from "@/trading";
  * 예수금 내역(cashBreakdown)을 함께 돌려준다. 예수금은 이번 사이클 실현손익을 입력으로
  * 받는 파생값이라(ADR-0003) 화면이 보유 티어만으로 다시 계산하면 주문표와 어긋난다.
  * 주문표와 같은 사이클 상태(loadCycleState)에서 읽어 같은 규칙으로 계산한다.
+ *
+ * 평가금(가장 최근 종가 × 보유 수량)에 쓸 저장된 가장 최근 종가와 그 날짜(latestClose)도
+ * 함께 돌려준다 (#98). 실시간 시세가 아니다. 가격 행이 없으면 null이다.
  */
 export async function GET(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -46,14 +50,17 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   const detail = await runInReadSnapshot(async (snapshot) => {
     const account = await getTradingAccountWithHoldings(id, userId, snapshot);
     if (!account) return null;
-    const state = await loadCycleState(account, getTodayTradingDate(), snapshot);
-    return { account, state };
+    const [state, latestClose] = await Promise.all([
+      loadCycleState(account, getTodayTradingDate(), snapshot),
+      getLatestClose(account.ticker, snapshot),
+    ]);
+    return { account, state, latestClose };
   });
 
   if (!detail) {
     return notFoundResponse("Account");
   }
-  const { account, state } = detail;
+  const { account, state, latestClose } = detail;
 
   // 조회 시각 갱신(부가 동작): 실패해도 상세 조회 응답은 유지한다
   try {
@@ -63,7 +70,7 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
     console.warn(`[${id}] 조회 시각 갱신 실패:`, error);
   }
 
-  return NextResponse.json({ account, cashBreakdown: cashBreakdown(state) });
+  return NextResponse.json({ account, cashBreakdown: cashBreakdown(state), latestClose });
 }
 
 /**

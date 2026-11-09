@@ -48,6 +48,7 @@ export {
   updateOrderExecuted,
   getClosingPrice,
   getPreviousTradingClose,
+  getLatestClose,
   listTradingDatesBetween,
   replaceDailyOrders,
 } from "./orders";

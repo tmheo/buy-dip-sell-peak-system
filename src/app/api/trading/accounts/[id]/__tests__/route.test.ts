@@ -119,6 +119,23 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     });
   });
 
+  it("평가금 계산에 쓸 저장된 가장 최근 종가와 그 날짜를 돌려줘야 한다 (#98)", async () => {
+    mockLoggedIn(OWNER_ID);
+    const latest = await db.execute<{ date: string; adj_close: number }>(
+      sql`select date::text as date, adj_close from daily_prices
+          where ticker = 'SOXL' order by date desc limit 1`
+    );
+
+    const response = await get(accountId);
+
+    const body = await response.json();
+    expect(latest.length).toBe(1);
+    expect(body.latestClose).toEqual({
+      date: latest[0].date,
+      adjClose: Number(latest[0].adj_close),
+    });
+  });
+
   it("읽는 도중 매도가 커밋돼도 보유 티어와 예수금 내역은 같은 시점의 것이어야 한다", async () => {
     // 티어 1($100 × 10주)만 보유한 계좌. 끼어드는 매도는 티어 1을 $50에 손절(-$500)하고
     // 보유가 비어 사이클을 완료한다 - 사이클 완료가 계좌 행을 갱신하므로, 커밋 전까지

@@ -154,6 +154,24 @@ export async function getPreviousTradingClose(
 }
 
 /**
+ * 저장된 가장 최근 종가(adjClose)와 그 거래일 조회 (#98)
+ * 계좌 화면의 평가금(가장 최근 종가 × 보유 수량)에 쓴다. 가격 행이 하나도 없으면 null.
+ */
+export async function getLatestClose(
+  ticker: Ticker,
+  executor: DbExecutor = db
+): Promise<{ date: string; adjClose: number } | null> {
+  const rows = await executor
+    .select({ date: dailyPrices.date, adjClose: dailyPrices.adjClose })
+    .from(dailyPrices)
+    .where(eq(dailyPrices.ticker, ticker))
+    .orderBy(desc(dailyPrices.date))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
  * 두 날짜 사이(양 끝 제외)의 실제 거래일 목록 (가격 데이터 행 기준)
  * #41: 평일 근사는 휴장일을 거래일로 세어 백테스트보다 하루 일찍 손절하게 만든다.
  */
