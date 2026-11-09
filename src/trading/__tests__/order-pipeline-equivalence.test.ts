@@ -194,15 +194,7 @@ describe.skipIf(!hasDb)("실계좌 주문 파이프라인 동등성 (#47)", () =
     accountId = account.id;
 
     // 사이클 시작일부터 전일(07-21)까지 실계좌 마감 처리
-    await trading.processHistoricalOrders(
-      accountId,
-      CYCLE_START_DATE,
-      null,
-      CURRENT_DATE,
-      TICKER,
-      STRATEGY,
-      SEED_CAPITAL
-    );
+    await trading.processHistoricalOrders(account, CURRENT_DATE);
   });
 
   afterAll(async () => {

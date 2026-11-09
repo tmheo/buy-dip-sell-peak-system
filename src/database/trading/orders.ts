@@ -135,48 +135,6 @@ export async function listTradingDatesBetween(
 }
 
 /**
- * 주문 생성 이후 더 최신 가격 데이터가 적재됐는지 확인
- *
- * 당일 주문표는 화면 진입 시 지연 생성되므로, 일일 크론이 전일 종가를
- * 적재하기 전에 생성되면 그보다 더 이전 거래일 종가로 잘못 만들어진다.
- * 주문 생성 시각(since) 이후에 주문 기준일 이전 거래일의 가격 행이 새로
- * 적재됐다면 해당 주문은 stale이므로 재생성 대상으로 판정한다.
- *
- * @param ticker - 종목
- * @param orderDate - 주문 기준일 (이 날짜 미만의 가격만 기준 종가 후보)
- * @param since - 주문 생성 시각
- * @returns 주문 생성 이후 새 가격 데이터가 적재됐으면 true
- */
-export async function hasNewerPriceSince(
-  ticker: Ticker,
-  orderDate: string,
-  since: Date
-): Promise<boolean> {
-  const rows = await db
-    .select({ id: dailyPrices.id })
-    .from(dailyPrices)
-    .where(
-      and(
-        eq(dailyPrices.ticker, ticker),
-        lt(dailyPrices.date, orderDate),
-        gt(dailyPrices.createdAt, since)
-      )
-    )
-    .limit(1);
-
-  return rows.length > 0;
-}
-
-/**
- * 당일 주문 삭제 (재생성 용)
- */
-export async function deleteDailyOrders(accountId: string, date: string): Promise<void> {
-  await db
-    .delete(dailyOrders)
-    .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));
-}
-
-/**
  * 저장할 주문 하나. 전략의 주문 의도에서 표시용 지정가까지 정해진 상태다
  * (MOC는 규칙상 지정가가 없지만 limit_price 컬럼이 NOT NULL이라 값이 채워져 있다).
  */

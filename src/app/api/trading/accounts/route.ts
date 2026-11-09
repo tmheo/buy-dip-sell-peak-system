@@ -66,15 +66,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // 실패하더라도 계좌 생성 자체는 성공으로 응답한다 (cron이 자동으로 따라잡음).
     try {
       const today = new Date().toISOString().split("T")[0];
-      await processHistoricalOrders(
-        account.id,
-        account.cycleStartDate,
-        account.lastProcessedDate,
-        today,
-        account.ticker,
-        account.strategy,
-        account.seedCapital
-      );
+      await processHistoricalOrders(account, today);
     } catch (error) {
       console.error(`[${account.id}] 계좌 생성 후 초기 마감 처리 실패:`, error);
     }

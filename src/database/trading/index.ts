@@ -47,9 +47,7 @@ export {
   getClosingPrice,
   getPreviousTradingClose,
   listTradingDatesBetween,
-  deleteDailyOrders,
   replaceDailyOrders,
-  hasNewerPriceSince,
 } from "./orders";
 export type { NewDailyOrder } from "./orders";
 

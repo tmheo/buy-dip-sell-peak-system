@@ -81,7 +81,7 @@ export async function POST(request: Request, { params }: RouteParams): Promise<N
   }
 
   // 주문 체결 처리
-  const results = await processOrderExecution(id, date, account.ticker);
+  const results = await processOrderExecution(id, date);
 
   return NextResponse.json({
     date,

@@ -7,7 +7,7 @@
  */
 
 // 주문표 생성과 신선도 정책
-export { generateDailyOrders, getOrCreateDailyOrders, toStrategyHoldings } from "./orders";
+export { generateDailyOrders, getOrCreateDailyOrders, loadCycleState } from "./orders";
 
 // 체결·마감 처리
 export {

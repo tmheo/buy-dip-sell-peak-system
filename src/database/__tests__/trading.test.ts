@@ -987,7 +987,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       // 현재일(월요일)에서 이전 거래일 체결 처리
       // Note: 실제로는 종가 데이터가 DB에 있어야 체결됨
       const currentDate = "2009-01-12"; // 월요일
-      const results = await trading.processPreviousDayExecution(account.id, currentDate, "SOXL");
+      const results = await trading.processPreviousDayExecution(account.id, currentDate);
 
       // 종가 데이터가 없으므로 빈 배열 반환 (CON-001 준수)
       expect(results).toHaveLength(0);
@@ -1016,7 +1016,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       });
 
       // 체결 시도 - 종가 데이터 없음
-      const results = await trading.processPreviousDayExecution(account.id, "2009-01-12", "TQQQ");
+      const results = await trading.processPreviousDayExecution(account.id, "2009-01-12");
 
       // 종가 데이터가 없으므로 빈 배열 반환
       expect(results).toHaveLength(0);
@@ -1049,7 +1049,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       await tradingModule.updateOrderExecuted(order.id, true);
 
       // 체결 시도
-      const results = await trading.processPreviousDayExecution(account.id, "2025-01-13", "SOXL");
+      const results = await trading.processPreviousDayExecution(account.id, "2025-01-13");
 
       // 미체결 주문이 없으므로 빈 배열 반환
       expect(results).toHaveLength(0);
@@ -1079,8 +1079,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       // 월요일에서 이전 거래일 체결 처리 (금요일이어야 함)
       const results = await trading.processPreviousDayExecution(
         account.id,
-        "2025-01-13", // 월요일
-        "SOXL"
+        "2025-01-13" // 월요일
       );
 
       // 금요일(2025-01-10)의 주문이 처리 대상이어야 함
@@ -1101,7 +1100,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       createdAccountIds.push(account.id);
 
       // 주문 없이 체결 시도
-      const results = await trading.processPreviousDayExecution(account.id, "2025-01-13", "SOXL");
+      const results = await trading.processPreviousDayExecution(account.id, "2025-01-13");
 
       expect(results).toHaveLength(0);
     });
@@ -1163,16 +1162,8 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       for (const holding of filledTiers) {
         await tradingModule.updateTierHolding(account.id, holding.tier, holding);
       }
-      const holdings = await tradingModule.getTierHoldings(account.id);
 
-      const orders = await trading.generateDailyOrders(
-        account.id,
-        ORDER_DATE,
-        "TQQQ",
-        "Pro3",
-        65303.83,
-        holdings
-      );
+      const orders = await trading.generateDailyOrders(account, ORDER_DATE);
 
       // 보유 중인 티어 1-6은 매도 주문
       const sellOrders = orders.filter((order) => order.type === "SELL");

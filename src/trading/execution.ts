@@ -12,7 +12,6 @@ import {
   getClosingPrice,
   getDailyOrders,
   getPreviousTradingClose,
-  getTierHoldings,
   getTradingAccountByIdWithoutOwnerCheck,
   runInTransaction,
   updateAccountLastProcessedDate,
@@ -22,10 +21,10 @@ import {
 } from "@/database/trading";
 import { getPreviousTradingDate } from "@/lib/date";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
-import { calculateSellLimitPrice, getStrategyParams, settle } from "@/strategy";
-import type { DailyOrder, Ticker, Strategy, TradingAccount } from "@/types/trading";
+import { calculateSellLimitPrice, settle } from "@/strategy";
+import type { DailyOrder, Ticker, TradingAccount } from "@/types/trading";
 
-import { generateDailyOrders, toStrategyHoldings } from "./orders";
+import { generateDailyOrders, loadCycleState, refreshDailyOrders } from "./orders";
 
 export interface ExecutionResult {
   orderId: string;
@@ -69,37 +68,42 @@ function toOrderIntent(order: DailyOrder): OrderIntent {
  * 이 함수는 그 결과를 티어 홀딩·수익 기록·주문 상태에 트랜잭션으로 반영한다.
  * 사이클 완료 이벤트를 받으면 cycleNumber를 증가시킨다.
  *
+ * 주문표를 체결하는 모든 경로(일일 마감, 화면 진입, 체결 API)가 이 함수를 거친다.
+ * 그래서 체결 전에 여기서 신선도 판정을 하고, 낡았으면 다시 만든 주문표로 체결한다 (#96).
+ * 체결되는 주문표는 언제나 지금의 입력과 현재 규칙으로 만든 것이 된다.
+ *
  * @param accountId - 계좌 ID
  * @param date - 체결 처리할 날짜 (해당 날짜의 가격 행이 없으면 체결하지 않는다)
- * @param ticker - 종목
  * @returns 체결 결과 목록
  */
 export async function processOrderExecution(
   accountId: string,
-  date: string,
-  ticker: Ticker
+  date: string
 ): Promise<ExecutionResult[]> {
+  const account = await requireAccount(accountId);
+  const { ticker } = account;
+
   // 당일 종가 조회 (정확 일치 - 휴장일·미적재면 체결 처리 불가)
   const closePrice = await getClosingPrice(ticker, date);
   if (!closePrice) {
     return [];
   }
 
-  const orders = await getDailyOrders(accountId, date);
-  const pendingOrders = orders.filter((order) => !order.executed);
+  const stored = await getDailyOrders(accountId, date);
 
   // 미체결 주문이 없으면 현재 상태만 보고 (사이클 완료 중복 처리 방지)
-  if (pendingOrders.length === 0) {
-    return orders.map((order) => toExecutionResult(order, order.executed, closePrice));
+  if (stored.every((order) => order.executed)) {
+    return stored.map((order) => toExecutionResult(order, order.executed, closePrice));
   }
 
-  const account = await requireAccount(accountId);
-  const state: CycleState = {
-    strategy: getStrategyParams(account.strategy),
-    cycleCapital: account.seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
-    holdings: await toStrategyHoldings(ticker, await getTierHoldings(accountId), date),
-    cycleNumber: account.cycleNumber,
-  };
+  const { orders, regenerated } = await refreshDailyOrders(account, date, stored);
+  if (regenerated) {
+    // 배포일처럼 규칙이 바뀐 날 몇 계좌가 영향을 받았는지 보려는 기록이다
+    console.log(`[${accountId}] ${date} 낡은 주문표를 다시 만든 뒤 체결한다`);
+  }
+
+  const pendingOrders = orders.filter((order) => !order.executed);
+  const state = await loadCycleState(account, date);
 
   const intents = pendingOrders.map(toOrderIntent);
   const orderByIntent = new Map(intents.map((intent, index) => [intent, pendingOrders[index]]));
@@ -232,16 +236,16 @@ async function requireAccount(accountId: string): Promise<TradingAccount> {
  *
  * @param accountId - 계좌 ID
  * @param currentDate - 현재 날짜 (YYYY-MM-DD)
- * @param ticker - 종목
  * @returns 체결 결과 목록
  */
 export async function processPreviousDayExecution(
   accountId: string,
-  currentDate: string,
-  ticker: Ticker
+  currentDate: string
 ): Promise<ExecutionResult[]> {
+  const account = await requireAccount(accountId);
+
   // 1. 이전 거래일과 종가 확인 (CON-001 준수: 종가 없으면 체결 불가)
-  const prevClose = await getPreviousTradingClose(ticker, currentDate);
+  const prevClose = await getPreviousTradingClose(account.ticker, currentDate);
   if (!prevClose) {
     return [];
   }
@@ -254,8 +258,8 @@ export async function processPreviousDayExecution(
     return [];
   }
 
-  // 3. 체결 처리 (기존 함수 재사용, CON-002 준수: 이미 체결된 주문은 스킵됨)
-  return await processOrderExecution(accountId, prevClose.date, ticker);
+  // 3. 체결 처리 (신선도 판정을 거친다, CON-002 준수: 이미 체결된 주문은 스킵됨)
+  return await processOrderExecution(accountId, prevClose.date);
 }
 
 /**
@@ -281,30 +285,23 @@ export function getNextTradingDate(date: string): string {
  * - lastProcessedDate가 있으면 그 다음 거래일부터, 없으면 cycleStartDate부터 처리
  * - 가격 행이 있는 거래일만 처리한다 (휴장일·미적재일은 주문 생성 없이 건너뜀)
  * - 체결 결과에 따라 holdings가 업데이트되므로 순차 처리 필수
+ *   (날짜 D의 신선도 판정과 체결은 D 직전 거래일 마감 뒤의 보유 상태로 한다)
+ * - 이미 저장된 주문표도 체결 전에 신선도 판정을 거친다 (processOrderExecution, #96)
  * - 종가가 있는 거래일을 처리할 때마다 lastProcessedDate를 갱신하여,
  *   중간에 중단(타임아웃 등)되어도 다음 실행이 이어받을 수 있게 한다
  * - deadline이 지정되면 그 시각을 넘기기 전에 루프를 중단 (Vercel 함수 제한 대응)
  *
- * @param accountId - 계좌 ID
- * @param cycleStartDate - 사이클 시작일 (YYYY-MM-DD)
- * @param lastProcessedDate - 마지막으로 처리 완료한 거래일 (최초 실행이면 null)
+ * @param account - 계좌 (사이클 시작일·마지막 처리일·종목·시드 금액·전략)
  * @param currentDate - 현재 날짜 (YYYY-MM-DD)
- * @param ticker - 종목
- * @param strategy - 전략
- * @param seedCapital - 시드 캐피털
  * @param deadline - 처리를 중단할 시각 (Date.now() 기준 ms, 선택)
  * @returns 전체 체결 결과 목록
  */
 export async function processHistoricalOrders(
-  accountId: string,
-  cycleStartDate: string,
-  lastProcessedDate: string | null,
+  account: TradingAccount,
   currentDate: string,
-  ticker: Ticker,
-  strategy: Strategy,
-  seedCapital: number,
   deadline?: number
 ): Promise<ExecutionResult[]> {
+  const { id: accountId, cycleStartDate, lastProcessedDate, ticker } = account;
   const allResults: ExecutionResult[] = [];
 
   // 처리 시작일: 마지막 처리일의 다음 거래일, 최초 실행이면 사이클 시작일
@@ -327,21 +324,13 @@ export async function processHistoricalOrders(
 
       // 3. 주문이 없으면 생성 (현재 holdings 상태 기준)
       if (orders.length === 0) {
-        const holdings = await getTierHoldings(accountId);
-        orders = await generateDailyOrders(
-          accountId,
-          processingDate,
-          ticker,
-          strategy,
-          seedCapital,
-          holdings
-        );
+        orders = await generateDailyOrders(account, processingDate);
       }
 
-      // 4. 미체결 주문이 있으면 체결 처리
+      // 4. 미체결 주문이 있으면 체결 처리 (체결 전에 신선도 판정을 거친다)
       const hasUnexecutedOrders = orders.some((o) => !o.executed);
       if (hasUnexecutedOrders) {
-        const results = await processOrderExecution(accountId, processingDate, ticker);
+        const results = await processOrderExecution(accountId, processingDate);
         allResults.push(...results);
       }
 

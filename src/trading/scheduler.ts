@@ -100,16 +100,7 @@ export async function processDailyClose(
 
     // 한 계좌의 실패가 다른 계좌 처리를 막지 않도록 개별 try/catch
     try {
-      const executed = await processHistoricalOrders(
-        account.id,
-        account.cycleStartDate,
-        account.lastProcessedDate,
-        today,
-        account.ticker,
-        account.strategy,
-        account.seedCapital,
-        deadline
-      );
+      const executed = await processHistoricalOrders(account, today, deadline);
       results.push({ accountId: account.id, executed: executed.length });
     } catch (error) {
       console.error(`[${account.id}] 마감 처리 실패:`, error);
