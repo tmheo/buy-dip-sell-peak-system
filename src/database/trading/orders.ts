@@ -15,10 +15,14 @@ import { dailyOrders, dailyPrices } from "../schema/index";
 import { mapDrizzleDailyOrder } from "./mappers";
 
 /**
- * 당일 주문표 조회
+ * 당일 주문표 조회 (티어, 구분 순)
  */
-export async function getDailyOrders(accountId: string, date: string): Promise<DailyOrder[]> {
-  const rows = await db
+export async function getDailyOrders(
+  accountId: string,
+  date: string,
+  executor: DbExecutor = db
+): Promise<DailyOrder[]> {
+  const rows = await executor
     .select()
     .from(dailyOrders)
     .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)))
@@ -222,7 +226,7 @@ export interface NewDailyOrder {
  * @param accountId - 계좌 ID
  * @param date - 주문 기준일
  * @param orders - 저장할 주문 목록 (미체결 상태로 삽입된다)
- * @returns 생성된 주문 목록
+ * @returns 생성된 주문 목록 (getDailyOrders와 같은 티어, 구분 순)
  * @throws 해당 날짜에 체결된 주문이 있으면 에러
  */
 export async function replaceDailyOrders(
@@ -258,24 +262,20 @@ export async function replaceDailyOrders(
       .delete(dailyOrders)
       .where(and(eq(dailyOrders.accountId, accountId), eq(dailyOrders.date, date)));
 
-    const createdOrders: DailyOrder[] = [];
     for (const order of orders) {
-      const result = await tx
-        .insert(dailyOrders)
-        .values({
-          accountId,
-          date,
-          tier: order.tier,
-          type: order.type,
-          orderMethod: order.orderMethod,
-          limitPrice: order.limitPrice,
-          shares: order.shares,
-          executed: false,
-        })
-        .returning();
-      createdOrders.push(mapDrizzleDailyOrder(result[0]));
+      await tx.insert(dailyOrders).values({
+        accountId,
+        date,
+        tier: order.tier,
+        type: order.type,
+        orderMethod: order.orderMethod,
+        limitPrice: order.limitPrice,
+        shares: order.shares,
+        executed: false,
+      });
     }
 
-    return createdOrders;
+    // 조회와 같은 순서로 돌려준다 - 처음 만든 주문표와 다시 조회한 주문표의 줄 순서가 같아야 한다
+    return getDailyOrders(accountId, date, tx);
   });
 }
