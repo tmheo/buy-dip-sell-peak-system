@@ -21,7 +21,7 @@ import {
   updateTierHolding,
   type DbExecutor,
 } from "@/database/trading";
-import { getPreviousTradingDate } from "@/lib/date";
+import { formatUtcDate, getPreviousTradingDate } from "@/lib/date";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { calculateSellLimitPrice, settle } from "@/strategy";
 import type { DailyOrder, Ticker, TradingAccount } from "@/types/trading";
@@ -335,7 +335,7 @@ export function getNextTradingDate(date: string): string {
     d.setDate(d.getDate() + 2); // 토요일 -> 월요일
   }
 
-  return d.toISOString().split("T")[0];
+  return formatUtcDate(d);
 }
 
 /**

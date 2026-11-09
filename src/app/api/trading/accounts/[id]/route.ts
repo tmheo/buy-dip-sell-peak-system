@@ -21,6 +21,7 @@ import {
   markAccountViewed,
 } from "@/database/trading";
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
+import { getTodayTradingDate } from "@/lib/date";
 import { cashBreakdown } from "@/strategy";
 import { loadCycleState } from "@/trading";
 
@@ -53,8 +54,7 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
     console.warn(`[${id}] 조회 시각 갱신 실패:`, error);
   }
 
-  const today = new Date().toISOString().split("T")[0];
-  const state = await loadCycleState(account, today);
+  const state = await loadCycleState(account, getTodayTradingDate());
 
   return NextResponse.json({ account, cashBreakdown: cashBreakdown(state) });
 }

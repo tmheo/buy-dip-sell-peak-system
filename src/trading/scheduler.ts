@@ -11,6 +11,7 @@ import {
   getTradingAccountByIdWithoutOwnerCheck,
 } from "@/database/trading";
 
+import { getTodayTradingDate } from "@/lib/date";
 import { processHistoricalOrders } from "./execution";
 
 /**
@@ -73,7 +74,7 @@ export async function processDailyClose(
   );
   const startTime = Date.now();
   const deadline = startTime + TIME_BUDGET_MS;
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayTradingDate();
 
   let accounts;
   if (accountId) {

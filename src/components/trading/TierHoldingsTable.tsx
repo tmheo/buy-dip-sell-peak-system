@@ -12,7 +12,7 @@ import {
   RESERVE_TIER_NUMBER,
   getStrategyParams,
 } from "@/strategy";
-import { calculateTradingDays } from "@/lib/date";
+import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
@@ -44,11 +44,8 @@ function formatDate(date: string | null): string {
 
 function calculateHoldingDays(buyDate: string | null): string {
   if (!buyDate) return "-";
-  // 오늘 날짜를 YYYY-MM-DD 형식으로
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
   // 거래일(영업일) 기준으로 보유 기간 계산 (주말 제외, 매수일 포함)
-  const tradingDays = calculateTradingDays(buyDate, todayStr);
+  const tradingDays = calculateTradingDays(buyDate, getTodayTradingDate());
   return `${tradingDays}일`;
 }
 
