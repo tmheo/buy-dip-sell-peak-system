@@ -19,6 +19,7 @@ import {
   updateTradingAccount,
   deleteTradingAccount,
   markAccountViewed,
+  runInReadSnapshot,
 } from "@/database/trading";
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
 import { getTodayTradingDate } from "@/lib/date";
@@ -40,11 +41,19 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   }
 
   const { id } = await params;
-  const account = await getTradingAccountWithHoldings(id, userId);
+  // 보유 티어와 예수금 내역은 한 시점에서 읽는다 - 따로 읽으면 그 사이에 커밋된 매도가
+  // 보유 티어에는 빠지고 예수금 내역에는 들어간다
+  const detail = await runInReadSnapshot(async (snapshot) => {
+    const account = await getTradingAccountWithHoldings(id, userId, snapshot);
+    if (!account) return null;
+    const state = await loadCycleState(account, getTodayTradingDate(), snapshot);
+    return { account, state };
+  });
 
-  if (!account) {
+  if (!detail) {
     return notFoundResponse("Account");
   }
+  const { account, state } = detail;
 
   // 조회 시각 갱신(부가 동작): 실패해도 상세 조회 응답은 유지한다
   try {
@@ -53,8 +62,6 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   } catch (error) {
     console.warn(`[${id}] 조회 시각 갱신 실패:`, error);
   }
-
-  const state = await loadCycleState(account, getTodayTradingDate());
 
   return NextResponse.json({ account, cashBreakdown: cashBreakdown(state) });
 }

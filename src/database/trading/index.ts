@@ -10,7 +10,7 @@
 export type { DbExecutor } from "../db-drizzle";
 
 // 트랜잭션
-export { runInTransaction } from "./transaction";
+export { runInReadSnapshot, runInTransaction } from "./transaction";
 
 // Mappers (내부용이지만 필요시 export)
 export {

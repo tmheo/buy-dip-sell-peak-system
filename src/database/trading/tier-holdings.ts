@@ -13,8 +13,11 @@ import { mapDrizzleTierHolding } from "./mappers";
 /**
  * 티어별 보유 현황 조회
  */
-export async function getTierHoldings(accountId: string): Promise<TierHolding[]> {
-  const rows = await db
+export async function getTierHoldings(
+  accountId: string,
+  executor: DbExecutor = db
+): Promise<TierHolding[]> {
+  const rows = await executor
     .select()
     .from(tierHoldings)
     .where(eq(tierHoldings.accountId, accountId))
@@ -26,8 +29,11 @@ export async function getTierHoldings(accountId: string): Promise<TierHolding[]>
 /**
  * 총 보유 수량 조회
  */
-export async function getTotalShares(accountId: string): Promise<number> {
-  const result = await db
+export async function getTotalShares(
+  accountId: string,
+  executor: DbExecutor = db
+): Promise<number> {
+  const result = await executor
     .select({ total: sql<number>`COALESCE(SUM(${tierHoldings.shares}), 0)` })
     .from(tierHoldings)
     .where(eq(tierHoldings.accountId, accountId));

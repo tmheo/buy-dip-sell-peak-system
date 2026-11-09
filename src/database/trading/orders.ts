@@ -160,9 +160,10 @@ export async function getPreviousTradingClose(
 export async function listTradingDatesBetween(
   ticker: Ticker,
   afterDate: string,
-  beforeDate: string
+  beforeDate: string,
+  executor: DbExecutor = db
 ): Promise<string[]> {
-  const rows = await db
+  const rows = await executor
     .select({ date: dailyPrices.date })
     .from(dailyPrices)
     .where(

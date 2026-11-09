@@ -27,6 +27,8 @@ vi.mock("@/database/trading", () => ({
   listTradingDatesBetween: vi.fn(),
   lockDailyOrders: vi.fn(),
   replaceDailyOrders: vi.fn(),
+  // 읽기 시점은 대역 저장 함수에 그대로 넘겨지기만 하므로 빈 실행자로 work를 바로 부른다
+  runInReadSnapshot: vi.fn((work: (tx: unknown) => Promise<unknown>) => work({})),
   runInTransaction: vi.fn(),
   updateAccountLastProcessedDate: vi.fn(),
   updateOrderExecuted: vi.fn(),
