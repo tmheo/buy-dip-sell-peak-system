@@ -54,7 +54,7 @@ describe("settle - 매수 체결", () => {
     expect(newState.holdings).toHaveLength(0);
   });
 
-  it("매수 체결 시 예수금이 투자원금만큼 감소해야 한다", () => {
+  it("매수 체결 시 예수금이 티어 매수금액만큼 감소해야 한다", () => {
     const { newState } = settle(createState(), [buyOrder()], {
       date: "2025-01-03",
       close: 99,
@@ -114,7 +114,7 @@ describe("settle - 매도 체결", () => {
     expect(newState.holdings).toHaveLength(1);
   });
 
-  it("매도 체결 시 원금만 예수금으로 회복되고 실현 수익은 포함되지 않아야 한다 (ADR-0001)", () => {
+  it("매도 체결 시 티어 매수금액만 예수금으로 회복되고 실현 수익은 포함되지 않아야 한다 (ADR-0001)", () => {
     const state = createState({
       holdings: [createHolding({ tier: 1, buyPrice: 99, shares: 10 })],
     });
@@ -125,7 +125,7 @@ describe("settle - 매도 체결", () => {
       date: "2025-01-06",
       close: 101,
     });
-    // 수익 20이 났지만 예수금은 원금 회복분까지만: 10000 (10020이 아님)
+    // 수익 20이 났지만 예수금은 티어 매수금액 회복분까지만: 10000 (10020이 아님)
     expect(availableCash(newState)).toBe(10000);
   });
 

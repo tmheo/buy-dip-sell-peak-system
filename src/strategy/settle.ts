@@ -33,7 +33,7 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
 
   const executions: Execution[] = [];
 
-  // 1. 매도 체결 (LOC: 종가 >= 지정가, MOC: 무조건) - 티어 제거, 원금 회복 (ADR-0001),
+  // 1. 매도 체결 (LOC: 종가 >= 지정가, MOC: 무조건) - 티어 제거, 티어 매수금액 회복 (ADR-0001),
   //    손익은 이번 사이클 실현손익에 쌓인다 (ADR-0003)
   const holdingsByTier = new Map(state.holdings.map((h) => [h.tier, h]));
   const soldTiers = new Set<number>();
@@ -69,7 +69,7 @@ export function settle(state: CycleState, orders: OrderIntent[], bar: DayBar): S
 
   // 2. 매수 체결 (종가 <= 지정가) - 매도와 동시에 제출된 주문이므로 티어는 이미 결정됨
   //    현금 검사는 당일 매도 손익까지 반영한 상태로 한다. 전날 상태로 만든 매수 주문은
-  //    언제나 통과한다: 당일 매도는 예수금을 줄이지 않고(원금 회복분 ≥ 0, 계좌 현금은
+  //    언제나 통과한다: 당일 매도는 예수금을 줄이지 않고(티어 매수금액 회복분 ≥ 0, 계좌 현금은
   //    매도 대금만큼 증가), 체결가는 지정가 이하다. 이 검사는 주문표 오염 방어선이다.
   const buyOrder = orders.find((o): o is Extract<OrderIntent, { type: "BUY" }> => o.type === "BUY");
   if (buyOrder && shouldExecuteBuy(bar.close, buyOrder.limitPrice)) {

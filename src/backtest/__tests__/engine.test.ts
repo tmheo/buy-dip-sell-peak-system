@@ -296,7 +296,7 @@ describe("BacktestEngine", () => {
       expect(day2.holdingsValue).toBe(11 * 89);
     });
 
-    it("ADR-0003: 손절 원금은 회복되지만 순실현손실만큼 예수금이 줄어 재매수 금액이 줄어야 한다", async () => {
+    it("ADR-0003: 손절한 티어의 매수금액은 회복되지만 순실현손실만큼 예수금이 줄어 재매수 금액이 줄어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -326,7 +326,7 @@ describe("BacktestEngine", () => {
       expect(day11.cash).toBe(531);
 
       // 12일째(44): 티어 1 재매수 금액 = min(1000, 예수금 531) = 531, 지정가 44.99
-      // (ADR-0001이었다면 원금 전액 회복으로 floor(1000 / 44.99) = 22주)
+      // (ADR-0001이었다면 티어 매수금액 전액 회복으로 floor(1000 / 44.99) = 22주)
       const day12 = result.dailyHistory[12];
       const rebuy = day12.trades.find((t) => t.type === "BUY");
       expect(rebuy).toBeDefined();
@@ -347,7 +347,7 @@ describe("BacktestEngine", () => {
         initialCapital: 10000,
       };
       // Pro3: 매수 임계값 -0.1%, 손절일 12 거래일, 티어 금액 floor(10000 / 6) = 1666.66
-      // 1일째 99에 티어 1 매수: floor(1666.66 / 99.9) = 16주 (원금 1584),
+      // 1일째 99에 티어 1 매수: floor(1666.66 / 99.9) = 16주 (티어 매수금액 1584),
       // 이후 매일 0.05씩 하락(-0.1% 미만이라 추가 매수 없음), 13일째 98.4에 손절,
       // 14일째는 보합이라 새 사이클에서 매수가 없다
       const declines = Array.from({ length: 12 }, (_, i) => 99 - 0.05 * (i + 1));
@@ -379,15 +379,15 @@ describe("BacktestEngine", () => {
       };
       const prices: DailyPrice[] = [
         createMockPrice("2025-01-02", 100),
-        createMockPrice("2025-01-03", 99), // 티어 1 매수: 10주 @99 (원금 990)
-        createMockPrice("2025-01-04", 98), // 티어 2 매수: 15주 @98 (원금 1470)
+        createMockPrice("2025-01-03", 99), // 티어 1 매수: 10주 @99 (티어 매수금액 990)
+        createMockPrice("2025-01-04", 98), // 티어 2 매수: 15주 @98 (티어 매수금액 1470)
         createMockPrice("2025-01-05", 99.5), // 티어 2 매도 (지정가 99.47): 수익 22.5, 티어 1 보유 유지
         createMockPrice("2025-01-06", 98.5), // 티어 2 재매수
       ];
 
       const result = await engine.run(request, prices);
 
-      // 매도일: 현금 = 사이클 자본 - 활성 원금(990) + 실현 수익(22.5)
+      // 매도일: 현금 = 사이클 자본 - 활성 티어 매수금액(990) + 실현 수익(22.5)
       const sellDay = result.dailyHistory[3];
       expect(sellDay.cash).toBe(10000 - 990 + 22.5);
       expect(sellDay.holdingsValue).toBe(10 * 99.5);
