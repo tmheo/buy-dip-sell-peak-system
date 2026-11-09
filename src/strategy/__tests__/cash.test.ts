@@ -152,4 +152,20 @@ describe("cashBreakdown - 화면용 현금 내역", () => {
       isReduced: false,
     });
   });
+
+  it("예비 티어를 보유 중이면 할당 시드를 알 수 없어 null이어야 한다", () => {
+    // 예비 티어는 매수 당시의 예수금 전액을 썼다. 그 금액은 저장되지 않고, 지금 남은
+    // 예수금(매수 뒤 잔액)은 할당 시드가 아니다.
+    const holdings = [1, 2, 3, 4, 5, 6, 7].map((tier) =>
+      createHolding({ tier, buyPrice: 10, shares: [100, 150, 200, 250, 200, 50, 40][tier - 1] })
+    );
+    const breakdown = cashBreakdown(createState({ holdings }));
+
+    expect(breakdown.tiers[6]).toEqual({
+      tier: 7,
+      amount: null,
+      nominalAmount: null,
+      isReduced: false,
+    });
+  });
 });

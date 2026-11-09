@@ -213,6 +213,14 @@ export function nominalTierAmount(state: CycleState, tier: number): number {
     .toNumber();
 }
 
+/** 예비 티어의 할당 시드 (cashBreakdown 참고, 내부 헬퍼) */
+function reserveTierAmount(heldTiers: Set<number>, cash: number): number | null {
+  if (heldTiers.has(RESERVE_TIER_NUMBER)) {
+    return null;
+  }
+  return lowestEmptyBaseTier(heldTiers) === null ? cash : 0;
+}
+
 /**
  * 화면용 현금 내역 (ADR-0003, #98)
  * 예수금과 그 계산식의 항목(사이클 자본, 투자 중, 이번 사이클 순실현손실), 계좌 현금,
@@ -222,7 +230,9 @@ export function nominalTierAmount(state: CycleState, tier: number): number {
  * - 보유 중인 기본 티어: 비율대로의 금액 (사이클 자본 × 비율)
  * - 아직 안 산 기본 티어: 지금 사면 쓰일 금액 min(사이클 자본 × 비율, 예수금).
  *   비율대로의 금액보다 작으면 예수금 때문에 축소된 것이다.
- * - 예비 티어: 기본 티어 1-6이 모두 보유 중이면 예수금 전액, 아니면 0
+ * - 아직 안 산 예비 티어: 기본 티어 1-6이 모두 보유 중이면 예수금 전액, 아니면 0
+ * - 보유 중인 예비 티어: null. 매수 당시의 예수금 전액을 썼지만 그 금액은 저장되지 않고,
+ *   지금 남은 예수금은 매수 뒤의 잔액이라 할당 시드가 아니다.
  *
  * @param state - 사이클 상태
  * @returns 현금 내역
@@ -239,7 +249,7 @@ export function cashBreakdown(state: CycleState): CashBreakdown {
   }
   tiers.push({
     tier: RESERVE_TIER_NUMBER,
-    amount: lowestEmptyBaseTier(heldTiers) === null ? cash : 0,
+    amount: reserveTierAmount(heldTiers, cash),
     nominalAmount: null,
     isReduced: false,
   });

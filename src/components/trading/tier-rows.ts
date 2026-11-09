@@ -16,8 +16,8 @@ export interface TierRow {
   isReserveTier: boolean;
   // 전략 비율(%). 예비 티어는 0
   ratioPercent: number;
-  // 할당 시드 (cashBreakdown의 티어 금액)
-  allocatedSeed: number;
+  // 할당 시드 (cashBreakdown의 티어 금액). 보유 중인 예비 티어처럼 알 수 없으면 null
+  allocatedSeed: number | null;
   // 예수금 부족으로 비율보다 덜 사는 티어의 비율대로의 금액. 축소되지 않았으면 null
   reducedFrom: number | null;
 }
@@ -44,4 +44,19 @@ export function buildTierRows(
       reducedFrom: isReduced ? nominalAmount : null,
     };
   });
+}
+
+/**
+ * 표 아래 축소 안내에 보일 순실현손실 금액.
+ * 순실현손실로 예수금이 줄어 비율대로 못 사는 티어가 실제로 있을 때만 낸다 - 손실이 있어도
+ * 예수금이 남은 티어의 비율대로의 금액보다 크면 덜 사는 티어가 없어 안내가 틀린 말이 된다.
+ * 티어별 축소 여부는 cashBreakdown의 tiers가 정한다.
+ *
+ * @returns 안내할 순실현손실 금액. 안내하지 않으면 null
+ */
+export function reductionNotice(cash: CashBreakdown): number | null {
+  if (!cash.isCashReduced || !cash.tiers.some((tier) => tier.isReduced)) {
+    return null;
+  }
+  return cash.netRealizedLoss;
 }

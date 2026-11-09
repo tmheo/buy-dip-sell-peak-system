@@ -13,7 +13,7 @@ import type { TierHolding, Strategy } from "@/types/trading";
 import type { CashBreakdown } from "@/strategy";
 import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
 import { formatCurrency, getTierLabel } from "./format";
-import { buildTierRows, type TierRow } from "./tier-rows";
+import { buildTierRows, reductionNotice, type TierRow } from "./tier-rows";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
@@ -46,6 +46,9 @@ function ReducedBadge(): React.ReactElement {
 
 /** 할당 시드 금액. 축소된 티어는 비율대로의 금액을 지우고 실제 금액을 강조한다. */
 function AllocatedSeed({ row }: { row: TierRow }): React.ReactElement {
+  if (row.allocatedSeed === null) {
+    return <>-</>;
+  }
   if (row.reducedFrom === null) {
     return <>{formatCurrency(row.allocatedSeed)}</>;
   }
@@ -63,6 +66,7 @@ export default function TierHoldingsTable({
   cash,
 }: TierHoldingsTableProps): React.ReactElement {
   const tierData = buildTierRows(holdings, strategy, cash);
+  const noticeLoss = reductionNotice(cash);
 
   return (
     <div className="card bg-dark border-secondary mb-4">
@@ -185,11 +189,11 @@ export default function TierHoldingsTable({
           })}
         </div>
       </div>
-      {cash.isCashReduced && (
+      {noticeLoss !== null && (
         <div className="card-footer border-secondary">
           <small className="text-secondary" style={{ wordBreak: "keep-all" }}>
-            * 이번 사이클 순실현손실 {formatCurrency(cash.netRealizedLoss)}만큼 예수금이 줄어,
-            다음에 사는 티어가 비율보다 적게 삽니다.
+            * 이번 사이클 순실현손실 {formatCurrency(noticeLoss)}만큼 예수금이 줄어, 다음에 사는
+            티어가 비율보다 적게 삽니다.
           </small>
         </div>
       )}
