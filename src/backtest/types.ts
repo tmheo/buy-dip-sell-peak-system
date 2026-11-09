@@ -230,11 +230,11 @@ export interface DailySnapshot {
   close: number;
   // 수정종가 (주식분할, 배당 등 반영, 수익률 계산에 사용)
   adjClose: number;
-  // 현재 예수금
+  // 계좌 현금 (src/strategy의 accountCash, 예수금이 아니다)
   cash: number;
   // 보유 주식 총 가치 (수정종가 기준, 수익률 계산용)
   holdingsValue: number;
-  // 총 자산 (예수금 + 보유 주식 가치)
+  // 총 자산 (계좌 현금 + 보유 주식 가치)
   totalAsset: number;
   // 당일 거래 내역 (체결된 거래만)
   trades: TradeAction[];

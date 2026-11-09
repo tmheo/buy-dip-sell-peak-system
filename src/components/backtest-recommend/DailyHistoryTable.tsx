@@ -33,7 +33,7 @@ export default function DailyHistoryTable({
               <th className="text-center">거래</th>
               <th className="text-end">보유수량</th>
               <th className="text-end">보유금액</th>
-              <th className="text-end">예수금</th>
+              <th className="text-end">계좌 현금</th>
               <th className="text-end">총자산</th>
               <th className="text-end">수익률</th>
               <th className="text-end">MDD</th>
