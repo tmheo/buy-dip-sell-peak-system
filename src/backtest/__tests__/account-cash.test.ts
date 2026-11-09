@@ -22,26 +22,25 @@ const MIN_FULL_PERIOD_DAYS = 4000;
 
 describe("SOXL 전체 기간 - 계좌 현금보다 큰 매수 주문", () => {
   let prices: DailyPrice[] = [];
-  let hasData = false;
+  // 데이터가 없으면 통과가 아니라 건너뜀으로 보고한다. CI는 DB는 있지만 가격 테이블이
+  // 비어 있으므로 실패로 처리하지 않는다.
+  let skipReason: string | null = null;
 
   beforeAll(async () => {
     try {
       prices = await getAllPricesByTicker("SOXL");
-      hasData = prices.length >= MIN_FULL_PERIOD_DAYS;
-      if (!hasData) {
-        console.log(
-          `[INFO] 계좌 현금 테스트 건너뜀: 가격 데이터 부족 (${prices.length}일 / 최소 ${MIN_FULL_PERIOD_DAYS}일 필요)`
-        );
+      if (prices.length < MIN_FULL_PERIOD_DAYS) {
+        skipReason = `가격 데이터 부족 (${prices.length}일 / 최소 ${MIN_FULL_PERIOD_DAYS}일 필요)`;
       }
     } catch {
-      console.log("[INFO] 계좌 현금 테스트 건너뜀: 데이터베이스 접근 불가");
+      skipReason = "데이터베이스 접근 불가";
     }
   });
 
-  it.each(STRATEGIES)(
+  it.for(STRATEGIES)(
     "%s: 매수 주문 금액이 전일 마감 계좌 현금을 넘는 날이 없어야 한다",
-    async (strategy) => {
-      if (!hasData) return;
+    async (strategy, { skip }) => {
+      if (skipReason) skip(skipReason);
 
       const result = await new BacktestEngine(strategy).run(
         {
