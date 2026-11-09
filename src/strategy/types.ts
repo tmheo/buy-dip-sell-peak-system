@@ -185,9 +185,9 @@ export interface BaseTierCash {
  * 화면이 예수금과 티어 금액을 직접 계산하지 않도록 규칙 모듈이 한 번에 내준다.
  */
 export interface CashBreakdown {
-  // 예수금: max(0, min(사이클 자본 - Σ 활성 티어 매수금액, 계좌 현금))
+  // 예수금 (공식은 calculations.ts의 availableCash, ADR-0003)
   availableCash: number;
-  // 계좌 현금: 사이클 자본 - Σ 활성 티어 매수금액 + 이번 사이클 실현손익
+  // 계좌 현금 (공식은 calculations.ts의 accountCash, ADR-0003)
   accountCash: number;
   // 이번 사이클 순실현손실 (양수, 손실이 없으면 0)
   netRealizedLoss: number;
