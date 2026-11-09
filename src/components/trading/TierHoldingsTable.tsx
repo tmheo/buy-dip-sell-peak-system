@@ -18,7 +18,7 @@ interface TierHoldingsTableProps {
   holdings: TierHolding[];
   seedCapital: number;
   strategy: Strategy;
-  cashBalance: number;
+  availableCash: number;
 }
 
 function formatCurrency(value: number | null): string {
@@ -61,7 +61,7 @@ export default function TierHoldingsTable({
   holdings,
   seedCapital,
   strategy,
-  cashBalance,
+  availableCash,
 }: TierHoldingsTableProps): React.ReactElement {
   // 티어 비율은 src/strategy의 전략 파라미터 표가 단일 소유한다 (#43)
   const ratios = getStrategyParams(strategy).tierRatios;
@@ -83,7 +83,7 @@ export default function TierHoldingsTable({
     const ratioPercent = isReserveTier ? 0 : ratios[tier - 1] * 100;
     const allocatedSeed = isReserveTier
       ? allMainTiersFilled
-        ? cashBalance
+        ? availableCash
         : 0
       : seedCapital * ratios[tier - 1];
     const hasShares = holding && holding.shares > 0;

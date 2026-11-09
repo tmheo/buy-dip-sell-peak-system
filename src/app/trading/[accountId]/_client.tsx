@@ -43,7 +43,7 @@ interface AssetValues {
   totalAssets: number;
   totalShares: number;
   stockValue: number;
-  cashBalance: number;
+  availableCash: number;
   profitRate: number;
 }
 
@@ -65,13 +65,11 @@ function calculateAssetValues(
     return sum;
   }, 0);
 
-  const cashBalance = cash.availableCash;
-
   return {
-    totalAssets: cashBalance + investedAmount,
+    totalAssets: cash.availableCash + investedAmount,
     totalShares: account.totalShares,
     stockValue: investedAmount,
-    cashBalance,
+    availableCash: cash.availableCash,
     profitRate: 0, // 실시간 시세 연동 전까지 수익률 0%
   };
 }
@@ -226,7 +224,7 @@ export default function TradingDetailClient({
         totalAssets={assetValues.totalAssets}
         totalShares={assetValues.totalShares}
         stockValue={assetValues.stockValue}
-        cashBalance={assetValues.cashBalance}
+        availableCash={assetValues.availableCash}
         profitRate={assetValues.profitRate}
         ticker={account.ticker}
       />
@@ -236,7 +234,7 @@ export default function TradingDetailClient({
         holdings={account.holdings}
         seedCapital={account.seedCapital}
         strategy={account.strategy}
-        cashBalance={assetValues.cashBalance}
+        availableCash={assetValues.availableCash}
       />
 
       {/* Daily Orders Section */}
