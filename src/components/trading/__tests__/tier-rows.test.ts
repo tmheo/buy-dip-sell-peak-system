@@ -117,11 +117,16 @@ describe("buildTierRows", () => {
 });
 
 describe("reductionNotice - 표 아래 축소 안내", () => {
-  it("순실현손실로 비율보다 덜 사는 티어가 있으면 손실 금액과 함께 안내한다", () => {
-    expect(reductionNotice(reducedCash())).toBe(
-      "이번 사이클 순실현손실 $400.00만큼 예수금이 줄어, 축소 표시된 티어는 비율보다 적게 삽니다. " +
-        "앞 티어를 비율대로 산다고 쳤을 때의 금액입니다."
+  /** #108이 정한 안내 문구. 순실현손실 금액만 상황마다 다르다 */
+  function expectedNotice(loss: string): string {
+    return (
+      `이번 사이클 순실현손실 ${loss}만큼 예수금이 줄어, 축소 표시된 티어는 비율보다 적게 삽니다. ` +
+      "앞 티어를 비율대로 산다고 쳤을 때의 금액입니다."
     );
+  }
+
+  it("순실현손실로 비율보다 덜 사는 티어가 있으면 손실 금액과 함께 안내한다", () => {
+    expect(reductionNotice(reducedCash())).toBe(expectedNotice("$400.00"));
   });
 
   it("첫 번째로 살 티어는 비율대로 사고 뒤 티어만 줄어도 안내한다 (#108)", () => {
@@ -138,7 +143,7 @@ describe("reductionNotice - 표 아래 축소 안내", () => {
       }),
     });
 
-    expect(reductionNotice(laterReduced)).toContain("순실현손실 $3,000.00만큼");
+    expect(reductionNotice(laterReduced)).toBe(expectedNotice("$3,000.00"));
   });
 
   it("순실현손실이 있어도 모든 티어가 비율대로 사면 안내하지 않는다", () => {

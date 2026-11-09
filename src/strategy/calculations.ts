@@ -245,7 +245,6 @@ export function cashBreakdown(state: CycleState): CashBreakdown {
   const heldTiers = new Set(state.holdings.map((h) => h.tier));
   const cash = availableCash(state);
 
-  // 안 산 기본 티어는 번호 순서(nextBuyTier가 사는 순서)대로 산다고 치고 남은 예수금에서 뺀다
   let remainingCash = new Decimal(cash);
   const tiers: TierCash[] = [];
   for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {

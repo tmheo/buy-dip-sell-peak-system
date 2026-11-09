@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { accountCash, availableCash, cashBreakdown, planOrders, settle } from "@/strategy";
+import { nextBuyTier, tierAmount } from "../calculations";
 import { createHolding, createState, sellOrder } from "./fixtures";
 
 describe("availableCash / accountCash - 사이클 안 실현손익", () => {
@@ -166,6 +167,53 @@ describe("cashBreakdown - 화면용 현금 내역", () => {
       { tier: 6, amount: 0, isReduced: true },
       { tier: 7, amount: 0, isReduced: false },
     ]);
+  });
+
+  it.each([
+    {
+      name: "티어 1-4 보유, 순실현손실 1,800",
+      state: createState({
+        holdings: [
+          createHolding({ tier: 1, buyPrice: 10, shares: 100 }),
+          createHolding({ tier: 2, buyPrice: 10, shares: 150 }),
+          createHolding({ tier: 3, buyPrice: 10, shares: 200 }),
+          createHolding({ tier: 4, buyPrice: 10, shares: 250 }),
+        ],
+        realizedPnl: -1800,
+      }),
+    },
+    {
+      name: "#108의 실계좌 예",
+      state: createState({
+        cycleCapital: 54938.44,
+        holdings: [
+          createHolding({ tier: 1, buyPrice: 45.78, shares: 120 }),
+          createHolding({ tier: 2, buyPrice: 43.45, shares: 189 }),
+          createHolding({ tier: 3, buyPrice: 240.07, shares: 32 }),
+        ],
+        realizedPnl: -13673.3,
+      }),
+    },
+    {
+      name: "손절된 티어 1이 비고 티어 2-6 보유, 순실현손실 300",
+      state: createState({
+        holdings: [
+          createHolding({ tier: 2, buyPrice: 10, shares: 150 }),
+          createHolding({ tier: 3, buyPrice: 10, shares: 200 }),
+          createHolding({ tier: 4, buyPrice: 10, shares: 250 }),
+          createHolding({ tier: 5, buyPrice: 10, shares: 200 }),
+          createHolding({ tier: 6, buyPrice: 10, shares: 100 }),
+        ],
+        realizedPnl: -300,
+      }),
+    },
+  ])("첫 번째로 살 티어의 금액은 오늘 주문표의 티어 금액과 같아야 한다 ($name)", ({ state }) => {
+    const firstTier = nextBuyTier(state);
+    if (firstTier === null) throw new Error("살 티어가 없는 상태");
+
+    const firstTierCash = cashBreakdown(state).tiers.find((t) => t.tier === firstTier);
+
+    expect(firstTierCash?.amount).toBe(tierAmount(state, firstTier));
   });
 
   it("손실이 없으면 티어를 보유 중이어도 안 산 티어가 모두 비율대로의 금액이어야 한다", () => {

@@ -175,10 +175,7 @@ export interface SettleResult {
 export interface TierCash {
   // 티어 번호 (1-7)
   tier: number;
-  // 할당 시드: 보유 중인 기본 티어는 사이클 자본 × 비율, 아직 안 산 기본 티어는 앞 티어부터
-  // 차례로 산다고 쳤을 때의 금액 min(사이클 자본 × 비율, 남은 예수금) (#108), 아직 안 산 예비
-  // 티어는 기본 티어 1-6이 모두 보유 중이면 예수금 전액, 아니면 0. 보유 중인 예비 티어는 매수
-  // 당시 금액이 저장되지 않아 null
+  // 할당 시드. 티어마다 어떤 값인지는 cashBreakdown 참고. 보유 중인 예비 티어는 null
   amount: number | null;
   // 비율대로의 금액: 사이클 자본 × 비율. 예비 티어는 비율이 없어 null
   nominalAmount: number | null;
