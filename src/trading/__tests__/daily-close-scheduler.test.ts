@@ -118,7 +118,7 @@ describe("processDailyClose - 활성 계좌 판정", () => {
     expect(mockedGetTradingAccountById).toHaveBeenCalledWith("b");
     expect(mockedGetActiveTradingAccounts).not.toHaveBeenCalled();
     expect(mockedProcessHistoricalOrders).toHaveBeenCalledOnce();
-    expect(mockedProcessHistoricalOrders.mock.calls[0][0]).toBe("b");
+    expect(mockedProcessHistoricalOrders.mock.calls[0][0].id).toBe("b");
   });
 
   it("지정한 accountId의 계좌가 없으면 아무것도 처리하지 않고 알린다", async () => {
@@ -211,33 +211,9 @@ describe("processDailyClose - 시간 예산", () => {
 
     await processDailyClose();
 
-    const [
-      accountId,
-      cycleStartDate,
-      lastProcessedDate,
-      today,
-      ticker,
-      strategy,
-      seedCapital,
-      deadline,
-    ] = mockedProcessHistoricalOrders.mock.calls[0];
+    const [account, today, deadline] = mockedProcessHistoricalOrders.mock.calls[0];
     expect(deadline).toBe(START_TIME + TIME_BUDGET_MS);
-    expect({
-      accountId,
-      cycleStartDate,
-      lastProcessedDate,
-      today,
-      ticker,
-      strategy,
-      seedCapital,
-    }).toEqual({
-      accountId: "a",
-      cycleStartDate: "2026-07-01",
-      lastProcessedDate: "2026-07-13",
-      today: TODAY,
-      ticker: "SOXL",
-      strategy: "Pro2",
-      seedCapital: 100_000,
-    });
+    expect(today).toBe(TODAY);
+    expect(account).toEqual(createAccount("a"));
   });
 });

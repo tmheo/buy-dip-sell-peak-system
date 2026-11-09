@@ -126,7 +126,7 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 | **지표(`daily_metrics`)** | 가격 보정 후 **전체 재계산** | 부분 재계산은 경계 오염 위험, 전체 재계산이 안전 |
 | **보유(`tier_holdings`)** | 보유 티어(`shares > 0`)만: `shares × R`, `buyPrice ÷ R`, `sellTargetPrice` 재계산, **`buyDate` 유지** | `buyDate` 유지로 손절일 카운트 보존 |
 | **거래 기록(`profit_records`)** | `buyPrice ÷ R`, `sellPrice ÷ R`, `buyQuantity × R` | `buyAmount/sellAmount/profit/profitRate` **불변**(검증 포인트) |
-| **일일 주문(`daily_orders`)** | 분할일 전후 주문 삭제 후 재생성 | `deleteDailyOrders(accountId, date)` 활용 |
+| **일일 주문(`daily_orders`)** | 미체결 주문은 주문표 신선도 판정이 자동으로 다시 만든다 | 가격·보유 보정 후 다시 계산한 주문과 달라지므로 낡은 것으로 판정된다 (#96) |
 
 > **무손실 원칙**: 분할은 자산 가치 중립이다. 보정 후 `shares × buyPrice`(티어별 투자원금),
 > 계정 총 평가금액, 누적 달러 손익이 **분할 전과 동일해야 한다**. 이는 사후 검증의 핵심
@@ -196,11 +196,21 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 - [ ] `buyAmount/sellAmount/profit/profitRate`는 **변경하지 않고**, 보정 후에도 동일한지 검증.
 
 ### (5) `daily_orders` 정리
-- [ ] 분할일 전후의 미체결 주문 삭제: `deleteDailyOrders(accountId, date)`
-      (`src/database/trading/orders.ts`).
+- [ ] 체결된 주문이 하나도 없는 날짜의 주문표는 지우지 않아도 된다: 가격·보유 보정 뒤 화면 진입이나
+      일일 마감이 체결 전에 주문표 신선도 판정을 거쳐, 다시 계산한 주문과 다르면 교체한다
+      (`src/trading/orders.ts`의 `refreshDailyOrders`, #96).
+- [ ] **체결·미체결이 섞인 날짜 보정**: 체결된 주문이 하나라도 있는 날짜의 주문표는 신선도 판정이
+      교체하지 않는다(체결 결과가 이미 보유와 수익 기록에 반영됐다). 그대로 두면 분할 전 종가로
+      만든 미체결 매수 LOC가 보정되지 않은 지정가로 남아, 분할 반영된 종가에 체결될 수 있다.
+      이런 날짜는 체결된 행은 그대로 두고 미체결 행만 손으로 고친다:
+  - `limitPrice ← limitPrice ÷ R`
+  - `shares ← shares × R`
 - [ ] **부분 체결 주문 확인**: 분할 시점에 일부만 체결된 매수/매도 주문이 있었다면, 체결된 수량이
       `tier_holdings`에 올바르게 반영되었는지 확인하고 **분할 비율(`× R`)로 보정**한다. 단순
       삭제만으로는 체결 이력과 실제 보유 수량 간 불일치가 남을 수 있다.
+- [ ] **실행 순서**: 위 보정을 포함한 (3)~(5) 전체를 다음 일일 마감이나 화면 진입보다 먼저 끝낸다
+      (예: 유지보수 시간대). 그 전에 체결 처리가 돌면 보정되지 않은 보유·주문표로 분할 반영된
+      종가에 체결된다.
 - [ ] 다음 크론 실행 또는 화면 진입 시 보정된 보유/가격 기준으로 주문이 재생성되는지 확인.
 
 ### (6) 사후 검증
@@ -262,6 +272,6 @@ const sellPrice = calculateSellLimitPrice(holding.buyPrice, sellThreshold);
 | CLI | `src/index.ts` - `init`/`update`(`--force` 가드 우회), `init-metrics` |
 | 보유 보정 | `src/database/trading/tier-holdings.ts` — `updateTierHolding`, `getTierHoldings` |
 | 주문 생성 조율 | `src/trading/orders.ts` - `generateDailyOrders`, `calculateSellLimitPrice` |
-| 주문 저장/정리 | `src/database/trading/orders.ts` - `deleteDailyOrders`, `replaceDailyOrders`, `getClosingPrice` |
+| 주문 저장/정리 | `src/database/trading/orders.ts` - `replaceDailyOrders`, `getClosingPrice` |
 | 거래 기록 | `src/database/trading/profits.ts` |
 | 전략 상수 | `src/types/trading.ts` — `SELL_THRESHOLDS`, `STOP_LOSS_DAYS` 등 |

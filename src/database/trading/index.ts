@@ -42,14 +42,14 @@ export {
 // DailyOrder CRUD
 export {
   getDailyOrders,
+  hasExecutedOrdersAfter,
+  lockDailyOrders,
   createDailyOrder,
   updateOrderExecuted,
   getClosingPrice,
   getPreviousTradingClose,
   listTradingDatesBetween,
-  deleteDailyOrders,
   replaceDailyOrders,
-  hasNewerPriceSince,
 } from "./orders";
 export type { NewDailyOrder } from "./orders";
 

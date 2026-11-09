@@ -12,7 +12,7 @@ import {
   type RouteParams,
 } from "@/lib/api-utils";
 import { getTradingAccountById } from "@/database/trading";
-import { getOrCreateDailyOrders, processOrderExecution } from "@/trading";
+import { getFreshDailyOrders, processOrderExecution } from "@/trading";
 
 /**
  * GET /api/trading/accounts/[id]/orders
@@ -44,7 +44,7 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  const orders = await getOrCreateDailyOrders(account, date);
+  const orders = await getFreshDailyOrders(account, date);
 
   return NextResponse.json({
     date,
@@ -81,7 +81,7 @@ export async function POST(request: Request, { params }: RouteParams): Promise<N
   }
 
   // 주문 체결 처리
-  const results = await processOrderExecution(id, date, account.ticker);
+  const results = await processOrderExecution(id, date);
 
   return NextResponse.json({
     date,
