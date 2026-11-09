@@ -37,8 +37,8 @@ describe("calculateAssetValues", () => {
   });
 
   it("평가금은 소수 둘째 자리에서 내림한다", () => {
-    // 10.0039 × 3 = 30.0117 → $30.01 (반올림이면 $30.02)
-    const values = calculateAssetValues(3, CASH, { date: "2026-04-06", adjClose: 10.0039 });
+    // 10.0066 × 3 = 30.0198 → $30.01 (반올림이면 $30.02)
+    const values = calculateAssetValues(3, CASH, { date: "2026-04-06", adjClose: 10.0066 });
 
     expect(values.stockValue).toBe(30.01);
   });
@@ -66,6 +66,8 @@ describe("calculateAssetValues", () => {
     });
 
     expect(values.totalAssets).toBe(10_500);
+    // 현금 비율도 예수금($5,600)이 아니라 계좌 현금 기준: 5,700 ÷ 10,500 = 54.29%
+    expect(values.cashRatio).toBeCloseTo(54.2857, 2);
   });
 
   it("보유가 없으면 종가가 없어도 평가금은 0이고 현금 100%다", () => {

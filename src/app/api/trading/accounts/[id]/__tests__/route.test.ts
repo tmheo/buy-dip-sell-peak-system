@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { randomUUID } from "crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -126,23 +126,25 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
 
   it("평가금 계산에 쓸 저장된 가장 최근 종가와 그 날짜를 돌려줘야 한다 (#98)", async () => {
     mockLoggedIn(OWNER_ID);
-    // CI 시험용 DB에는 시세가 없으므로 SOXL 상장(2010-03-11) 이전 날짜에 합성 종가를 넣는다.
+    // CI 시험용 DB에는 시세가 없으므로 SOXL 상장(2010-03-11) 이전 날짜에 날짜와 종가가 다른
+    // 합성 시세 두 행을 넣는다 - 한 행뿐이면 정렬 방향이 뒤집혀도 통과한다.
     // 실데이터가 있으면 그쪽이 더 최근이라 응답은 실데이터의 최근 종가와 같아야 한다.
+    const synthetic = (date: string, price: number) => ({
+      ticker: "SOXL" as const,
+      date,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+      adjClose: price,
+      volume: 1000,
+    });
     const inserted = await db
       .insert(schema.dailyPrices)
-      .values({
-        ticker: "SOXL",
-        date: "2009-06-03",
-        open: 12.34,
-        high: 12.34,
-        low: 12.34,
-        close: 12.34,
-        adjClose: 12.34,
-        volume: 1000,
-      })
+      .values([synthetic("2009-06-02", 11.11), synthetic("2009-06-03", 12.34)])
       .onConflictDoNothing()
       .returning({ id: schema.dailyPrices.id });
-    const syntheticPriceId = inserted[0]?.id;
+    const syntheticPriceIds = inserted.map((row) => row.id);
 
     try {
       const latest = await db.execute<{ date: string; adj_close: number }>(
@@ -159,9 +161,11 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         adjClose: Number(latest[0].adj_close),
       });
     } finally {
-      // 삽입이 건너뛰어졌다면(같은 행이 이미 있음) 기존 데이터를 보존한다
-      if (syntheticPriceId !== undefined) {
-        await db.delete(schema.dailyPrices).where(eq(schema.dailyPrices.id, syntheticPriceId));
+      // 삽입이 건너뛰어진 행(같은 행이 이미 있음)은 기존 데이터라 보존한다
+      if (syntheticPriceIds.length > 0) {
+        await db
+          .delete(schema.dailyPrices)
+          .where(inArray(schema.dailyPrices.id, syntheticPriceIds));
       }
     }
   });

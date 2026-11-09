@@ -19,10 +19,32 @@ const TIERS_1_TO_5 = [1, 2, 3, 4, 5].map((tier, i) =>
 );
 
 describe("planOrdersDetailed - 주문표", () => {
-  it("주문 의도는 planOrders와 같아야 한다", () => {
+  it("예수금으로 덜 사는 매수와 보유 티어의 매도를 주문 의도로 내야 한다", () => {
+    // 예수금 = 1,000 - 700 = 300 → 티어 6을 지정가 99.99(직전 종가 -0.01%)로 3주.
+    // 티어 1-5는 매수가 100의 +1.5%인 101.5에 전량 매도
     const state = createState({ holdings: TIERS_1_TO_5, realizedPnl: -700 });
 
-    expect(planOrdersDetailed(state, 100).intents).toEqual(planOrders(state, 100));
+    const sell = (tier: number, shares: number) => ({
+      type: "SELL",
+      tier,
+      orderMethod: "LOC",
+      limitPrice: 101.5,
+      shares,
+    });
+    expect(planOrdersDetailed(state, 100).intents).toEqual([
+      { type: "BUY", tier: 6, orderMethod: "LOC", limitPrice: 99.99, shares: 3 },
+      sell(1, 10),
+      sell(2, 15),
+      sell(3, 20),
+      sell(4, 25),
+      sell(5, 20),
+    ]);
+  });
+
+  it("planOrders는 같은 주문 의도를 내야 한다", () => {
+    const state = createState({ holdings: TIERS_1_TO_5, realizedPnl: -700 });
+
+    expect(planOrders(state, 100)).toEqual(planOrdersDetailed(state, 100).intents);
   });
 });
 

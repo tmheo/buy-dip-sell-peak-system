@@ -370,6 +370,18 @@ describe("getFreshDailyOrders - 예수금으로 1주도 살 수 없는 날 (#98)
     ]);
   });
 
+  it("저장된 주문표가 지금 다시 만든 것과 같으면 그대로 두고도 알린다", async () => {
+    const stored = storedOrders([FRESH_ROWS[0]]);
+    mockedGetDailyOrders.mockResolvedValue(stored);
+    mockedGetCycleRealizedPnl.mockResolvedValue(-89_990);
+
+    const { orders, unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(unaffordableBuy).toEqual({ tier: 2, availableCash: 26 });
+    expect(orders).toBe(stored);
+    expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
+  });
+
   it("매수 주문이 나가는 날에는 알리지 않는다", async () => {
     mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
 
@@ -404,6 +416,21 @@ describe("getFreshDailyOrders - 예수금 때문에 비율대로보다 덜 사�
       { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
       { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 48.72, shares: 208 },
     ]);
+  });
+
+  it("저장된 주문표가 지금 다시 만든 것과 같으면 그대로 두고도 알린다", async () => {
+    const stored = storedOrders([
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+      FRESH_ROWS[0],
+    ]);
+    mockedGetDailyOrders.mockResolvedValue(stored);
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    const { orders, reducedBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(reducedBuy).toEqual({ tier: 2, nominalShares: 300 });
+    expect(orders).toBe(stored);
+    expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
   });
 
   it("비율대로 사는 날에는 알리지 않는다", async () => {
