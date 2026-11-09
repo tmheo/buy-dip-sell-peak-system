@@ -111,14 +111,15 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
       investedAmount: 1_000,
       netRealizedLoss: 7_500,
       isCashReduced: true,
-      // 할당 시드: 보유 중인 티어 1은 비율대로, 아직 안 산 티어는 min(10,000 × 비율, 1,500)
+      // 할당 시드: 보유 중인 티어 1은 비율대로, 아직 안 산 티어는 앞 티어부터 차례로 산다고 친
+      // 금액(#108) - 티어 2가 비율대로 1,500을 사면 남은 예수금이 없다
       tiers: [
         { tier: 1, amount: 1_000, nominalAmount: 1_000, isReduced: false },
         { tier: 2, amount: 1_500, nominalAmount: 1_500, isReduced: false },
-        { tier: 3, amount: 1_500, nominalAmount: 2_000, isReduced: true },
-        { tier: 4, amount: 1_500, nominalAmount: 2_500, isReduced: true },
-        { tier: 5, amount: 1_500, nominalAmount: 2_000, isReduced: true },
-        { tier: 6, amount: 1_000, nominalAmount: 1_000, isReduced: false },
+        { tier: 3, amount: 0, nominalAmount: 2_000, isReduced: true },
+        { tier: 4, amount: 0, nominalAmount: 2_500, isReduced: true },
+        { tier: 5, amount: 0, nominalAmount: 2_000, isReduced: true },
+        { tier: 6, amount: 0, nominalAmount: 1_000, isReduced: true },
         { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
     });

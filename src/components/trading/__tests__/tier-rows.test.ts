@@ -117,8 +117,33 @@ describe("buildTierRows", () => {
 });
 
 describe("reductionNotice - 표 아래 축소 안내", () => {
-  it("순실현손실로 비율보다 덜 사는 티어가 있으면 그 손실 금액을 낸다", () => {
-    expect(reductionNotice(reducedCash())).toBe(400);
+  /** #108이 정한 안내 문구. 순실현손실 금액만 상황마다 다르다 */
+  function expectedNotice(loss: string): string {
+    return (
+      `이번 사이클 순실현손실 ${loss}만큼 예수금이 줄어, 축소 표시된 티어는 비율보다 적게 삽니다. ` +
+      "앞 티어를 비율대로 산다고 쳤을 때의 금액입니다."
+    );
+  }
+
+  it("순실현손실로 비율보다 덜 사는 티어가 있으면 손실 금액과 함께 안내한다", () => {
+    expect(reductionNotice(reducedCash())).toBe(expectedNotice("$400.00"));
+  });
+
+  it("첫 번째로 살 티어는 비율대로 사고 뒤 티어만 줄어도 안내한다 (#108)", () => {
+    // 티어 1-3 보유(투자 중 $4,500), 순실현손실 $3,000 → 예수금 $2,500.
+    // 티어 4가 비율대로 $2,500을 사고 나면 티어 5, 6은 남은 예수금이 없다.
+    const laterReduced = reducedCash({
+      availableCash: 2_500,
+      accountCash: 2_500,
+      investedAmount: 4_500,
+      netRealizedLoss: 3_000,
+      tiers: tiers({
+        5: { amount: 0, isReduced: true },
+        6: { amount: 0, isReduced: true },
+      }),
+    });
+
+    expect(reductionNotice(laterReduced)).toBe(expectedNotice("$3,000.00"));
   });
 
   it("순실현손실이 있어도 모든 티어가 비율대로 사면 안내하지 않는다", () => {

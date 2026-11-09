@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { accountCash, availableCash, cashBreakdown, planOrders, settle } from "@/strategy";
+import { nextBuyTier, tierAmount } from "../calculations";
 import { createHolding, createState, sellOrder } from "./fixtures";
 
 describe("availableCash / accountCash - 사이클 안 실현손익", () => {
@@ -110,13 +111,129 @@ describe("cashBreakdown - 화면용 현금 내역", () => {
         { tier: 2, amount: 1500, nominalAmount: 1500, isReduced: false },
         { tier: 3, amount: 2000, nominalAmount: 2000, isReduced: false },
         { tier: 4, amount: 2500, nominalAmount: 2500, isReduced: false },
-        // 아직 안 산 티어는 지금 사면 쓰일 금액: 티어 5 min(2000, 1200), 티어 6 min(1000, 1200)
+        // 아직 안 산 티어는 앞 티어부터 차례로 산다고 친 금액: 티어 5가 min(2000, 1200)으로
+        // 예수금을 다 쓰고, 티어 6은 남은 예수금 0
         { tier: 5, amount: 1200, nominalAmount: 2000, isReduced: true },
-        { tier: 6, amount: 1000, nominalAmount: 1000, isReduced: false },
+        { tier: 6, amount: 0, nominalAmount: 1000, isReduced: true },
         // 예비 티어는 기본 티어 1-6이 다 차기 전에는 할당이 없다
         { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
     });
+  });
+
+  it("안 산 티어가 여럿이면 첫 티어는 비율대로 사고 남은 예수금으로 뒤 티어를 차례로 줄여야 한다", () => {
+    // #108의 실계좌 예: 시드 $54,938.44, Pro2 비율 10/15/20/25/20/10%, 티어 1-3 보유
+    // (5,493.60 + 8,212.05 + 7,682.24 = 21,387.89), 순실현손실 13,673.30
+    // → 예수금 = 54,938.44 - 21,387.89 - 13,673.30 = 19,877.25
+    const holdings = [
+      createHolding({ tier: 1, buyPrice: 45.78, shares: 120 }),
+      createHolding({ tier: 2, buyPrice: 43.45, shares: 189 }),
+      createHolding({ tier: 3, buyPrice: 240.07, shares: 32 }),
+    ];
+    const breakdown = cashBreakdown(
+      createState({ cycleCapital: 54938.44, holdings, realizedPnl: -13673.3 })
+    );
+
+    expect(breakdown.availableCash).toBe(19877.25);
+    expect(breakdown.tiers.slice(3, 6)).toEqual([
+      // 첫 번째로 살 티어는 오늘 주문표의 금액(tierAmount)과 같다: min(13,734.61, 19,877.25)
+      { tier: 4, amount: 13734.61, nominalAmount: 13734.61, isReduced: false },
+      // 남은 예수금 19,877.25 - 13,734.61 = 6,142.64
+      { tier: 5, amount: 6142.64, nominalAmount: 10987.68, isReduced: true },
+      // 남은 예수금 0
+      { tier: 6, amount: 0, nominalAmount: 5493.84, isReduced: true },
+    ]);
+  });
+
+  it("손절된 앞쪽 티어가 비어 있으면 그 티어부터 차례로 산다고 쳐야 한다", () => {
+    // 티어 1은 손절되어 비고 티어 2-3 보유(1,500 + 2,000 = 3,500), 순실현손실 5,000
+    // → 예수금 = min(6,500, 10,000 - 3,500 - 5,000) = 1,500
+    const holdings = [
+      createHolding({ tier: 2, buyPrice: 10, shares: 150 }),
+      createHolding({ tier: 3, buyPrice: 10, shares: 200 }),
+    ];
+    const breakdown = cashBreakdown(createState({ holdings, realizedPnl: -5000 }));
+
+    expect(breakdown.availableCash).toBe(1500);
+    expect(
+      breakdown.tiers.map(({ tier, amount, isReduced }) => ({ tier, amount, isReduced }))
+    ).toEqual([
+      // 티어 1이 비율대로 1,000을 사고, 남은 500을 티어 4가 쓴다
+      { tier: 1, amount: 1000, isReduced: false },
+      { tier: 2, amount: 1500, isReduced: false },
+      { tier: 3, amount: 2000, isReduced: false },
+      { tier: 4, amount: 500, isReduced: true },
+      { tier: 5, amount: 0, isReduced: true },
+      { tier: 6, amount: 0, isReduced: true },
+      { tier: 7, amount: 0, isReduced: false },
+    ]);
+  });
+
+  it.each([
+    {
+      name: "티어 1-4 보유, 순실현손실 1,800",
+      state: createState({
+        holdings: [
+          createHolding({ tier: 1, buyPrice: 10, shares: 100 }),
+          createHolding({ tier: 2, buyPrice: 10, shares: 150 }),
+          createHolding({ tier: 3, buyPrice: 10, shares: 200 }),
+          createHolding({ tier: 4, buyPrice: 10, shares: 250 }),
+        ],
+        realizedPnl: -1800,
+      }),
+    },
+    {
+      name: "#108의 실계좌 예",
+      state: createState({
+        cycleCapital: 54938.44,
+        holdings: [
+          createHolding({ tier: 1, buyPrice: 45.78, shares: 120 }),
+          createHolding({ tier: 2, buyPrice: 43.45, shares: 189 }),
+          createHolding({ tier: 3, buyPrice: 240.07, shares: 32 }),
+        ],
+        realizedPnl: -13673.3,
+      }),
+    },
+    {
+      name: "손절된 티어 1이 비고 티어 2-6 보유, 순실현손실 300",
+      state: createState({
+        holdings: [
+          createHolding({ tier: 2, buyPrice: 10, shares: 150 }),
+          createHolding({ tier: 3, buyPrice: 10, shares: 200 }),
+          createHolding({ tier: 4, buyPrice: 10, shares: 250 }),
+          createHolding({ tier: 5, buyPrice: 10, shares: 200 }),
+          createHolding({ tier: 6, buyPrice: 10, shares: 100 }),
+        ],
+        realizedPnl: -300,
+      }),
+    },
+  ])("첫 번째로 살 티어의 금액은 오늘 주문표의 티어 금액과 같아야 한다 ($name)", ({ state }) => {
+    const firstTier = nextBuyTier(state);
+    if (firstTier === null) throw new Error("살 티어가 없는 상태");
+
+    const firstTierCash = cashBreakdown(state).tiers.find((t) => t.tier === firstTier);
+
+    expect(firstTierCash?.amount).toBe(tierAmount(state, firstTier));
+  });
+
+  it("손실이 없으면 티어를 보유 중이어도 안 산 티어가 모두 비율대로의 금액이어야 한다", () => {
+    // 티어 1-2 보유(1,000 + 1,500), 실현손익 0 → 예수금 7,500 = 티어 3-6 비율대로의 합
+    const holdings = [
+      createHolding({ tier: 1, buyPrice: 10, shares: 100 }),
+      createHolding({ tier: 2, buyPrice: 10, shares: 150 }),
+    ];
+    const breakdown = cashBreakdown(createState({ holdings }));
+
+    expect(breakdown.availableCash).toBe(7500);
+    expect(breakdown.tiers.map(({ amount, isReduced }) => ({ amount, isReduced }))).toEqual([
+      { amount: 1000, isReduced: false },
+      { amount: 1500, isReduced: false },
+      { amount: 2000, isReduced: false },
+      { amount: 2500, isReduced: false },
+      { amount: 2000, isReduced: false },
+      { amount: 1000, isReduced: false },
+      { amount: 0, isReduced: false },
+    ]);
   });
 
   it("손실이 없으면 예수금이 줄지 않았고 기본 티어는 비율대로의 금액이어야 한다", () => {

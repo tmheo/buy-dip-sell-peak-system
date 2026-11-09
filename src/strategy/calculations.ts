@@ -228,7 +228,11 @@ function reserveTierAmount(heldTiers: Set<number>, cash: number): number | null 
  *
  * 할당 시드:
  * - 보유 중인 기본 티어: 비율대로의 금액 (사이클 자본 × 비율)
- * - 아직 안 산 기본 티어: 지금 사면 쓰일 금액 min(사이클 자본 × 비율, 예수금).
+ * - 아직 안 산 기본 티어: 앞 티어부터 번호 순서대로 산다고 쳤을 때의 금액 (#108).
+ *   남은 예수금을 지금 예수금에서 시작해, 티어마다 min(사이클 자본 × 비율, 남은 예수금)을
+ *   금액으로 하고 남은 예수금에서 뺀다. 같은 예수금을 여러 티어에 겹쳐 보이지 않기 위해서다.
+ *   첫 번째로 살 티어의 금액은 tierAmount와 같아 오늘의 주문표와 어긋나지 않는다.
+ *   실제 매수는 주 단위로 내림해 조금 덜 쓰므로, 뒤 티어는 실제로는 표시보다 조금 더 산다.
  *   비율대로의 금액보다 작으면 예수금 때문에 축소된 것이다.
  * - 아직 안 산 예비 티어: 기본 티어 1-6이 모두 보유 중이면 예수금 전액, 아니면 0
  * - 보유 중인 예비 티어: null. 매수 당시의 예수금 전액을 썼지만 그 금액은 저장되지 않고,
@@ -241,10 +245,15 @@ export function cashBreakdown(state: CycleState): CashBreakdown {
   const heldTiers = new Set(state.holdings.map((h) => h.tier));
   const cash = availableCash(state);
 
+  let remainingCash = new Decimal(cash);
   const tiers: TierCash[] = [];
   for (let tier = MIN_TIER_NUMBER; tier <= BASE_TIER_COUNT; tier++) {
     const nominalAmount = nominalTierAmount(state, tier);
-    const amount = heldTiers.has(tier) ? nominalAmount : tierAmount(state, tier);
+    let amount = nominalAmount;
+    if (!heldTiers.has(tier)) {
+      amount = Decimal.min(nominalAmount, remainingCash).toNumber();
+      remainingCash = remainingCash.sub(amount);
+    }
     tiers.push({ tier, amount, nominalAmount, isReduced: amount < nominalAmount });
   }
   tiers.push({

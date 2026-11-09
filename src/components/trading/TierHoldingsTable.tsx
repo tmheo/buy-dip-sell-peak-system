@@ -3,9 +3,9 @@
 /**
  * 티어별 보유 현황 테이블 컴포넌트
  *
- * 아직 안 산 티어의 할당 시드는 실제로 살 금액이고, 예수금 때문에 비율대로 못 사는 티어에는
- * "예수금 부족으로 축소"를 붙인다 (#98, ADR-0003, 결정은 #93). 데스크톱 표와 휴대폰 카드가 같은
- * 정보를 보인다.
+ * 아직 안 산 티어의 할당 시드는 cashBreakdown이 정한 금액을 그대로 보이고, 예수금 때문에 비율대로
+ * 못 사는 티어에는 "예수금 부족으로 축소"를 붙인다 (#98, ADR-0003, 결정은 #93). 데스크톱 표와
+ * 휴대폰 카드가 같은 정보를 보인다.
  */
 
 import type React from "react";
@@ -66,7 +66,7 @@ export default function TierHoldingsTable({
   cash,
 }: TierHoldingsTableProps): React.ReactElement {
   const tierData = buildTierRows(holdings, strategy, cash);
-  const noticeLoss = reductionNotice(cash);
+  const notice = reductionNotice(cash);
 
   return (
     <div className="card bg-dark border-secondary mb-4">
@@ -189,11 +189,10 @@ export default function TierHoldingsTable({
           })}
         </div>
       </div>
-      {noticeLoss !== null && (
+      {notice !== null && (
         <div className="card-footer border-secondary">
           <small className="text-secondary" style={{ wordBreak: "keep-all" }}>
-            * 이번 사이클 순실현손실 {formatCurrency(noticeLoss)}만큼 예수금이 줄어, 다음에 사는
-            티어가 비율보다 적게 삽니다.
+            * {notice}
           </small>
         </div>
       )}

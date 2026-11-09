@@ -8,6 +8,7 @@
 import type { CashBreakdown } from "@/strategy";
 import { RESERVE_TIER_NUMBER, getStrategyParams } from "@/strategy";
 import type { Strategy, TierHolding } from "@/types/trading";
+import { formatCurrency } from "./format";
 
 export interface TierRow {
   tier: number;
@@ -47,16 +48,22 @@ export function buildTierRows(
 }
 
 /**
- * 표 아래 축소 안내에 보일 순실현손실 금액.
+ * 표 아래 축소 안내 문구.
  * 순실현손실로 예수금이 줄어 비율대로 못 사는 티어가 실제로 있을 때만 낸다 - 손실이 있어도
  * 예수금이 남은 티어의 비율대로의 금액보다 크면 덜 사는 티어가 없어 안내가 틀린 말이 된다.
  * 티어별 축소 여부는 cashBreakdown의 tiers가 정한다.
  *
- * @returns 안내할 순실현손실 금액. 안내하지 않으면 null
+ * 첫 번째로 살 티어는 비율대로 사고 뒤 티어만 줄 수 있어서(cashBreakdown 참고), 문구는
+ * "다음에 사는 티어"가 아니라 축소 표시된 티어를 가리킨다.
+ *
+ * @returns 안내 문구. 안내하지 않으면 null
  */
-export function reductionNotice(cash: CashBreakdown): number | null {
+export function reductionNotice(cash: CashBreakdown): string | null {
   if (!cash.isCashReduced || !cash.tiers.some((tier) => tier.isReduced)) {
     return null;
   }
-  return cash.netRealizedLoss;
+  return (
+    `이번 사이클 순실현손실 ${formatCurrency(cash.netRealizedLoss)}만큼 예수금이 줄어, ` +
+    "축소 표시된 티어는 비율보다 적게 삽니다. 앞 티어를 비율대로 산다고 쳤을 때의 금액입니다."
+  );
 }
