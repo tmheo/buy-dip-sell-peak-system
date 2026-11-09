@@ -201,10 +201,34 @@ export interface CashBreakdown {
 /**
  * 예수금이 모자라 매수 주문을 내지 않는 티어 (#98)
  * 매수할 티어가 있지만 예수금으로 1주도 살 수 없는 날, 화면이 그 이유를 보이는 데 쓴다.
+ * 비율대로의 금액으로도 1주를 못 사는 날은 예수금 탓이 아니므로 해당하지 않는다.
  */
 export interface UnaffordableBuy {
   // 매수 차례인 티어 번호 (1-7)
   tier: number;
   // 그날의 예수금
   availableCash: number;
+}
+
+/**
+ * 예수금 때문에 비율대로의 수량보다 덜 사는 매수 주문 (#98)
+ * 화면이 그 주문의 수량을 ~~비율대로의 수량~~ 실제 수량으로 보이는 데 쓴다.
+ * 예비 티어는 비율이 없으므로 해당하지 않는다.
+ */
+export interface ReducedBuy {
+  // 매수 주문의 티어 번호 (1-6)
+  tier: number;
+  // 비율대로의 금액(사이클 자본 × 비율)으로 살 수량. 실제 수량은 주문 의도의 shares다
+  nominalShares: number;
+}
+
+/**
+ * planOrdersDetailed 결과 (#98)
+ * 주문 의도와, 그 주문표를 만든 같은 매수 판단에서 나온 "왜 덜 사거나 사지 않는가".
+ * 둘 중 많아야 하나만 있다 - 매수 주문이 없으면 reducedBuy가, 있으면 unaffordableBuy가 null이다.
+ */
+export interface DetailedOrderPlan {
+  intents: OrderIntent[];
+  unaffordableBuy: UnaffordableBuy | null;
+  reducedBuy: ReducedBuy | null;
 }

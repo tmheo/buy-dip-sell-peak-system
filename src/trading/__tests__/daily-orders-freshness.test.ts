@@ -388,3 +388,42 @@ describe("getFreshDailyOrders - 예수금으로 1주도 살 수 없는 날 (#98)
     expect(unaffordableBuy).toBeNull();
   });
 });
+
+describe("getFreshDailyOrders - 예수금 때문에 비율대로보다 덜 사는 날 (#98)", () => {
+  it("줄어든 수량으로 만든 주문표와 함께 그 티어의 비율대로의 수량을 알린다", async () => {
+    mockedGetDailyOrders.mockResolvedValue([]);
+    // 계좌 현금 = 100,000 - 9,984(티어 1) - 80,016 = $10,000 → 티어 2 금액 $10,000 (비율대로 $15,000)
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    const { reducedBuy, unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    // 비율대로 floor(15,000 ÷ 49.99) = 300주, 실제 floor(10,000 ÷ 49.99) = 200주
+    expect(reducedBuy).toEqual({ tier: 2, nominalShares: 300 });
+    expect(unaffordableBuy).toBeNull();
+    expect(mockedReplaceDailyOrders).toHaveBeenCalledWith(ACCOUNT_ID, DATE, [
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+      { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 48.72, shares: 208 },
+    ]);
+  });
+
+  it("비율대로 사는 날에는 알리지 않는다", async () => {
+    mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
+
+    const { reducedBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(reducedBuy).toBeNull();
+  });
+
+  it("체결된 주문이 있어 주문표를 다시 계산하지 않으면 알리지 않는다", async () => {
+    const reducedRows: NewDailyOrder[] = [
+      FRESH_ROWS[0],
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+    ];
+    mockedGetDailyOrders.mockResolvedValue(storedOrders(reducedRows, true));
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    const { reducedBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(reducedBuy).toBeNull();
+  });
+});

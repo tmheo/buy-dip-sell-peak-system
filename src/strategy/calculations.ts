@@ -193,8 +193,9 @@ export function tierAmount(state: CycleState, tier: number): number {
 
 /**
  * 기본 티어의 비율대로의 금액: 사이클 자본 × 전략 비율 (소수점 2자리 내림)
+ * 예수금으로 줄기 전의 금액이다. tierAmount는 이 값과 예수금 중 작은 쪽이다.
  */
-function nominalTierAmount(state: CycleState, tier: number): number {
+export function nominalTierAmount(state: CycleState, tier: number): number {
   return new Decimal(state.cycleCapital)
     .mul(state.strategy.tierRatios[tier - 1])
     .toDecimalPlaces(2, Decimal.ROUND_DOWN)
