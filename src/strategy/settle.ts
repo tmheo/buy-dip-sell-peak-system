@@ -121,7 +121,8 @@ function executedAmount(price: number, shares: number): number {
  * 주문표와 상태의 정합성 검증
  */
 function validateOrders(state: CycleState, orders: OrderIntent[]): void {
-  const heldTiers = new Set(state.holdings.map((h) => h.tier));
+  const heldShares = new Map(state.holdings.map((h) => [h.tier, h.shares]));
+  const heldTiers = new Set(heldShares.keys());
 
   const buyOrders = orders.filter((o) => o.type === "BUY");
   if (buyOrders.length > 1) {
@@ -133,9 +134,17 @@ function validateOrders(state: CycleState, orders: OrderIntent[]): void {
     }
   }
 
+  // 매도 체결은 티어를 통째로 없애므로 매도 수량은 보유 수량과 같아야 한다
   for (const order of orders) {
-    if (order.type === "SELL" && !heldTiers.has(order.tier)) {
+    if (order.type !== "SELL") continue;
+    const shares = heldShares.get(order.tier);
+    if (shares === undefined) {
       throw new Error(`Tier ${order.tier} is not held`);
+    }
+    if (order.shares !== shares) {
+      throw new Error(
+        `Sell order for tier ${order.tier} has ${order.shares} shares but ${shares} are held`
+      );
     }
   }
 }

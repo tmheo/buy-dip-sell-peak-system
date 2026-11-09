@@ -251,6 +251,24 @@ describe("settle - 주문 검증", () => {
     ).toThrow("Tier 3 is not held");
   });
 
+  it("매도 수량이 보유 수량과 다르면 에러를 발생시켜야 한다", () => {
+    // 매도는 티어를 통째로 없앤다 - 일부만 파는 주문은 남은 주식을 기록 없이 지운다
+    const state = createState({ holdings: [createHolding({ tier: 1, shares: 10 })] });
+    expect(() =>
+      settle(state, [sellOrder({ tier: 1, shares: 4 })], { date: "2025-01-03", close: 101 })
+    ).toThrow("Sell order for tier 1 has 4 shares but 10 are held");
+  });
+
+  it("체결되지 않을 매도 주문이라도 수량이 보유 수량과 다르면 에러를 발생시켜야 한다", () => {
+    const state = createState({ holdings: [createHolding({ tier: 1, shares: 10 })] });
+    expect(() =>
+      settle(state, [sellOrder({ tier: 1, limitPrice: 200, shares: 11 })], {
+        date: "2025-01-03",
+        close: 101,
+      })
+    ).toThrow("Sell order for tier 1 has 11 shares but 10 are held");
+  });
+
   it("이미 보유한 티어의 매수 주문은 에러를 발생시켜야 한다", () => {
     const state = createState({ holdings: [createHolding({ tier: 1 })] });
     expect(() => settle(state, [buyOrder({ tier: 1 })], { date: "2025-01-03", close: 99 })).toThrow(

@@ -65,6 +65,13 @@ export async function createProfitRecord(
       `Sell execution for tier ${execution.order.tier} does not match holding tier ${holding.tier}`
     );
   }
+  // 매도는 티어를 통째로 없애므로 체결 수량은 보유 수량과 같다. 다르면 매수금액(보유 수량)과
+  // 매도금액·손익(체결 수량)이 서로 다른 주식을 가리킨다.
+  if (execution.order.shares !== holding.shares) {
+    throw new Error(
+      `Sell execution for tier ${holding.tier} has ${execution.order.shares} shares but holding has ${holding.shares}`
+    );
+  }
   if (execution.profit === undefined) {
     throw new Error(`Sell execution for tier ${holding.tier} has no profit`);
   }

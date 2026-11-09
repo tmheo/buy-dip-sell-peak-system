@@ -185,6 +185,38 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
         })
       ).rejects.toThrow("does not match holding tier 6");
     });
+
+    it("보유 수량과 다른 수량의 매도 체결은 기록하지 않는다", async () => {
+      // 매도는 티어를 통째로 없앤다 - 수량이 다르면 매수금액과 손익이 서로 다른 주식을 가리킨다
+      const { execution } = settledSale({
+        tier: 7,
+        buyDate: "2025-01-02",
+        buyPrice: 50.0,
+        shares: 4,
+        sellDate: "2025-01-03",
+        sellPrice: 51.0,
+      });
+      const { holding } = settledSale({
+        tier: 7,
+        buyDate: "2025-01-02",
+        buyPrice: 50.0,
+        shares: 10,
+        sellDate: "2025-01-03",
+        sellPrice: 51.0,
+      });
+
+      await expect(
+        tradingModule.createProfitRecord({
+          accountId: testAccountId,
+          ticker: "SOXL",
+          strategy: "Pro1",
+          cycleNumber: 1,
+          sellDate: "2025-01-03",
+          holding,
+          execution,
+        })
+      ).rejects.toThrow("Sell execution for tier 7 has 4 shares but holding has 10");
+    });
   });
 
   describe("getProfitRecords", () => {
