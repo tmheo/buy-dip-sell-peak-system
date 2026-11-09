@@ -16,7 +16,7 @@ import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
 import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
 import { calculateAssetValues } from "@/components/trading/asset-values";
 import type { LatestClose } from "@/database/trading";
-import type { CashBreakdown, UnaffordableBuy } from "@/strategy";
+import type { CashBreakdown, ReducedBuy, UnaffordableBuy } from "@/strategy";
 import type { TradingAccountWithHoldings, DailyOrder } from "@/types/trading";
 
 interface TradingDetailClientProps {
@@ -37,6 +37,7 @@ interface OrdersResponse {
   date: string;
   orders: DailyOrder[];
   unaffordableBuy: UnaffordableBuy | null;
+  reducedBuy: ReducedBuy | null;
 }
 
 interface AccountDetail {
@@ -216,6 +217,7 @@ export default function TradingDetailClient({
           ticker={account.ticker}
           date={dailyOrders.date}
           unaffordableBuy={dailyOrders.unaffordableBuy}
+          reducedBuy={dailyOrders.reducedBuy}
         />
       )}
 

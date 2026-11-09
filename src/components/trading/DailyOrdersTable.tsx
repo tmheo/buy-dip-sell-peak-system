@@ -3,12 +3,14 @@
 /**
  * 오늘의 주문표 테이블 컴포넌트
  *
- * 예수금으로 1주도 살 수 없어 매수 주문이 없는 날에는 그 티어 줄에 이유를 보인다 (#98, 결정은 #93).
- * 그날인지는 주문 조회 응답(unaffordableBuy)이 알려 준다 - 화면이 규칙을 다시 계산하지 않는다.
+ * 예수금 때문에 비율대로 사지 못하는 매수를 보인다 (#98, 결정은 #93).
+ * - 덜 사는 매수 주문은 수량을 ~~비율대로의 수량~~ 실제 수량으로 보인다.
+ * - 예수금으로 1주도 살 수 없어 매수 주문이 없는 날에는 그 티어 줄에 이유를 보인다.
+ * 둘 다 주문 조회 응답(reducedBuy, unaffordableBuy)이 알려 준다 - 화면이 규칙을 다시 계산하지 않는다.
  */
 
 import type React from "react";
-import type { UnaffordableBuy } from "@/strategy";
+import type { ReducedBuy, UnaffordableBuy } from "@/strategy";
 import type { DailyOrder } from "@/types/trading";
 import { formatCurrency, getTierLabel } from "./format";
 
@@ -17,6 +19,29 @@ interface DailyOrdersTableProps {
   ticker: string;
   date: string;
   unaffordableBuy: UnaffordableBuy | null;
+  reducedBuy: ReducedBuy | null;
+}
+
+/** 주문 수량. 예수금 때문에 덜 사는 매수 주문은 비율대로의 수량을 지우고 실제 수량을 강조한다. */
+function OrderShares({
+  order,
+  reducedBuy,
+}: {
+  order: DailyOrder;
+  reducedBuy: ReducedBuy | null;
+}): React.ReactElement {
+  const shares = order.shares.toLocaleString();
+  if (order.type !== "BUY" || reducedBuy?.tier !== order.tier) {
+    return <>{shares}</>;
+  }
+  // 휴대폰 너비에서는 표가 넘치지 않도록 실제 수량을 다음 줄로 내린다 (wbr로 줄바꿈 자리를 둔다)
+  return (
+    <>
+      <s className="text-secondary">{reducedBuy.nominalShares.toLocaleString()}</s>
+      <wbr />
+      <span className="text-warning ms-2">{shares}</span>
+    </>
+  );
 }
 
 export default function DailyOrdersTable({
@@ -24,6 +49,7 @@ export default function DailyOrdersTable({
   ticker,
   date,
   unaffordableBuy,
+  reducedBuy,
 }: DailyOrdersTableProps): React.ReactElement {
   const formattedDate = new Date(date).toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -92,7 +118,9 @@ export default function DailyOrdersTable({
                     <td className="text-end">
                       {order.orderMethod === "MOC" ? "-" : formatCurrency(order.limitPrice)}
                     </td>
-                    <td className="text-end">{order.shares.toLocaleString()}</td>
+                    <td className="text-end">
+                      <OrderShares order={order} reducedBuy={reducedBuy} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
