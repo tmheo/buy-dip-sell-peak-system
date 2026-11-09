@@ -114,6 +114,7 @@ export interface TradingAccountWithHoldings extends TradingAccount {
 export interface ProfitRecord {
   id: string;
   accountId: string;
+  cycleNumber: number;
   tier: number;
   ticker: Ticker;
   strategy: Strategy;

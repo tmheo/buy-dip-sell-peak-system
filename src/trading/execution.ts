@@ -222,10 +222,18 @@ async function applyExecution(
   if (!holding) {
     throw new Error(`Tier ${order.tier} holding not found for sell execution`);
   }
+  if (execution.profit === undefined) {
+    throw new Error(`Sell execution for tier ${order.tier} has no profit`);
+  }
 
+  // 매도금액과 손익은 settle이 계산한 값을 그대로 남긴다 - 예수금 계산이 읽는
+  // 이번 사이클 실현손익이 체결 판정과 어긋나지 않게 하려는 것이다 (#97).
+  // 사이클 번호는 체결 시점의 것이다. 이 체결로 사이클이 끝나도 번호 증가는
+  // 체결 반영 뒤에 하므로 이 기록은 끝난 사이클에 속한다.
   await createProfitRecord(
     {
       accountId,
+      cycleNumber: state.cycleNumber,
       tier: order.tier,
       ticker,
       strategy: state.strategy.name,
@@ -234,6 +242,8 @@ async function applyExecution(
       buyQuantity: holding.shares,
       sellDate: date,
       sellPrice: price,
+      sellAmount: execution.amount,
+      profit: execution.profit,
     },
     tx
   );
