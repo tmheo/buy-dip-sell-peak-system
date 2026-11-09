@@ -13,6 +13,7 @@ import {
   getDailyOrders,
   getPreviousTradingClose,
   getTradingAccountByIdWithoutOwnerCheck,
+  hasExecutedOrdersAfter,
   runInTransaction,
   updateAccountLastProcessedDate,
   updateOrderExecuted,
@@ -106,6 +107,12 @@ export async function processOrderExecution(
  * 판정 뒤의 주문표에 미체결 주문이 없으면(다시 만든 주문표가 비는 경우 등)
  * 체결 트랜잭션을 열지 않고 현재 상태만 보고한다.
  *
+ * 사이클 상태는 지금의 보유 티어로 조립하므로, 그 날짜보다 뒤에 체결된 주문이 있으면
+ * 그날의 상태가 아니다. 그 상태로 다시 만들면 뒤에 산 티어의 매도가 나오고, 체결하면
+ * 매수보다 앞선 매도가 기록되고 지금의 보유가 지워진다. 그래서 이때는 다시 만들지도
+ * 체결하지도 않고 저장된 주문표를 그대로 보고한다. 일일 마감은 날짜를 차례로 처리하므로
+ * 평소에는 이 경우가 생기지 않고, 아무 날짜나 받는 체결 API에서 생긴다.
+ *
  * @param account - 계좌 (체결 처리 시점에 다시 읽은 것)
  * @param date - 체결 처리할 날짜
  * @param closePrice - 그날 종가 (adjClose)
@@ -118,6 +125,16 @@ async function refreshAndSettle(
   stored: DailyOrder[]
 ): Promise<ExecutionResult[]> {
   const { id: accountId, ticker } = account;
+  const reportStored = () =>
+    stored.map((order) => toExecutionResult(order, order.executed, closePrice));
+
+  if (await hasExecutedOrdersAfter(accountId, date)) {
+    console.warn(
+      `[${accountId}] ${date} 뒤 날짜에 체결된 주문이 있어 지금의 보유로 체결할 수 없다 - 건너뛴다`
+    );
+    return reportStored();
+  }
+
   const state = await loadCycleState(account, date);
 
   const { orders, regenerated } = await refreshDailyOrders(account, date, stored, state);

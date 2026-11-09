@@ -28,6 +28,26 @@ export async function getDailyOrders(accountId: string, date: string): Promise<D
 }
 
 /**
+ * 기준일보다 뒤 날짜에 체결된 주문이 하나라도 있는지 확인
+ * 있으면 지금의 보유 티어는 기준일 직전 마감 뒤의 상태가 아니다.
+ */
+export async function hasExecutedOrdersAfter(accountId: string, date: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: dailyOrders.id })
+    .from(dailyOrders)
+    .where(
+      and(
+        eq(dailyOrders.accountId, accountId),
+        gt(dailyOrders.date, date),
+        eq(dailyOrders.executed, true)
+      )
+    )
+    .limit(1);
+
+  return rows.length > 0;
+}
+
+/**
  * 주문 생성
  */
 export async function createDailyOrder(

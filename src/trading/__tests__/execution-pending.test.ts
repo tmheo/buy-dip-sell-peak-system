@@ -22,6 +22,7 @@ vi.mock("@/database/trading", () => ({
   getPreviousTradingClose: vi.fn(),
   getTierHoldings: vi.fn(),
   getTradingAccountByIdWithoutOwnerCheck: vi.fn(),
+  hasExecutedOrdersAfter: vi.fn(),
   listTradingDatesBetween: vi.fn(),
   replaceDailyOrders: vi.fn(),
   runInTransaction: vi.fn(),
@@ -36,6 +37,7 @@ import {
   getPreviousTradingClose,
   getTierHoldings,
   getTradingAccountByIdWithoutOwnerCheck,
+  hasExecutedOrdersAfter,
   listTradingDatesBetween,
   replaceDailyOrders,
   runInTransaction,
@@ -82,6 +84,7 @@ beforeEach(() => {
   vi.mocked(getClosingPrice).mockResolvedValue(49);
   vi.mocked(getDailyOrders).mockResolvedValue([STALE_ORDER]);
   vi.mocked(getPreviousTradingClose).mockResolvedValue({ date: "2026-07-14", adjClose: 50 });
+  vi.mocked(hasExecutedOrdersAfter).mockResolvedValue(false);
   vi.mocked(getTierHoldings).mockResolvedValue([]);
   vi.mocked(listTradingDatesBetween).mockResolvedValue([]);
   vi.mocked(replaceDailyOrders).mockResolvedValue([]);

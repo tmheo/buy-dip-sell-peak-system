@@ -131,4 +131,65 @@ describe.skipIf(!hasDb)("체결 처리의 입력 일관성", () => {
       expect(tier1?.shares).toBe(0);
     });
   });
+
+  describe("뒤에 체결된 날짜가 있는 지난 날짜 (processOrderExecution)", () => {
+    it("지금 보유로 다시 만들거나 체결하지 않고 저장된 주문표를 미체결로 보고한다", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const account = await tradingModule.createTradingAccount(TEST_USER_ID, {
+          name: "지난 날짜 체결 테스트 계좌",
+          ticker: "TQQQ",
+          seedCapital: 100_000,
+          strategy: "Pro1",
+          cycleStartDate: "2009-10-07",
+        });
+
+        // 10-07: 매수 LOC $99.99는 종가 $101에 체결되지 않는다
+        // 10-08: 매수 LOC floor(101 × 0.9999, 2) = $100.98, floor(5,000 ÷ 100.98) = 49주가
+        //        종가 $99에 체결된다
+        await trading.processHistoricalOrders(account, "2009-10-09");
+        const before = await tradingModule.getDailyOrders(account.id, "2009-10-07");
+        expect(content(before)).toEqual([
+          {
+            tier: 1,
+            type: "BUY",
+            orderMethod: "LOC",
+            limitPrice: 99.99,
+            shares: 50,
+            executed: false,
+          },
+        ]);
+
+        // 체결 API는 아무 날짜나 받는다. 10-08에 산 티어 1로 10-07 주문표를 다시 만들면
+        // 매도 LOC $99.00이 나오고, 종가 $101에 체결되면 매수보다 앞선 매도가 기록된다.
+        const results = await trading.processOrderExecution(account.id, "2009-10-07");
+
+        expect(results).toEqual([
+          expect.objectContaining({
+            orderId: before[0].id,
+            tier: 1,
+            type: "BUY",
+            executed: false,
+            limitPrice: 99.99,
+            closePrice: 101,
+            shares: 50,
+          }),
+        ]);
+        const after = await tradingModule.getDailyOrders(account.id, "2009-10-07");
+        expect(after).toEqual(before);
+        const tier1 = (await tradingModule.getTierHoldings(account.id)).find((h) => h.tier === 1);
+        expect(tier1).toMatchObject({ buyPrice: 99, shares: 49, buyDate: "2009-10-08" });
+        expect(await tradingModule.getProfitRecords(account.id)).toEqual([]);
+
+        // 어느 계좌의 어느 날짜를 건너뛰었는지 남긴다
+        const warnings = warnSpy.mock.calls.filter((args: unknown[]) => {
+          const line = args.join(" ");
+          return line.includes(account.id) && line.includes("2009-10-07");
+        });
+        expect(warnings).toHaveLength(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
 });

@@ -42,6 +42,7 @@ export {
 // DailyOrder CRUD
 export {
   getDailyOrders,
+  hasExecutedOrdersAfter,
   createDailyOrder,
   updateOrderExecuted,
   getClosingPrice,
