@@ -12,12 +12,14 @@ export { planOrders } from "./plan-orders";
 export { settle } from "./settle";
 export { startNextCycle } from "./cycle";
 export { PRO_STRATEGIES, getStrategyParams } from "./params";
-// 예수금 파생 규칙(ADR-0001)의 단일 소유자. 소비자가 재계산하지 않도록 함께 공개한다.
+// 예수금·계좌 현금 파생 규칙(ADR-0001, ADR-0003)의 단일 소유자. 소비자가 재계산하지 않도록 함께 공개한다.
 // 매수 티어 선정, 티어 금액, 체결 판정은 모듈 내부 구현이다.
-export { availableCash } from "./calculations";
+export { accountCash, availableCash, cashBreakdown } from "./calculations";
 // 매도 지정가 파생 계산. sellTargetPrice DB 컬럼(표시용 캐시)을 채울 때 사용한다 (#43).
 export { calculateSellLimitPrice } from "./calculations";
 export type {
+  BaseTierCash,
+  CashBreakdown,
   CycleState,
   CycleEvent,
   DayBar,

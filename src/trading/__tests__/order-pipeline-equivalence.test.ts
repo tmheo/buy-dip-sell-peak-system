@@ -129,6 +129,7 @@ function runReferenceLoop(): Map<string, NormalizedOrder[]> {
     cycleCapital: SEED_CAPITAL,
     holdings: [],
     cycleNumber: 1,
+    realizedPnl: 0,
   };
   let cycleCompleted = false;
 

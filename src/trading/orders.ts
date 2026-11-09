@@ -74,6 +74,8 @@ export async function loadCycleState(account: TradingAccount, date: string): Pro
     cycleCapital: account.seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
     holdings: await toStrategyHoldings(account.ticker, holdings, date),
     cycleNumber: account.cycleNumber,
+    // TODO(#97): 현재 사이클의 실현손익(profit_records)을 더한다 - 그 전까지는 ADR-0001 동작
+    realizedPnl: 0,
   };
 }
 

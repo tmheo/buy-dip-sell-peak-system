@@ -4,7 +4,7 @@
  * order.test.ts(체결 판정)의 규칙 검증을 새 interface 대상으로 이식.
  *
  * 규칙 의미는 #43 "확정된 규칙 의미" 절을 따른다.
- * 예수금 의미는 ADR-0001: 사이클 자본 - Σ(활성 티어 투자원금).
+ * 예수금 의미는 ADR-0001과 ADR-0003: max(0, min(사이클 자본 - Σ 활성 티어 매수금액, 계좌 현금)).
  */
 import { describe, it, expect } from "vitest";
 import { planOrders } from "../plan-orders";
@@ -141,6 +141,27 @@ describe("settle - 매도 체결", () => {
     // 실현 손익 = (90 - 100) × 10 = -100
     expect(executions[0].profit).toBe(-100);
   });
+
+  it("매도 체결의 손익을 이번 사이클 실현손익에 더해야 한다 (ADR-0003)", () => {
+    // 앞서 -50을 실현한 사이클에서 티어 1(-100 손절)과 티어 2(+20 익절)가 함께 체결된다
+    const state = createState({
+      holdings: [
+        createHolding({ tier: 1, buyPrice: 100, shares: 10, holdingDays: 9 }),
+        createHolding({ tier: 2, buyPrice: 88, shares: 10 }),
+      ],
+      realizedPnl: -50,
+    });
+    const { newState } = settle(
+      state,
+      [
+        sellOrder({ tier: 1, orderMethod: "MOC", limitPrice: null, shares: 10 }),
+        sellOrder({ tier: 2, limitPrice: 89.32, shares: 10 }),
+      ],
+      { date: "2025-01-16", close: 90 }
+    );
+    // -50 + (90 - 100) × 10 + (90 - 88) × 10 = -50 - 100 + 20 = -130
+    expect(newState.realizedPnl).toBe(-130);
+  });
 });
 
 describe("settle - 손절(MOC) 체결", () => {
@@ -255,6 +276,25 @@ describe("settle - 주문 검증", () => {
         date: "2025-01-03",
         close: 100,
       })
+    ).toThrow("Insufficient cash for buy execution");
+  });
+
+  it("매수 현금 검사는 당일 매도 손실까지 반영해야 한다 (ADR-0003)", () => {
+    // 티어 1(100 × 5 = 500)을 50에 손절하면 -250이 실현된다.
+    // 손절 뒤 예수금 = min(1000, 1000 - 250) = 750 → 800짜리 매수는 낼 수 없다
+    const state = createState({
+      cycleCapital: 1000,
+      holdings: [createHolding({ tier: 1, buyPrice: 100, shares: 5, holdingDays: 9 })],
+    });
+    expect(() =>
+      settle(
+        state,
+        [
+          buyOrder({ tier: 2, limitPrice: 100, shares: 16 }),
+          sellOrder({ tier: 1, orderMethod: "MOC", limitPrice: null, shares: 5 }),
+        ],
+        { date: "2025-01-16", close: 50 }
+      )
     ).toThrow("Insufficient cash for buy execution");
   });
 

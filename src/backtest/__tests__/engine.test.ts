@@ -296,7 +296,7 @@ describe("BacktestEngine", () => {
       expect(day2.holdingsValue).toBe(11 * 89);
     });
 
-    it("ADR-0001: 손절 매도 시 원금이 즉시 회복되어 다음 매수 여력이 생겨야 한다", async () => {
+    it("ADR-0003: 손절 원금은 회복되지만 순실현손실만큼 예수금이 줄어 재매수 금액이 줄어야 한다", async () => {
       const engine = new BacktestEngine("Pro2");
       const request: BacktestRequest = {
         ticker: "SOXL",
@@ -306,9 +306,9 @@ describe("BacktestEngine", () => {
         initialCapital: 10000,
       };
       // 하락 지속: 티어 1-7 순차 매수 후 폭락, 손절일(10 거래일) 도달로 티어 1 MOC 매도.
-      // 예수금 = 사이클 자본 - Σ(활성 티어 투자원금)이므로 티어 1 원금은 손실과 무관하게
-      // 전액 회복되고, 다음 날 티어 1 재매수가 체결되어야 한다.
-      // (기존 예수금 의미에서는 손실만큼 현금이 부족해 매수가 불가능했다)
+      // 티어 매수: 1) 10주 @99 = 990, 2) 15주 @98 = 1470, 3) 20주 @97 = 1940,
+      // 4) 25주 @96 = 2400, 5) 20주 @95 = 1900, 6) 10주 @94 = 940, 7) 3주 @93 = 279
+      // → 투자되지 않은 자본 = 10000 - 9919 = 81
       const closes = [100, 99, 98, 97, 96, 95, 94, 93, 75, 60, 50, 45, 44];
       const prices: DailyPrice[] = closes.map((close, i) =>
         createMockPrice(`2025-01-${(2 + i).toString().padStart(2, "0")}`, close)
@@ -316,20 +316,56 @@ describe("BacktestEngine", () => {
 
       const result = await engine.run(request, prices);
 
-      // 11일째(45): 티어 1 손절 MOC 매도
+      // 11일째(45): 티어 1 손절 MOC 매도, 손실 (45 - 99) × 10 = -540
       const day11 = result.dailyHistory[11];
       const stopLoss = day11.trades.find((t) => t.type === "STOP_LOSS");
       expect(stopLoss).toBeDefined();
       expect(stopLoss!.tier).toBe(1);
       expect(stopLoss!.price).toBe(45);
+      // 현금 = 계좌 현금 = 81 + 990 - 540 = 531 (손실을 한 번만 뺀다)
+      expect(day11.cash).toBe(531);
 
-      // 12일째(44): 티어 1 재매수 체결 (금액 = min(1000, 예수금), 지정가 44.99)
+      // 12일째(44): 티어 1 재매수 금액 = min(1000, 예수금 531) = 531, 지정가 44.99
+      // (ADR-0001이었다면 원금 전액 회복으로 floor(1000 / 44.99) = 22주)
       const day12 = result.dailyHistory[12];
       const rebuy = day12.trades.find((t) => t.type === "BUY");
       expect(rebuy).toBeDefined();
       expect(rebuy!.tier).toBe(1);
-      expect(rebuy!.shares).toBe(22); // floor(1000 / 44.99)
+      expect(rebuy!.shares).toBe(11); // floor(531 / 44.99)
       expect(rebuy!.price).toBe(44);
+      // 같은 날 티어 2 손절 (44 - 98) × 15 = -810 → 현금 = 1071 + 1470 - 484 - 1350 = 707
+      expect(day12.cash).toBe(707);
+    });
+
+    it("ADR-0003: 순손실로 끝난 사이클은 손실을 뺀 자본으로 다음 사이클을 시작해야 한다", async () => {
+      const engine = new BacktestEngine("Pro3");
+      const request: BacktestRequest = {
+        ticker: "SOXL",
+        strategy: "Pro3",
+        startDate: "2025-01-01",
+        endDate: "2025-01-15",
+        initialCapital: 10000,
+      };
+      // Pro3: 매수 임계값 -0.1%, 손절일 12 거래일, 티어 금액 floor(10000 / 6) = 1666.66
+      // 1일째 99에 티어 1 매수: floor(1666.66 / 99.9) = 16주 (원금 1584),
+      // 이후 매일 0.05씩 하락(-0.1% 미만이라 추가 매수 없음), 13일째 98.4에 손절,
+      // 14일째는 보합이라 새 사이클에서 매수가 없다
+      const declines = Array.from({ length: 12 }, (_, i) => 99 - 0.05 * (i + 1));
+      const closes = [100, 99, ...declines, 98.4];
+      const prices: DailyPrice[] = closes.map((close, i) =>
+        createMockPrice(`2025-01-${(1 + i).toString().padStart(2, "0")}`, Number(close.toFixed(2)))
+      );
+
+      const result = await engine.run(request, prices);
+
+      // 손절 손실 = (98.4 - 99) × 16 = -9.6
+      expect(result.completedCycles).toEqual([{ profit: -9.6, strategy: "Pro3" }]);
+      // 손절일 현금 = 계좌 현금 = 10000 - 9.6 (손실을 한 번만 뺀다)
+      expect(result.dailyHistory[13].cash).toBe(9990.4);
+      expect(result.cycleStrategies[0].finalAsset).toBe(9990.4);
+      // 다음 사이클 자본 = 사이클 자본 + 이번 사이클 실현손익
+      expect(result.cycleStrategies[1].initialCapital).toBe(9990.4);
+      expect(result.dailyHistory[14].cash).toBe(9990.4);
     });
 
     it("ADR-0001: 사이클 중 실현 수익은 현금에 쌓이되 매수 여력에 포함되지 않아야 한다", async () => {

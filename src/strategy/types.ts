@@ -66,7 +66,8 @@ export interface TierHolding {
 
 /**
  * 사이클 상태
- * 예수금은 저장하지 않는다 - `사이클 자본 - Σ(활성 티어 투자원금)`으로 파생 (ADR-0001)
+ * 예수금과 계좌 현금은 저장하지 않는다 - 사이클 자본, 활성 티어 매수금액, 이번 사이클
+ * 실현손익에서 파생한다 (ADR-0001, ADR-0003)
  */
 export interface CycleState {
   // 전략 파라미터
@@ -77,6 +78,8 @@ export interface CycleState {
   holdings: TierHolding[];
   // 사이클 번호
   cycleNumber: number;
+  // 이번 사이클 실현손익 합계 (settle이 매도 손익을 더하고, startNextCycle이 0으로 되돌린다, ADR-0003)
+  realizedPnl: number;
 }
 
 // ============================================================
@@ -159,4 +162,38 @@ export interface SettleResult {
   executions: Execution[];
   // 사이클 완료 이벤트
   events: CycleEvent[];
+}
+
+// ============================================================
+// 화면용 현금 내역
+// ============================================================
+
+/**
+ * 아직 사지 않은 기본 티어의 금액
+ */
+export interface BaseTierCash {
+  // 티어 번호 (1-6)
+  tier: number;
+  // 지금 사면 쓰일 실제 금액: min(사이클 자본 × 비율, 예수금)
+  amount: number;
+  // 비율대로의 금액: 사이클 자본 × 비율
+  nominalAmount: number;
+}
+
+/**
+ * 현금 내역 (ADR-0003)
+ * 화면이 예수금과 티어 금액을 직접 계산하지 않도록 규칙 모듈이 한 번에 내준다.
+ */
+export interface CashBreakdown {
+  // 예수금: max(0, min(사이클 자본 - Σ 활성 티어 매수금액, 계좌 현금))
+  availableCash: number;
+  // 계좌 현금: 사이클 자본 - Σ 활성 티어 매수금액 + 이번 사이클 실현손익
+  accountCash: number;
+  // 이번 사이클 순실현손실 (양수, 손실이 없으면 0)
+  netRealizedLoss: number;
+  // 아직 사지 않은 기본 티어(1-6)별 금액, 티어 번호 순
+  baseTiers: BaseTierCash[];
+  // 예비 티어를 사면 쓰일 금액(예수금 전액). 이미 보유 중이면 null.
+  // 예비 티어는 기본 티어 1-6이 모두 보유된 뒤에만 매수된다.
+  reserveTierAmount: number | null;
 }
