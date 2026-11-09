@@ -900,6 +900,29 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       const [stored] = await tradingModule.getDailyOrders(created.id, "2025-01-08");
       expect(stored.limitPrice).toBe(50.01);
     });
+
+    it("교체한 주문표를 조회와 같은 순서(티어, 구분)로 돌려준다", async () => {
+      // 처음 만든 주문표와 다시 조회한 주문표의 줄 순서가 달라 화면에서 매수 줄이 오르내렸다
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, {
+        name: "주문표 순서 테스트",
+        ticker: "SOXL",
+        seedCapital: 10000,
+        strategy: "Pro2",
+        cycleStartDate: "2025-01-02",
+      });
+      createdAccountIds.push(created.id);
+
+      // 매매 규칙은 매수 주문을 먼저 낸다
+      const replaced = await tradingModule.replaceDailyOrders(created.id, "2025-01-08", [
+        { tier: 3, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 20 },
+        { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 50.75, shares: 10 },
+        { tier: 2, type: "SELL", orderMethod: "LOC", limitPrice: 50.75, shares: 15 },
+      ]);
+
+      const stored = await tradingModule.getDailyOrders(created.id, "2025-01-08");
+      expect(replaced.map((o) => `${o.tier}${o.type}`)).toEqual(["1SELL", "2SELL", "3BUY"]);
+      expect(replaced.map((o) => o.id)).toEqual(stored.map((o) => o.id));
+    });
   });
 
   describe("updateOrderExecuted()", () => {

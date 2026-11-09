@@ -8,6 +8,7 @@
 
 // 주문표 생성과 신선도 정책
 export { generateDailyOrders, getFreshDailyOrders } from "./orders";
+export type { FreshDailyOrders } from "./orders";
 
 // 사이클 상태 조립 - 화면의 예수금도 주문표와 같은 상태에서 읽는다 (#97)
 export { loadCycleState } from "./orders";

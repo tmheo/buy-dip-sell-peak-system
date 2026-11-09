@@ -45,11 +45,15 @@ export async function GET(request: Request, { params }: RouteParams): Promise<Ne
     return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
   }
 
-  const orders = await getFreshDailyOrders(account, date);
+  // unaffordableBuy: 예수금으로 1주도 살 수 없어 매수 주문이 없는 날의 티어와 예수금 (#98)
+  // reducedBuy: 예수금 때문에 비율대로의 수량보다 덜 사는 매수 주문의 티어와 비율대로의 수량 (#98)
+  const { orders, unaffordableBuy, reducedBuy } = await getFreshDailyOrders(account, date);
 
   return NextResponse.json({
     date,
     orders,
+    unaffordableBuy,
+    reducedBuy,
   });
 }
 

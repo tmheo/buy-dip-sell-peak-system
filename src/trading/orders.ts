@@ -21,8 +21,13 @@ import {
   type DbExecutor,
   type NewDailyOrder,
 } from "@/database/trading";
-import type { CycleState, TierHolding as StrategyTierHolding } from "@/strategy";
-import { getStrategyParams, planOrders } from "@/strategy";
+import type {
+  CycleState,
+  ReducedBuy,
+  TierHolding as StrategyTierHolding,
+  UnaffordableBuy,
+} from "@/strategy";
+import { getStrategyParams, planOrdersDetailed } from "@/strategy";
 import type { DailyOrder, TierHolding, Ticker, TradingAccount } from "@/types/trading";
 
 /**
@@ -99,6 +104,13 @@ export async function loadCycleState(
   };
 }
 
+/** 지금의 입력으로 계산한 그날의 주문표와, 예수금 때문에 덜 사거나 내지 않은 매수 (#98) */
+interface PlannedDailyOrders {
+  rows: NewDailyOrder[];
+  unaffordableBuy: UnaffordableBuy | null;
+  reducedBuy: ReducedBuy | null;
+}
+
 /**
  * 지금의 입력과 현재 규칙으로 그날의 주문표를 계산한다 (저장하지 않는다).
  * 직전 거래일 종가(adjClose)가 없으면 계산할 수 없으므로 null을 반환한다.
@@ -109,14 +121,14 @@ async function planDailyOrders(
   account: TradingAccount,
   date: string,
   state: CycleState
-): Promise<NewDailyOrder[] | null> {
+): Promise<PlannedDailyOrders | null> {
   const prevClose = await getPreviousTradingClose(account.ticker, date);
   if (!prevClose) {
     return null;
   }
 
-  const intents = planOrders(state, prevClose.adjClose);
-  return intents.map((intent) => ({
+  const { intents, unaffordableBuy, reducedBuy } = planOrdersDetailed(state, prevClose.adjClose);
+  const rows = intents.map((intent) => ({
     tier: intent.tier,
     type: intent.type,
     orderMethod: intent.orderMethod,
@@ -125,6 +137,7 @@ async function planDailyOrders(
     limitPrice: intent.limitPrice ?? prevClose.adjClose,
     shares: intent.shares,
   }));
+  return { rows, unaffordableBuy, reducedBuy };
 }
 
 /**
@@ -137,17 +150,26 @@ export async function generateDailyOrders(
   account: TradingAccount,
   date: string
 ): Promise<DailyOrder[]> {
-  const rows = await planDailyOrders(account, date, await loadCycleState(account, date));
-  if (!rows) {
+  const planned = await planDailyOrders(account, date, await loadCycleState(account, date));
+  if (!planned) {
     return [];
   }
-  return replaceDailyOrders(account.id, date, rows);
+  return replaceDailyOrders(account.id, date, planned.rows);
 }
 
-/** 신선도 판정을 거친 주문표. regenerated는 저장돼 있던 주문표를 교체했는지 여부다. */
+/**
+ * 신선도 판정을 거친 주문표.
+ * regenerated는 저장돼 있던 주문표를 교체했는지 여부다.
+ * unaffordableBuy는 매수 차례인 티어가 예수금으로 1주도 살 수 없어 매수 주문이 없을 때의
+ * 그 티어와 예수금이고, reducedBuy는 예수금 때문에 비율대로의 수량보다 덜 사는 매수 주문의
+ * 티어와 비율대로의 수량이다 (#98). 둘 다 주문표를 지금의 입력으로 다시 계산했을 때만 알 수 있어,
+ * 체결된 주문이 있거나 직전 종가가 없어 계산하지 않았으면 null이다.
+ */
 export interface RefreshedDailyOrders {
   orders: DailyOrder[];
   regenerated: boolean;
+  unaffordableBuy: UnaffordableBuy | null;
+  reducedBuy: ReducedBuy | null;
 }
 
 /**
@@ -176,7 +198,7 @@ export async function refreshDailyOrders(
   stored: DailyOrder[],
   state: CycleState
 ): Promise<RefreshedDailyOrders> {
-  const kept = { orders: stored, regenerated: false };
+  const kept = { orders: stored, regenerated: false, unaffordableBuy: null, reducedBuy: null };
 
   if (stored.some((order) => order.executed)) {
     return kept;
@@ -187,13 +209,16 @@ export async function refreshDailyOrders(
     return kept;
   }
 
-  if (stored.length > 0 && hasSameContent(stored, planned)) {
-    return kept;
+  const { unaffordableBuy, reducedBuy } = planned;
+  if (stored.length > 0 && hasSameContent(stored, planned.rows)) {
+    return { ...kept, unaffordableBuy, reducedBuy };
   }
 
   return {
-    orders: await replaceDailyOrders(account.id, date, planned),
+    orders: await replaceDailyOrders(account.id, date, planned.rows),
     regenerated: stored.length > 0,
+    unaffordableBuy,
+    reducedBuy,
   };
 }
 
@@ -213,12 +238,23 @@ export async function refreshDailyOrders(
 export async function getFreshDailyOrders(
   account: TradingAccount,
   date: string
-): Promise<DailyOrder[]> {
+): Promise<FreshDailyOrders> {
   const stored = await getDailyOrders(account.id, date);
   const state = await loadCycleState(account, date);
-  const { orders } = await refreshDailyOrders(account, date, stored, state);
-  return orders;
+  const { orders, unaffordableBuy, reducedBuy } = await refreshDailyOrders(
+    account,
+    date,
+    stored,
+    state
+  );
+  return { orders, unaffordableBuy, reducedBuy };
 }
+
+/** 화면에 보일 주문표와, 예수금 때문에 덜 사거나 내지 않은 매수 (RefreshedDailyOrders 참고) */
+export type FreshDailyOrders = Pick<
+  RefreshedDailyOrders,
+  "orders" | "unaffordableBuy" | "reducedBuy"
+>;
 
 /**
  * 저장된 주문표와 다시 계산한 주문표의 주문 내용이 같은지 비교 (내부 헬퍼)

@@ -150,7 +150,7 @@ beforeEach(() => {
 
 /** 저장된 주문표가 낡았다고 판정되어 rows로 교체됐는지 확인한다. */
 async function expectReplacedWith(account: TradingAccount, rows: NewDailyOrder[]): Promise<void> {
-  const orders = await getFreshDailyOrders(account, DATE);
+  const { orders } = await getFreshDailyOrders(account, DATE);
 
   expect(orders).toBe(REGENERATED);
   expect(mockedReplaceDailyOrders).toHaveBeenCalledOnce();
@@ -159,7 +159,7 @@ async function expectReplacedWith(account: TradingAccount, rows: NewDailyOrder[]
 
 /** 저장된 주문표가 그대로 반환되고 교체되지 않았는지 확인한다. */
 async function expectKept(account: TradingAccount, existing: DailyOrder[]): Promise<void> {
-  const orders = await getFreshDailyOrders(account, DATE);
+  const { orders } = await getFreshDailyOrders(account, DATE);
 
   expect(orders).toBe(existing);
   expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
@@ -349,9 +349,108 @@ describe("getFreshDailyOrders - 주문표가 없을 때", () => {
     mockedGetDailyOrders.mockResolvedValue([]);
     mockedGetPreviousTradingClose.mockResolvedValue(null);
 
-    const orders = await getFreshDailyOrders(createAccount(), DATE);
+    const { orders } = await getFreshDailyOrders(createAccount(), DATE);
 
     expect(orders).toEqual([]);
     expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
+  });
+});
+
+describe("getFreshDailyOrders - 예수금으로 1주도 살 수 없는 날 (#98)", () => {
+  it("매수 주문 없이 만든 주문표와 함께 매수 차례인 티어와 예수금을 알린다", async () => {
+    mockedGetDailyOrders.mockResolvedValue([]);
+    // 계좌 현금 = 100,000 - 9,984(티어 1) - 89,990 = $26 → 예수금 $26 < 매수 지정가 $49.99
+    mockedGetCycleRealizedPnl.mockResolvedValue(-89_990);
+
+    const { unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(unaffordableBuy).toEqual({ tier: 2, availableCash: 26 });
+    expect(mockedReplaceDailyOrders).toHaveBeenCalledWith(ACCOUNT_ID, DATE, [
+      { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 48.72, shares: 208 },
+    ]);
+  });
+
+  it("저장된 주문표가 지금 다시 만든 것과 같으면 그대로 두고도 알린다", async () => {
+    const stored = storedOrders([FRESH_ROWS[0]]);
+    mockedGetDailyOrders.mockResolvedValue(stored);
+    mockedGetCycleRealizedPnl.mockResolvedValue(-89_990);
+
+    const { orders, unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(unaffordableBuy).toEqual({ tier: 2, availableCash: 26 });
+    expect(orders).toBe(stored);
+    expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
+  });
+
+  it("매수 주문이 나가는 날에는 알리지 않는다", async () => {
+    mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
+
+    const { unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(unaffordableBuy).toBeNull();
+  });
+
+  it("체결된 주문이 있어 주문표를 다시 계산하지 않으면 알리지 않는다", async () => {
+    // 체결 뒤의 보유로 다시 계산하면 저장된 주문표와 다른 날의 판단이 된다
+    mockedGetDailyOrders.mockResolvedValue(storedOrders([FRESH_ROWS[0]], true));
+    mockedGetCycleRealizedPnl.mockResolvedValue(-89_990);
+
+    const { unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(unaffordableBuy).toBeNull();
+  });
+});
+
+describe("getFreshDailyOrders - 예수금 때문에 비율대로보다 덜 사는 날 (#98)", () => {
+  it("줄어든 수량으로 만든 주문표와 함께 그 티어의 비율대로의 수량을 알린다", async () => {
+    mockedGetDailyOrders.mockResolvedValue([]);
+    // 계좌 현금 = 100,000 - 9,984(티어 1) - 80,016 = $10,000 → 티어 2 금액 $10,000 (비율대로 $15,000)
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    const { reducedBuy, unaffordableBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    // 비율대로 floor(15,000 ÷ 49.99) = 300주, 실제 floor(10,000 ÷ 49.99) = 200주
+    expect(reducedBuy).toEqual({ tier: 2, nominalShares: 300 });
+    expect(unaffordableBuy).toBeNull();
+    expect(mockedReplaceDailyOrders).toHaveBeenCalledWith(ACCOUNT_ID, DATE, [
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+      { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 48.72, shares: 208 },
+    ]);
+  });
+
+  it("저장된 주문표가 지금 다시 만든 것과 같으면 그대로 두고도 알린다", async () => {
+    const stored = storedOrders([
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+      FRESH_ROWS[0],
+    ]);
+    mockedGetDailyOrders.mockResolvedValue(stored);
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    const { orders, reducedBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(reducedBuy).toEqual({ tier: 2, nominalShares: 300 });
+    expect(orders).toBe(stored);
+    expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
+  });
+
+  it("비율대로 사는 날에는 알리지 않는다", async () => {
+    mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
+
+    const { reducedBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(reducedBuy).toBeNull();
+  });
+
+  it("체결된 주문이 있어 주문표를 다시 계산하지 않으면 알리지 않는다", async () => {
+    const reducedRows: NewDailyOrder[] = [
+      FRESH_ROWS[0],
+      { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 200 },
+    ];
+    mockedGetDailyOrders.mockResolvedValue(storedOrders(reducedRows, true));
+    mockedGetCycleRealizedPnl.mockResolvedValue(-80_016);
+
+    const { reducedBuy } = await getFreshDailyOrders(createAccount(), DATE);
+
+    expect(reducedBuy).toBeNull();
   });
 });

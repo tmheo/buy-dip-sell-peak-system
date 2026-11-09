@@ -48,10 +48,11 @@ export {
   updateOrderExecuted,
   getClosingPrice,
   getPreviousTradingClose,
+  getLatestClose,
   listTradingDatesBetween,
   replaceDailyOrders,
 } from "./orders";
-export type { NewDailyOrder } from "./orders";
+export type { LatestClose, NewDailyOrder } from "./orders";
 
 // Profit Records
 export {

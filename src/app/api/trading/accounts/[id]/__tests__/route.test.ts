@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { randomUUID } from "crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -106,17 +106,68 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     expect(body.cashBreakdown).toEqual({
       availableCash: 1_500,
       accountCash: 1_500,
+      // 예수금 계산식: 시드 10,000 - 투자 중 1,000(티어 1) - 순실현손실 7,500 = 1,500
+      cycleCapital: 10_000,
+      investedAmount: 1_000,
       netRealizedLoss: 7_500,
-      // 아직 안 산 기본 티어: 실제 금액 min(10,000 × 비율, 1,500)과 비율대로의 금액
-      baseTiers: [
-        { tier: 2, amount: 1_500, nominalAmount: 1_500 },
-        { tier: 3, amount: 1_500, nominalAmount: 2_000 },
-        { tier: 4, amount: 1_500, nominalAmount: 2_500 },
-        { tier: 5, amount: 1_500, nominalAmount: 2_000 },
-        { tier: 6, amount: 1_000, nominalAmount: 1_000 },
+      isCashReduced: true,
+      // 할당 시드: 보유 중인 티어 1은 비율대로, 아직 안 산 티어는 min(10,000 × 비율, 1,500)
+      tiers: [
+        { tier: 1, amount: 1_000, nominalAmount: 1_000, isReduced: false },
+        { tier: 2, amount: 1_500, nominalAmount: 1_500, isReduced: false },
+        { tier: 3, amount: 1_500, nominalAmount: 2_000, isReduced: true },
+        { tier: 4, amount: 1_500, nominalAmount: 2_500, isReduced: true },
+        { tier: 5, amount: 1_500, nominalAmount: 2_000, isReduced: true },
+        { tier: 6, amount: 1_000, nominalAmount: 1_000, isReduced: false },
+        { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
-      reserveTierAmount: 1_500,
     });
+  });
+
+  it("평가금 계산에 쓸 저장된 가장 최근 종가와 그 날짜를 돌려줘야 한다 (#98)", async () => {
+    mockLoggedIn(OWNER_ID);
+    // CI 시험용 DB에는 시세가 없으므로 SOXL 상장(2010-03-11) 이전 날짜에 날짜와 종가가 다른
+    // 합성 시세 두 행을 넣는다 - 한 행뿐이면 정렬 방향이 뒤집혀도 통과한다.
+    // 실데이터가 있으면 그쪽이 더 최근이라 응답은 실데이터의 최근 종가와 같아야 한다.
+    const synthetic = (date: string, price: number) => ({
+      ticker: "SOXL" as const,
+      date,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+      adjClose: price,
+      volume: 1000,
+    });
+    const inserted = await db
+      .insert(schema.dailyPrices)
+      .values([synthetic("2009-06-02", 11.11), synthetic("2009-06-03", 12.34)])
+      .onConflictDoNothing()
+      .returning({ id: schema.dailyPrices.id });
+    const syntheticPriceIds = inserted.map((row) => row.id);
+
+    try {
+      const latest = await db.execute<{ date: string; adj_close: number }>(
+        sql`select date::text as date, adj_close from daily_prices
+            where ticker = 'SOXL' order by date desc limit 1`
+      );
+
+      const response = await get(accountId);
+
+      const body = await response.json();
+      expect(latest.length).toBe(1);
+      expect(body.latestClose).toEqual({
+        date: latest[0].date,
+        adjClose: Number(latest[0].adj_close),
+      });
+    } finally {
+      // 삽입이 건너뛰어진 행(같은 행이 이미 있음)은 기존 데이터라 보존한다
+      if (syntheticPriceIds.length > 0) {
+        await db
+          .delete(schema.dailyPrices)
+          .where(inArray(schema.dailyPrices.id, syntheticPriceIds));
+      }
+    }
   });
 
   it("읽는 도중 매도가 커밋돼도 보유 티어와 예수금 내역은 같은 시점의 것이어야 한다", async () => {
@@ -191,7 +242,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
       expect(tier1.shares).toBe(10);
       expect(body.cashBreakdown.netRealizedLoss).toBe(0);
       expect(body.cashBreakdown.availableCash).toBe(9_000);
-      expect(body.cashBreakdown.baseTiers.map((t: { tier: number }) => t.tier)).not.toContain(1);
+      expect(body.cashBreakdown.investedAmount).toBe(1_000);
     } finally {
       await otherClient.end();
     }

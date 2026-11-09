@@ -2,35 +2,54 @@
 
 /**
  * 오늘의 주문표 테이블 컴포넌트
+ *
+ * 예수금 때문에 비율대로 사지 못하는 매수를 보인다 (#98, 결정은 #93).
+ * - 덜 사는 매수 주문은 수량을 ~~비율대로의 수량~~ 실제 수량으로 보인다.
+ * - 예수금으로 1주도 살 수 없어 매수 주문이 없는 날에는 그 티어 줄에 이유를 보인다.
+ * 둘 다 주문 조회 응답(reducedBuy, unaffordableBuy)이 알려 준다 - 화면이 규칙을 다시 계산하지 않는다.
  */
 
 import type React from "react";
+import type { ReducedBuy, UnaffordableBuy } from "@/strategy";
 import type { DailyOrder } from "@/types/trading";
+import { formatCurrency, getTierLabel } from "./format";
 
 interface DailyOrdersTableProps {
   orders: DailyOrder[];
   ticker: string;
   date: string;
+  unaffordableBuy: UnaffordableBuy | null;
+  reducedBuy: ReducedBuy | null;
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function getTierLabel(tier: number): string {
-  if (tier === 7) return "예비";
-  return `${tier}`;
+/** 주문 수량. 예수금 때문에 덜 사는 매수 주문은 비율대로의 수량을 지우고 실제 수량을 강조한다. */
+function OrderShares({
+  order,
+  reducedBuy,
+}: {
+  order: DailyOrder;
+  reducedBuy: ReducedBuy | null;
+}): React.ReactElement {
+  const shares = order.shares.toLocaleString();
+  if (order.type !== "BUY" || reducedBuy?.tier !== order.tier) {
+    return <>{shares}</>;
+  }
+  // 휴대폰 너비에서는 표가 넘치지 않도록 실제 수량을 다음 줄로 내린다 (wbr로 줄바꿈 자리를 둔다)
+  return (
+    <>
+      <s className="text-secondary">{reducedBuy.nominalShares.toLocaleString()}</s>
+      <wbr />
+      <span className="text-warning ms-2">{shares}</span>
+    </>
+  );
 }
 
 export default function DailyOrdersTable({
   orders,
   ticker,
   date,
+  unaffordableBuy,
+  reducedBuy,
 }: DailyOrdersTableProps): React.ReactElement {
   const formattedDate = new Date(date).toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -45,12 +64,13 @@ export default function DailyOrdersTable({
         <small className="text-secondary">{formattedDate}</small>
       </div>
       <div className="card-body p-0">
-        {orders.length === 0 ? (
+        {orders.length === 0 && !unaffordableBuy ? (
           <div className="p-4 text-center text-secondary">오늘 예정된 주문이 없습니다.</div>
         ) : (
           <div className="table-responsive">
-            <table className="table table-dark table-striped table-hover mb-0">
-              <thead>
+            <table className="table table-dark table-striped table-hover align-middle mb-0">
+              {/* 머리글은 줄바꿈하지 않는다: 긴 안내 문구 줄이 있으면 열이 좁아져 머리글이 한 글자씩 꺾였다 */}
+              <thead className="text-nowrap">
                 <tr>
                   <th className="text-center">종목</th>
                   <th className="text-center">티어</th>
@@ -61,6 +81,24 @@ export default function DailyOrdersTable({
                 </tr>
               </thead>
               <tbody>
+                {unaffordableBuy && (
+                  <tr>
+                    <td className="text-center">{ticker}</td>
+                    <td className="text-center">
+                      <span className="badge bg-secondary">
+                        {getTierLabel(unaffordableBuy.tier)}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <span className="badge trading-buy">매수</span>
+                    </td>
+                    {/* 좁은 화면에서 줄이 바뀔 때 낱말 중간에서 끊지 않는다 */}
+                    <td className="text-secondary" colSpan={3} style={{ wordBreak: "keep-all" }}>
+                      예수금 {formatCurrency(unaffordableBuy.availableCash)}로는 1주도 살 수 없어
+                      주문하지 않습니다
+                    </td>
+                  </tr>
+                )}
                 {orders.map((order) => (
                   <tr key={order.id}>
                     <td className="text-center">{ticker}</td>
@@ -80,7 +118,9 @@ export default function DailyOrdersTable({
                     <td className="text-end">
                       {order.orderMethod === "MOC" ? "-" : formatCurrency(order.limitPrice)}
                     </td>
-                    <td className="text-end">{order.shares.toLocaleString()}</td>
+                    <td className="text-end">
+                      <OrderShares order={order} reducedBuy={reducedBuy} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

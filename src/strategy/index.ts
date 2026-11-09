@@ -9,6 +9,8 @@
  * 가격 불변식: 입력되는 모든 가격은 분할·배당 조정된 연속 시계열(adjClose)이어야 한다.
  */
 export { planOrders } from "./plan-orders";
+// 같은 주문표에 예수금 때문에 덜 사거나 사지 않는 매수를 함께 낸다. 화면에 그 이유를 보일 때 쓴다 (#98)
+export { planOrdersDetailed } from "./plan-orders";
 export { settle } from "./settle";
 export { startNextCycle } from "./cycle";
 export { PRO_STRATEGIES, getStrategyParams } from "./params";
@@ -18,15 +20,18 @@ export { accountCash, availableCash, cashBreakdown } from "./calculations";
 // 매도 지정가 파생 계산. sellTargetPrice DB 컬럼(표시용 캐시)을 채울 때 사용한다 (#43).
 export { calculateSellLimitPrice } from "./calculations";
 export type {
-  BaseTierCash,
   CashBreakdown,
   CycleState,
   CycleEvent,
   DayBar,
+  DetailedOrderPlan,
   Execution,
   OrderIntent,
+  ReducedBuy,
   SettleResult,
   StrategyParams,
+  TierCash,
   TierHolding,
+  UnaffordableBuy,
 } from "./types";
 export { BASE_TIER_COUNT, MAX_TIER_NUMBER, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";

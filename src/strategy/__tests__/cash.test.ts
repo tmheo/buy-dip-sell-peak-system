@@ -85,7 +85,7 @@ describe("planOrders - 순실현손실이 있는 사이클의 매수 금액", ()
 });
 
 describe("cashBreakdown - 화면용 현금 내역", () => {
-  it("순손실 사이클의 예수금, 계좌 현금, 순실현손실과 아직 안 산 기본 티어 금액을 보여야 한다", () => {
+  it("순손실 사이클의 예수금, 그 계산식의 항목, 티어별 할당 시드를 보여야 한다", () => {
     // Pro2 비율 10/15/20/25/20/10%. 티어 1-4 보유(1000 + 1500 + 2000 + 2500 = 7000),
     // 앞서 손절로 -1800 실현 → 예수금 = min(3000, 1200) = 1200
     const holdings = [
@@ -99,39 +99,73 @@ describe("cashBreakdown - 화면용 현금 내역", () => {
     expect(breakdown).toEqual({
       availableCash: 1200,
       accountCash: 1200,
+      // 예수금 계산식: 시드 10,000 - 투자 중 7,000 - 순실현손실 1,800 = 1,200
+      cycleCapital: 10000,
+      investedAmount: 7000,
       netRealizedLoss: 1800,
-      baseTiers: [
-        // 티어 5: min(2000, 1200) = 1200, 티어 6: min(1000, 1200) = 1000
-        { tier: 5, amount: 1200, nominalAmount: 2000 },
-        { tier: 6, amount: 1000, nominalAmount: 1000 },
+      isCashReduced: true,
+      tiers: [
+        // 보유 중인 티어는 비율대로의 금액
+        { tier: 1, amount: 1000, nominalAmount: 1000, isReduced: false },
+        { tier: 2, amount: 1500, nominalAmount: 1500, isReduced: false },
+        { tier: 3, amount: 2000, nominalAmount: 2000, isReduced: false },
+        { tier: 4, amount: 2500, nominalAmount: 2500, isReduced: false },
+        // 아직 안 산 티어는 지금 사면 쓰일 금액: 티어 5 min(2000, 1200), 티어 6 min(1000, 1200)
+        { tier: 5, amount: 1200, nominalAmount: 2000, isReduced: true },
+        { tier: 6, amount: 1000, nominalAmount: 1000, isReduced: false },
+        // 예비 티어는 기본 티어 1-6이 다 차기 전에는 할당이 없다
+        { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
-      reserveTierAmount: 1200,
     });
   });
 
-  it("손실이 없으면 순실현손실은 0이고 기본 티어는 비율대로의 금액이어야 한다", () => {
+  it("손실이 없으면 예수금이 줄지 않았고 기본 티어는 비율대로의 금액이어야 한다", () => {
     const breakdown = cashBreakdown(createState({ realizedPnl: 120 }));
 
     expect(breakdown.availableCash).toBe(10000);
     expect(breakdown.accountCash).toBe(10120);
+    expect(breakdown.investedAmount).toBe(0);
     expect(breakdown.netRealizedLoss).toBe(0);
-    expect(breakdown.baseTiers).toEqual([
-      { tier: 1, amount: 1000, nominalAmount: 1000 },
-      { tier: 2, amount: 1500, nominalAmount: 1500 },
-      { tier: 3, amount: 2000, nominalAmount: 2000 },
-      { tier: 4, amount: 2500, nominalAmount: 2500 },
-      { tier: 5, amount: 2000, nominalAmount: 2000 },
-      { tier: 6, amount: 1000, nominalAmount: 1000 },
+    expect(breakdown.isCashReduced).toBe(false);
+    expect(breakdown.tiers.map(({ amount, isReduced }) => ({ amount, isReduced }))).toEqual([
+      { amount: 1000, isReduced: false },
+      { amount: 1500, isReduced: false },
+      { amount: 2000, isReduced: false },
+      { amount: 2500, isReduced: false },
+      { amount: 2000, isReduced: false },
+      { amount: 1000, isReduced: false },
+      { amount: 0, isReduced: false },
     ]);
   });
 
-  it("예비 티어를 이미 보유하고 있으면 예비 티어 금액은 없어야 한다", () => {
-    const holdings = [1, 2, 3, 4, 5, 6, 7].map((tier) =>
-      createHolding({ tier, buyPrice: 10, shares: 100 })
+  it("기본 티어 1-6이 모두 보유 중이면 예비 티어에 예수금 전액을 할당해야 한다", () => {
+    // 티어 1-6 매수금액 합 = 9,500 → 예수금 500
+    const holdings = [1, 2, 3, 4, 5, 6].map((tier) =>
+      createHolding({ tier, buyPrice: 10, shares: [100, 150, 200, 250, 200, 50][tier - 1] })
     );
     const breakdown = cashBreakdown(createState({ holdings }));
 
-    expect(breakdown.baseTiers).toEqual([]);
-    expect(breakdown.reserveTierAmount).toBeNull();
+    expect(breakdown.tiers[6]).toEqual({
+      tier: 7,
+      amount: 500,
+      nominalAmount: null,
+      isReduced: false,
+    });
+  });
+
+  it("예비 티어를 보유 중이면 할당 시드를 알 수 없어 null이어야 한다", () => {
+    // 예비 티어는 매수 당시의 예수금 전액을 썼다. 그 금액은 저장되지 않고, 지금 남은
+    // 예수금(매수 뒤 잔액)은 할당 시드가 아니다.
+    const holdings = [1, 2, 3, 4, 5, 6, 7].map((tier) =>
+      createHolding({ tier, buyPrice: 10, shares: [100, 150, 200, 250, 200, 50, 40][tier - 1] })
+    );
+    const breakdown = cashBreakdown(createState({ holdings }));
+
+    expect(breakdown.tiers[6]).toEqual({
+      tier: 7,
+      amount: null,
+      nominalAmount: null,
+      isReduced: false,
+    });
   });
 });
