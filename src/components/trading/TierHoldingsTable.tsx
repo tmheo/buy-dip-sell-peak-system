@@ -2,23 +2,22 @@
 
 /**
  * 티어별 보유 현황 테이블 컴포넌트
+ *
+ * 아직 안 산 티어의 할당 시드는 실제로 살 금액이고, 예수금 때문에 비율대로 못 사는 티어에는
+ * "예수금 부족으로 축소"를 붙인다 (ADR-0003, #93). 데스크톱 표와 휴대폰 카드가 같은 정보를 보인다.
  */
 
 import type React from "react";
 import type { TierHolding, Strategy } from "@/types/trading";
-import {
-  BASE_TIER_COUNT,
-  MAX_TIER_NUMBER,
-  RESERVE_TIER_NUMBER,
-  getStrategyParams,
-} from "@/strategy";
+import { RESERVE_TIER_NUMBER, type CashBreakdown } from "@/strategy";
 import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
+import { buildTierRows, type TierRow } from "./tier-rows";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
   seedCapital: number;
   strategy: Strategy;
-  availableCash: number;
+  cash: CashBreakdown;
 }
 
 function formatCurrency(value: number | null): string {
@@ -54,38 +53,31 @@ function getTierLabel(tier: number): string {
   return `${tier}`;
 }
 
+/** 축소 표시 배지. 표와 카드가 같은 문구를 쓴다. */
+function ReducedBadge(): React.ReactElement {
+  return <span className="badge bg-warning text-dark fw-normal">예수금 부족으로 축소</span>;
+}
+
+/** 할당 시드 금액. 축소된 티어는 비율대로의 금액을 지우고 실제 금액을 강조한다. */
+function AllocatedSeed({ row }: { row: TierRow }): React.ReactElement {
+  if (row.reducedFrom === null) {
+    return <>{formatCurrency(row.allocatedSeed)}</>;
+  }
+  return (
+    <>
+      <s className="text-secondary me-2">{formatCurrency(row.reducedFrom)}</s>
+      <span className="text-warning">{formatCurrency(row.allocatedSeed)}</span>
+    </>
+  );
+}
+
 export default function TierHoldingsTable({
   holdings,
   seedCapital,
   strategy,
-  availableCash,
+  cash,
 }: TierHoldingsTableProps): React.ReactElement {
-  // 티어 비율은 src/strategy의 전략 파라미터 표가 단일 소유한다 (#43)
-  const ratios = getStrategyParams(strategy).tierRatios;
-  const holdingsByTier = new Map(holdings.map((h) => [h.tier, h]));
-
-  // 티어 1~6이 모두 매수되었는지 확인
-  const allMainTiersFilled = Array.from({ length: BASE_TIER_COUNT }, (_, i) => i + 1).every(
-    (tier) => {
-      const holding = holdingsByTier.get(tier);
-      return holding && holding.shares > 0;
-    }
-  );
-
-  // 티어별 데이터 사전 계산 (데스크톱/모바일 공통)
-  const tierData = Array.from({ length: MAX_TIER_NUMBER }, (_, i) => {
-    const tier = i + 1;
-    const holding = holdingsByTier.get(tier);
-    const isReserveTier = tier === RESERVE_TIER_NUMBER;
-    const ratioPercent = isReserveTier ? 0 : ratios[tier - 1] * 100;
-    const allocatedSeed = isReserveTier
-      ? allMainTiersFilled
-        ? availableCash
-        : 0
-      : seedCapital * ratios[tier - 1];
-    const hasShares = holding && holding.shares > 0;
-    return { tier, holding, ratioPercent, isReserveTier, allocatedSeed, hasShares };
-  });
+  const tierData = buildTierRows(holdings, seedCapital, strategy, cash);
 
   return (
     <div className="card bg-dark border-secondary mb-4">
@@ -96,7 +88,7 @@ export default function TierHoldingsTable({
         {/* 데스크톱: 기존 테이블 (769px 이상) */}
         <div className="trading-desktop-table">
           <div className="table-responsive">
-            <table className="table table-dark table-striped table-hover mb-0">
+            <table className="table table-dark table-striped table-hover align-middle mb-0">
               <thead>
                 <tr>
                   <th className="text-center">티어</th>
@@ -111,8 +103,9 @@ export default function TierHoldingsTable({
                 </tr>
               </thead>
               <tbody>
-                {tierData.map(
-                  ({ tier, holding, ratioPercent, isReserveTier, allocatedSeed, hasShares }) => (
+                {tierData.map((row) => {
+                  const { tier, holding, ratioPercent, isReserveTier, hasShares } = row;
+                  return (
                     <tr key={tier} className={hasShares ? "table-active" : ""}>
                       <td className="text-center">
                         <span className={hasShares ? "badge bg-success" : "badge bg-secondary"}>
@@ -122,7 +115,14 @@ export default function TierHoldingsTable({
                       <td className="text-center">
                         {isReserveTier ? "-" : `${ratioPercent.toFixed(1)}%`}
                       </td>
-                      <td className="text-end">{formatCurrency(allocatedSeed)}</td>
+                      <td className="text-end">
+                        <AllocatedSeed row={row} />
+                        {row.reducedFrom !== null && (
+                          <div className="mt-1">
+                            <ReducedBadge />
+                          </div>
+                        )}
+                      </td>
                       <td className="text-center">{formatDate(holding?.buyDate ?? null)}</td>
                       <td className="text-end">
                         {hasShares && holding?.buyPrice
@@ -144,8 +144,8 @@ export default function TierHoldingsTable({
                         {calculateHoldingDays(holding?.buyDate ?? null)}
                       </td>
                     </tr>
-                  )
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -153,8 +153,9 @@ export default function TierHoldingsTable({
 
         {/* 모바일: 티어 카드 뷰 (768px 이하) */}
         <div className="trading-mobile-card p-2">
-          {tierData.map(
-            ({ tier, holding, ratioPercent, isReserveTier, allocatedSeed, hasShares }) => (
+          {tierData.map((row) => {
+            const { tier, holding, ratioPercent, isReserveTier, hasShares } = row;
+            return (
               <div
                 key={tier}
                 className={`card mb-2 bg-dark ${hasShares ? "border-success" : "border-secondary"}`}
@@ -168,31 +169,45 @@ export default function TierHoldingsTable({
                       {isReserveTier ? "예비" : `${ratioPercent.toFixed(1)}%`}
                     </span>
                   </div>
-                  <div className="row small">
-                    <div className="col-6 text-secondary">
-                      매수가: {formatCurrency(holding?.buyPrice ?? null)}
-                    </div>
-                    <div className="col-6 text-end text-secondary">
+                  {/* 격자(.row/.col-6) 대신 flex 줄로 둔다: 모바일 전역 규칙의 .card.bg-dark .col-6
+                      여백·글자 크기 조정이 이 카드에 새어 들어와 글자가 카드 테두리에 붙고
+                      금액·수량이 작아졌다 */}
+                  <div className="d-flex justify-content-between gap-2 small text-secondary">
+                    <span>매수가: {formatCurrency(holding?.buyPrice ?? null)}</span>
+                    <span>
                       수량:{" "}
                       {hasShares ? (
                         <span className="text-success">{holding?.shares.toLocaleString()}</span>
                       ) : (
                         "-"
                       )}
-                    </div>
-                    <div className="col-6 text-secondary">
-                      할당: {formatCurrency(allocatedSeed)}
-                    </div>
-                    <div className="col-6 text-end text-secondary">
-                      보유: {calculateHoldingDays(holding?.buyDate ?? null)}
-                    </div>
+                    </span>
                   </div>
+                  <div className="d-flex justify-content-between gap-2 small text-secondary">
+                    <span>
+                      할당: <AllocatedSeed row={row} />
+                    </span>
+                    <span>보유: {calculateHoldingDays(holding?.buyDate ?? null)}</span>
+                  </div>
+                  {row.reducedFrom !== null && (
+                    <div className="mt-1">
+                      <ReducedBadge />
+                    </div>
+                  )}
                 </div>
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       </div>
+      {cash.netRealizedLoss > 0 && (
+        <div className="card-footer border-secondary">
+          <small className="text-secondary" style={{ wordBreak: "keep-all" }}>
+            * 이번 사이클 순실현손실 {formatCurrency(cash.netRealizedLoss)}만큼 예수금이 줄어,
+            다음에 사는 티어가 비율보다 적게 삽니다.
+          </small>
+        </div>
+      )}
     </div>
   );
 }

@@ -330,9 +330,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  /* 숫자 한 자리는 원, "예비"처럼 긴 이름은 알약 모양으로 늘어난다 */
+  min-width: 28px;
   height: 28px;
-  border-radius: 50%;
+  padding: 0 0.5rem;
+  border-radius: 14px;
   font-weight: bold;
   font-size: 0.875rem;
 }

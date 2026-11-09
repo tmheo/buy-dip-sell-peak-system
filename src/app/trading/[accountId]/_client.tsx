@@ -14,64 +14,41 @@ import AssetSummary from "@/components/trading/AssetSummary";
 import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
 import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
-import type { CashBreakdown } from "@/strategy";
+import { calculateAssetValues, type LatestClose } from "@/components/trading/asset-values";
+import type { CashBreakdown, UnaffordableBuy } from "@/strategy";
 import type { TradingAccountWithHoldings, DailyOrder } from "@/types/trading";
 
 interface TradingDetailClientProps {
   accountId: string;
 }
 
+/**
+ * 계좌 상세 응답
+ * 예수금·계좌 현금·티어 금액(cashBreakdown)은 매매 규칙이 계산한 값을 그대로 쓴다 (ADR-0003).
+ */
 interface AccountResponse {
   account: TradingAccountWithHoldings;
   cashBreakdown: CashBreakdown;
+  latestClose: LatestClose | null;
 }
 
 interface OrdersResponse {
   date: string;
   orders: DailyOrder[];
+  unaffordableBuy: UnaffordableBuy | null;
 }
 
-interface AssetValues {
-  totalAssets: number;
-  totalShares: number;
-  stockValue: number;
-  availableCash: number;
-  profitRate: number;
-}
-
-/**
- * 자산 가치 계산
- * - 투자 금액은 보유 수량 × 매수가의 합계
- * - 예수금은 직접 계산하지 않고 계좌 상세 응답의 값을 쓴다. 이번 사이클 순실현손실이
- *   빠진 값이라(ADR-0003) 주문표의 매수 금액과 같은 규칙을 따른다.
- * - 현재가 데이터가 없으므로 매수가를 기준으로 평가 (수익률 0%)
- */
-function calculateAssetValues(
-  account: TradingAccountWithHoldings,
-  cash: CashBreakdown
-): AssetValues {
-  const investedAmount = account.holdings.reduce((sum, holding) => {
-    if (holding.shares > 0 && holding.buyPrice) {
-      return sum + holding.shares * holding.buyPrice;
-    }
-    return sum;
-  }, 0);
-
-  return {
-    totalAssets: cash.availableCash + investedAmount,
-    totalShares: account.totalShares,
-    stockValue: investedAmount,
-    availableCash: cash.availableCash,
-    profitRate: 0, // 실시간 시세 연동 전까지 수익률 0%
-  };
+interface AccountDetail {
+  account: TradingAccountWithHoldings;
+  cash: CashBreakdown;
+  latestClose: LatestClose | null;
 }
 
 export default function TradingDetailClient({
   accountId,
 }: TradingDetailClientProps): React.ReactElement {
   const router = useRouter();
-  const [account, setAccount] = useState<TradingAccountWithHoldings | null>(null);
-  const [cash, setCash] = useState<CashBreakdown | null>(null);
+  const [detail, setDetail] = useState<AccountDetail | null>(null);
   // 주문표와 그 거래일은 주문 조회 응답에서만 온다 - 조회에 실패하면 둘 다 없다
   const [dailyOrders, setDailyOrders] = useState<OrdersResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,8 +90,11 @@ export default function TradingDetailClient({
       }
 
       const accountData: AccountResponse = await accountRes.json();
-      setAccount(accountData.account);
-      setCash(accountData.cashBreakdown);
+      setDetail({
+        account: accountData.account,
+        cash: accountData.cashBreakdown,
+        latestClose: accountData.latestClose,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
@@ -181,7 +161,7 @@ export default function TradingDetailClient({
     );
   }
 
-  if (!account || !cash) {
+  if (!detail) {
     return (
       <div className="container py-4">
         <div className="card bg-dark border-secondary">
@@ -196,7 +176,8 @@ export default function TradingDetailClient({
     );
   }
 
-  const assetValues = calculateAssetValues(account, cash);
+  const { account, cash, latestClose } = detail;
+  const assetValues = calculateAssetValues(account.holdings, cash, latestClose);
 
   return (
     <div className="container py-4">
@@ -212,12 +193,12 @@ export default function TradingDetailClient({
 
       {/* Asset Summary Section */}
       <AssetSummary
-        totalAssets={assetValues.totalAssets}
-        totalShares={assetValues.totalShares}
-        stockValue={assetValues.stockValue}
-        availableCash={assetValues.availableCash}
-        profitRate={assetValues.profitRate}
         ticker={account.ticker}
+        totalShares={account.totalShares}
+        seedCapital={account.seedCapital}
+        values={assetValues}
+        cash={cash}
+        priceDate={latestClose?.date ?? null}
       />
 
       {/* Holdings Section */}
@@ -225,7 +206,7 @@ export default function TradingDetailClient({
         holdings={account.holdings}
         seedCapital={account.seedCapital}
         strategy={account.strategy}
-        availableCash={assetValues.availableCash}
+        cash={cash}
       />
 
       {/* Daily Orders Section */}
@@ -239,6 +220,7 @@ export default function TradingDetailClient({
           orders={dailyOrders.orders}
           ticker={account.ticker}
           date={dailyOrders.date}
+          unaffordableBuy={dailyOrders.unaffordableBuy}
         />
       )}
 
