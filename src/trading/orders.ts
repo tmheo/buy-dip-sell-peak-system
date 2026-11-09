@@ -23,7 +23,7 @@ import { getStrategyParams, planOrders } from "@/strategy";
 import type { DailyOrder, TierHolding, Ticker, TradingAccount } from "@/types/trading";
 
 /**
- * DB 티어 홀딩을 src/strategy의 보유 상태로 변환 (내부 헬퍼)
+ * DB 티어 홀딩을 src/strategy의 보유 상태로 변환 (내부 함수)
  * holdingDays는 기준일 직전 거래일 마감 시점의 보유 거래일 수다
  * (매수 당일 = 0, settle마다 +1 - src/strategy의 손절 카운트 의미).
  * 가장 이른 매수일 이후 거래일 목록을 한 번만 조회하고 티어별 수는 메모리에서 센다.
@@ -80,17 +80,20 @@ export async function loadCycleState(account: TradingAccount, date: string): Pro
 /**
  * 지금의 입력과 현재 규칙으로 그날의 주문표를 계산한다 (저장하지 않는다).
  * 직전 거래일 종가(adjClose)가 없으면 계산할 수 없으므로 null을 반환한다.
+ *
+ * @param state - loadCycleState(account, date)로 조립한 사이클 상태
  */
 async function planDailyOrders(
   account: TradingAccount,
-  date: string
+  date: string,
+  state: CycleState
 ): Promise<NewDailyOrder[] | null> {
   const prevClose = await getPreviousTradingClose(account.ticker, date);
   if (!prevClose) {
     return null;
   }
 
-  const intents = planOrders(await loadCycleState(account, date), prevClose.adjClose);
+  const intents = planOrders(state, prevClose.adjClose);
   return intents.map((intent) => ({
     tier: intent.tier,
     type: intent.type,
@@ -112,7 +115,7 @@ export async function generateDailyOrders(
   account: TradingAccount,
   date: string
 ): Promise<DailyOrder[]> {
-  const rows = await planDailyOrders(account, date);
+  const rows = await planDailyOrders(account, date, await loadCycleState(account, date));
   if (!rows) {
     return [];
   }
@@ -142,11 +145,14 @@ export interface RefreshedDailyOrders {
  * @param account - 계좌
  * @param date - 주문표 날짜 (YYYY-MM-DD)
  * @param stored - 그 날짜에 저장돼 있는 주문표 (getDailyOrders 결과)
+ * @param state - loadCycleState(account, date)로 조립한 사이클 상태. 체결 처리는 같은 상태로
+ *   settle을 부르므로, 판정과 체결이 같은 입력을 보도록 호출자가 한 번 조립해 넘긴다.
  */
 export async function refreshDailyOrders(
   account: TradingAccount,
   date: string,
-  stored: DailyOrder[]
+  stored: DailyOrder[],
+  state: CycleState
 ): Promise<RefreshedDailyOrders> {
   const kept = { orders: stored, regenerated: false };
 
@@ -154,7 +160,7 @@ export async function refreshDailyOrders(
     return kept;
   }
 
-  const planned = await planDailyOrders(account, date);
+  const planned = await planDailyOrders(account, date, state);
   if (!planned) {
     return kept;
   }
@@ -170,7 +176,7 @@ export async function refreshDailyOrders(
 }
 
 /**
- * 주문표 조회 - 없거나 낡았으면 생성한다 (#80, #96)
+ * 신선한 주문표 조회 - 없으면 만들고, 낡았으면 다시 만들어 교체한다 (#80, #96)
  *
  * 주문표는 화면 진입 시 지연 생성된다. 사이클 시작일부터 어제까지의 마감 처리는
  * 스케줄러(processDailyClose)가 담당하므로, 여기서는 조회와 해당 날짜 주문 생성만
@@ -182,12 +188,13 @@ export async function refreshDailyOrders(
  * @param account - 소유자 확인을 마친 계좌
  * @param date - 주문표 날짜 (YYYY-MM-DD)
  */
-export async function getOrCreateDailyOrders(
+export async function getFreshDailyOrders(
   account: TradingAccount,
   date: string
 ): Promise<DailyOrder[]> {
   const stored = await getDailyOrders(account.id, date);
-  const { orders } = await refreshDailyOrders(account, date, stored);
+  const state = await loadCycleState(account, date);
+  const { orders } = await refreshDailyOrders(account, date, stored, state);
   return orders;
 }
 

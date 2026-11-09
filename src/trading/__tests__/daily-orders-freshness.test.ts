@@ -1,7 +1,7 @@
 /**
  * 주문표 신선도 판정 테스트 (#80, #96)
  *
- * 저장 모듈을 대역으로 바꿔, getOrCreateDailyOrders가 소유하는 판정만 검증한다.
+ * 저장 모듈을 대역으로 바꿔, getFreshDailyOrders가 소유하는 판정만 검증한다.
  * 신선도는 "지금 다시 만들면 같은가"다 - 지금의 계좌 설정·보유 티어·가격 기록으로
  * 주문을 다시 계산해 저장된 주문표와 주문 내용(티어, 매수·매도, 주문 방식, 지정가, 수량)을
  * 비교한다 (GLOSSARY.md "주문표 신선도").
@@ -34,7 +34,7 @@ import {
   type NewDailyOrder,
 } from "@/database/trading";
 
-import { getOrCreateDailyOrders } from "../orders";
+import { getFreshDailyOrders } from "../orders";
 
 const mockedGetDailyOrders = vi.mocked(getDailyOrders);
 const mockedGetTierHoldings = vi.mocked(getTierHoldings);
@@ -144,7 +144,7 @@ beforeEach(() => {
 
 /** 저장된 주문표가 낡았다고 판정되어 rows로 교체됐는지 확인한다. */
 async function expectReplacedWith(account: TradingAccount, rows: NewDailyOrder[]): Promise<void> {
-  const orders = await getOrCreateDailyOrders(account, DATE);
+  const orders = await getFreshDailyOrders(account, DATE);
 
   expect(orders).toBe(REGENERATED);
   expect(mockedReplaceDailyOrders).toHaveBeenCalledOnce();
@@ -153,13 +153,13 @@ async function expectReplacedWith(account: TradingAccount, rows: NewDailyOrder[]
 
 /** 저장된 주문표가 그대로 반환되고 교체되지 않았는지 확인한다. */
 async function expectKept(account: TradingAccount, existing: DailyOrder[]): Promise<void> {
-  const orders = await getOrCreateDailyOrders(account, DATE);
+  const orders = await getFreshDailyOrders(account, DATE);
 
   expect(orders).toBe(existing);
   expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();
 }
 
-describe("getOrCreateDailyOrders - 계좌 설정 변경", () => {
+describe("getFreshDailyOrders - 계좌 설정 변경", () => {
   it("시드 금액이 바뀌어 매수 수량이 달라지면 낡은 것으로 보고 다시 만든다", async () => {
     // 수정 시각은 그대로다 - 판정은 수정 시각이 아니라 주문 내용으로 한다
     mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
@@ -212,7 +212,7 @@ describe("getOrCreateDailyOrders - 계좌 설정 변경", () => {
   });
 });
 
-describe("getOrCreateDailyOrders - 가격 기록과 보유 상태 변화", () => {
+describe("getFreshDailyOrders - 가격 기록과 보유 상태 변화", () => {
   it("직전 종가가 뒤늦게 적재되면 그 종가로 다시 만든다", async () => {
     // 전일(07-14) 종가 적재 전에 07-13 종가 $52로 만든 주문표:
     // 매수 floor(52 × 0.9999, 2) = $51.99, floor(15,000 ÷ 51.99) = 288주
@@ -243,7 +243,7 @@ describe("getOrCreateDailyOrders - 가격 기록과 보유 상태 변화", () =>
   });
 });
 
-describe("getOrCreateDailyOrders - 지정가 비교 정밀도", () => {
+describe("getFreshDailyOrders - 지정가 비교 정밀도", () => {
   it("MOC 표시용 지정가는 소수 둘째 자리로 반올림해 비교한다", async () => {
     holdTier1UntilStopLoss();
     // 직전 종가 $50.004는 limit_price 컬럼에 $50.00으로 저장된다
@@ -275,7 +275,7 @@ describe("getOrCreateDailyOrders - 지정가 비교 정밀도", () => {
   });
 });
 
-describe("getOrCreateDailyOrders - 그대로 두는 경우", () => {
+describe("getFreshDailyOrders - 그대로 두는 경우", () => {
   it("주문 내용이 같으면 저장된 주문표를 그대로 반환하고 교체하지 않는다", async () => {
     // 저장 순서(티어·유형 오름차순)와 생성 순서(매수 먼저)가 달라도 같은 주문표다
     const existing = storedOrders(FRESH_ROWS);
@@ -305,7 +305,7 @@ describe("getOrCreateDailyOrders - 그대로 두는 경우", () => {
   });
 });
 
-describe("getOrCreateDailyOrders - 주문표가 없을 때", () => {
+describe("getFreshDailyOrders - 주문표가 없을 때", () => {
   it("주문이 없으면 지금의 입력으로 만든다", async () => {
     mockedGetDailyOrders.mockResolvedValue([]);
 
@@ -319,7 +319,7 @@ describe("getOrCreateDailyOrders - 주문표가 없을 때", () => {
     mockedGetDailyOrders.mockResolvedValue([]);
     mockedGetPreviousTradingClose.mockResolvedValue(null);
 
-    const orders = await getOrCreateDailyOrders(createAccount(), DATE);
+    const orders = await getFreshDailyOrders(createAccount(), DATE);
 
     expect(orders).toEqual([]);
     expect(mockedReplaceDailyOrders).not.toHaveBeenCalled();

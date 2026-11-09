@@ -97,7 +97,7 @@ export async function getActiveTradingAccounts(since: Date): Promise<TradingAcco
 /**
  * 계좌 조회 시각 갱신
  * 계좌 상세 화면을 열 때 호출하여 활성 계좌로 표시한다.
- * (updatedAt은 갱신하지 않는다 — 주문 라우트의 설정 변경 감지에 영향 방지)
+ * 조회 기록은 계좌 내용의 변경이 아니므로 updatedAt은 갱신하지 않는다.
  */
 export async function markAccountViewed(id: string): Promise<void> {
   await db
@@ -252,7 +252,7 @@ export async function completeCycleAndIncrement(
 /**
  * 마감 처리 완료 거래일을 계좌에 기록
  * 다음 스케줄러 실행이 이 날짜 다음부터 이어받아 증분 처리한다.
- * (updatedAt은 갱신하지 않는다 - 주문 라우트의 설정 변경 감지에 영향을 주지 않기 위함)
+ * 마감 진행 기록은 계좌 내용의 변경이 아니므로 updatedAt은 갱신하지 않는다.
  */
 export async function updateAccountLastProcessedDate(
   accountId: string,

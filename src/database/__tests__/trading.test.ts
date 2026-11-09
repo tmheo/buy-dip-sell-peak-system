@@ -882,6 +882,24 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       expect(buyOrder.type).toBe("BUY");
       expect(sellOrder.type).toBe("SELL");
     });
+
+    it("지정가는 소수 둘째 자리에서 반올림해 저장한다 (신선도 비교의 정밀도와 같다, #96)", async () => {
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, {
+        name: "지정가 정밀도 테스트",
+        ticker: "SOXL",
+        seedCapital: 10000,
+        strategy: "Pro2",
+        cycleStartDate: "2025-01-02",
+      });
+      createdAccountIds.push(created.id);
+
+      await tradingModule.replaceDailyOrders(created.id, "2025-01-08", [
+        { tier: 1, type: "SELL", orderMethod: "MOC", limitPrice: 50.005, shares: 10 },
+      ]);
+
+      const [stored] = await tradingModule.getDailyOrders(created.id, "2025-01-08");
+      expect(stored.limitPrice).toBe(50.01);
+    });
   });
 
   describe("updateOrderExecuted()", () => {

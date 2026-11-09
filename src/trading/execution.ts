@@ -24,7 +24,7 @@ import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { calculateSellLimitPrice, settle } from "@/strategy";
 import type { DailyOrder, Ticker, TradingAccount } from "@/types/trading";
 
-import { generateDailyOrders, loadCycleState, refreshDailyOrders } from "./orders";
+import { loadCycleState, refreshDailyOrders } from "./orders";
 
 export interface ExecutionResult {
   orderId: string;
@@ -81,10 +81,9 @@ export async function processOrderExecution(
   date: string
 ): Promise<ExecutionResult[]> {
   const account = await requireAccount(accountId);
-  const { ticker } = account;
 
   // 당일 종가 조회 (정확 일치 - 휴장일·미적재면 체결 처리 불가)
-  const closePrice = await getClosingPrice(ticker, date);
+  const closePrice = await getClosingPrice(account.ticker, date);
   if (!closePrice) {
     return [];
   }
@@ -96,14 +95,41 @@ export async function processOrderExecution(
     return stored.map((order) => toExecutionResult(order, order.executed, closePrice));
   }
 
-  const { orders, regenerated } = await refreshDailyOrders(account, date, stored);
+  return refreshAndSettle(account, date, closePrice, stored);
+}
+
+/**
+ * 저장된 주문표를 신선도 판정에 거친 뒤 체결한다 (내부 함수, #96)
+ *
+ * 사이클 상태는 여기서 한 번만 조립해 신선도 판정과 settle에 함께 넘긴다.
+ * 주문표가 비어 있으면 판정 과정에서 새로 만들어진다.
+ * 판정 뒤의 주문표에 미체결 주문이 없으면(다시 만든 주문표가 비는 경우 등)
+ * 체결 트랜잭션을 열지 않고 현재 상태만 보고한다.
+ *
+ * @param account - 계좌 (체결 처리 시점에 다시 읽은 것)
+ * @param date - 체결 처리할 날짜
+ * @param closePrice - 그날 종가 (adjClose)
+ * @param stored - 그 날짜에 저장돼 있는 주문표 (getDailyOrders 결과)
+ */
+async function refreshAndSettle(
+  account: TradingAccount,
+  date: string,
+  closePrice: number,
+  stored: DailyOrder[]
+): Promise<ExecutionResult[]> {
+  const { id: accountId, ticker } = account;
+  const state = await loadCycleState(account, date);
+
+  const { orders, regenerated } = await refreshDailyOrders(account, date, stored, state);
   if (regenerated) {
     // 배포일처럼 규칙이 바뀐 날 몇 계좌가 영향을 받았는지 보려는 기록이다
     console.log(`[${accountId}] ${date} 낡은 주문표를 다시 만든 뒤 체결한다`);
   }
 
   const pendingOrders = orders.filter((order) => !order.executed);
-  const state = await loadCycleState(account, date);
+  if (pendingOrders.length === 0) {
+    return orders.map((order) => toExecutionResult(order, order.executed, closePrice));
+  }
 
   const intents = pendingOrders.map(toOrderIntent);
   const orderByIntent = new Map(intents.map((intent, index) => [intent, pendingOrders[index]]));
@@ -320,25 +346,22 @@ export async function processHistoricalOrders(
 
     if (closePrice) {
       // 2. 해당 날짜의 주문 조회
-      let orders = await getDailyOrders(accountId, processingDate);
+      const stored = await getDailyOrders(accountId, processingDate);
 
-      // 3. 주문이 없으면 생성 (현재 holdings 상태 기준)
-      if (orders.length === 0) {
-        orders = await generateDailyOrders(account, processingDate);
-      }
-
-      // 4. 미체결 주문이 있으면 체결 처리 (체결 전에 신선도 판정을 거친다)
-      const hasUnexecutedOrders = orders.some((o) => !o.executed);
-      if (hasUnexecutedOrders) {
-        const results = await processOrderExecution(accountId, processingDate);
+      // 3. 주문표가 없거나 미체결 주문이 있으면 신선도 판정을 거쳐 체결 처리
+      //    (주문표가 없으면 판정 과정에서 현재 holdings 기준으로 만들어진다)
+      if (stored.length === 0 || stored.some((o) => !o.executed)) {
+        // 앞선 날짜의 사이클 완료로 사이클 번호가 바뀌었을 수 있어 계좌를 다시 읽는다
+        const current = await requireAccount(accountId);
+        const results = await refreshAndSettle(current, processingDate, closePrice, stored);
         allResults.push(...results);
       }
 
-      // 5. 종가가 있는 거래일을 처리 완료 → 진행 상태 영속화
+      // 4. 종가가 있는 거래일을 처리 완료 → 진행 상태 영속화
       await updateAccountLastProcessedDate(accountId, processingDate);
     }
 
-    // 6. 다음 거래일로 이동
+    // 5. 다음 거래일로 이동
     processingDate = getNextTradingDate(processingDate);
   }
 
