@@ -5,7 +5,7 @@
  * src/trading이 소유한다. 이 모듈은 주문·가격 행의 조회와 저장만 한다.
  */
 
-import { eq, and, desc, asc, lt, gt } from "drizzle-orm";
+import { eq, and, desc, asc, lt, gt, sql } from "drizzle-orm";
 
 import type { DailyOrder, Ticker, OrderType, OrderMethod } from "@/types/trading";
 
@@ -25,6 +25,28 @@ export async function getDailyOrders(accountId: string, date: string): Promise<D
     .orderBy(asc(dailyOrders.tier), asc(dailyOrders.type));
 
   return rows.map(mapDrizzleDailyOrder);
+}
+
+/**
+ * 한 계좌·날짜의 주문표를 트랜잭션이 끝날 때까지 잠근다
+ *
+ * 주문표 교체(replaceDailyOrders)와 체결 트랜잭션이 같은 계좌·날짜에서 서로 끼어들지
+ * 못하게, 둘 다 주문표를 읽거나 바꾸기 전에 이 잠금부터 쥔다. 잠금은 커밋이나 롤백 때
+ * 풀린다. 그래서 반드시 트랜잭션 안에서 불러야 한다 - 트랜잭션 밖에서는 문장이 끝나자마자
+ * 풀려 아무것도 막지 못한다.
+ *
+ * 행 잠금으로는 막을 수 없다. 교체는 "체결된 주문이 없다"를 읽고 나서 지우는데, 읽기는
+ * 행을 잠그지 않고 아직 없는 행은 잠글 수도 없다.
+ *
+ * @param executor - 잠금을 쥘 트랜잭션
+ */
+export async function lockDailyOrders(
+  accountId: string,
+  date: string,
+  executor: DbExecutor
+): Promise<void> {
+  const key = `${accountId}:${date}`;
+  await executor.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}::text, 0))`);
 }
 
 /**
@@ -168,7 +190,8 @@ export interface NewDailyOrder {
 
 /**
  * 특정 날짜의 주문표를 통째로 교체
- * 기존 주문 삭제와 새 주문 삽입을 한 트랜잭션으로 묶어 원자성을 보장한다.
+ * 기존 주문 삭제와 새 주문 삽입을 한 트랜잭션으로 묶어 원자성을 보장하고,
+ * 같은 계좌·날짜의 체결 트랜잭션과는 lockDailyOrders로 차례를 정한다.
  * 무엇을 주문할지는 조율 계층(src/trading)이 정하고, 이 함수는 저장만 한다.
  *
  * @param accountId - 계좌 ID
@@ -183,6 +206,11 @@ export async function replaceDailyOrders(
   orders: NewDailyOrder[]
 ): Promise<DailyOrder[]> {
   return db.transaction(async (tx) => {
+    // 같은 날짜의 체결 트랜잭션이나 다른 교체가 끼어들지 못하게 먼저 잠근다.
+    // 잠그지 않으면 아래 확인과 삭제 사이에 다른 요청의 체결이 커밋돼, 체결된 행을
+    // 지우고 다시 체결될 미체결 행을 넣게 된다.
+    await lockDailyOrders(accountId, date, tx);
+
     // 체결된 주문이 있는 날짜는 교체 불가 - 삭제 후 미체결로 되살리면
     // 재체결 처리로 홀딩·수익 기록이 중복 반영된다.
     // 조율 계층의 판단이 아니라 저장 자체의 불변식이므로 여기서 막는다.

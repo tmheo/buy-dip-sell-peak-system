@@ -24,6 +24,7 @@ vi.mock("@/database/trading", () => ({
   getTradingAccountByIdWithoutOwnerCheck: vi.fn(),
   hasExecutedOrdersAfter: vi.fn(),
   listTradingDatesBetween: vi.fn(),
+  lockDailyOrders: vi.fn(),
   replaceDailyOrders: vi.fn(),
   runInTransaction: vi.fn(),
   updateAccountLastProcessedDate: vi.fn(),

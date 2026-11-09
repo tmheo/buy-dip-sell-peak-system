@@ -14,6 +14,7 @@ import {
   getPreviousTradingClose,
   getTradingAccountByIdWithoutOwnerCheck,
   hasExecutedOrdersAfter,
+  lockDailyOrders,
   runInTransaction,
   updateAccountLastProcessedDate,
   updateOrderExecuted,
@@ -154,6 +155,10 @@ async function refreshAndSettle(
   const executedIntents = new Set(executions.map((execution) => execution.order));
 
   await runInTransaction(async (tx) => {
+    // 같은 날짜의 주문표 교체와 차례를 정한다. 교체가 먼저 끝났으면 아래 선점이
+    // 실패해 롤백되고, 체결이 먼저 끝났으면 교체가 체결된 주문을 보고 멈춘다.
+    await lockDailyOrders(accountId, date, tx);
+
     for (const execution of executions) {
       const order = orderByIntent.get(execution.order);
       if (!order) {

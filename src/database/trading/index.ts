@@ -43,6 +43,7 @@ export {
 export {
   getDailyOrders,
   hasExecutedOrdersAfter,
+  lockDailyOrders,
   createDailyOrder,
   updateOrderExecuted,
   getClosingPrice,
