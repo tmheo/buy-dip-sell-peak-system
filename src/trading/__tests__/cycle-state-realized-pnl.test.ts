@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
 import { hasDb } from "@/test-utils/db";
+import { settledSale } from "@/test-utils/settled-sale";
 import { db } from "@/database/db-drizzle";
 import { users } from "@/database/schema/auth";
 import { cashBreakdown } from "@/strategy";
@@ -23,21 +24,22 @@ describe.skipIf(!hasDb)("loadCycleState의 이번 사이클 실현손익", () =>
   let orders: typeof import("../orders");
   let account: TradingAccount;
 
-  /** 매수 $100 × 10주를 sellPrice에 판 기록. 손익은 settle이 내는 값처럼 직접 넘긴다. */
+  /** 매수 $100 × 10주를 sellPrice에 판 기록. 손익은 settle이 낸다: (sellPrice - 100) × 10 */
   async function recordSale(cycleNumber: number, tier: number, sellPrice: number): Promise<void> {
     await tradingModule.createProfitRecord({
       accountId: account.id,
-      cycleNumber,
-      tier,
       ticker: "SOXL",
       strategy: "Pro2",
-      buyDate: "2009-03-02",
-      buyPrice: 100,
-      buyQuantity: 10,
+      cycleNumber,
       sellDate: "2009-03-04",
-      sellPrice,
-      sellAmount: sellPrice * 10,
-      profit: (sellPrice - 100) * 10,
+      ...settledSale({
+        tier,
+        buyDate: "2009-03-02",
+        buyPrice: 100,
+        shares: 10,
+        sellDate: "2009-03-04",
+        sellPrice,
+      }),
     });
   }
 

@@ -16,6 +16,8 @@ import type {
   ProfitStatusResponse,
 } from "@/types/trading";
 
+import type { Execution, TierHolding as StrategyTierHolding } from "@/strategy";
+
 import { mapDrizzleProfitRecord } from "./mappers";
 
 export interface ProfitAggregate {
@@ -27,37 +29,50 @@ export interface ProfitAggregate {
 }
 
 /**
+ * 수익 기록 한 건의 출처: 보유 티어 하나와 그 티어를 판 settle의 매도 체결
+ */
+export interface SettledSale {
+  accountId: string;
+  ticker: Ticker;
+  strategy: Strategy;
+  // 체결 시점(사이클 완료 처리 전)의 계좌 사이클 번호
+  cycleNumber: number;
+  // 매도 체결일
+  sellDate: string;
+  // 판 보유 티어 (settle에 넘긴 상태의 것)
+  holding: Pick<StrategyTierHolding, "tier" | "buyDate" | "buyPrice" | "shares">;
+  // settle이 낸 매도 체결
+  execution: Execution;
+}
+
+/**
  * 수익 기록 생성
  * 매도 체결 시 호출되어 수익 기록을 저장한다.
- * 매도금액과 손익은 체결 판정(src/strategy의 settle)이 계산한 값을 그대로 받는다 -
+ * 매도가·매도금액·손익은 체결 판정(src/strategy의 settle)이 낸 체결을 그대로 남긴다 -
  * 예수금 계산이 보는 실현손익과 기록이 어긋나지 않게 하려는 것이다 (#97).
  * 매수금액은 보유 티어의 매수가 × 수량이다(가격이 소수 둘째 자리라 정확히 떨어진다).
- *
- * @param data.cycleNumber - 체결 시점(사이클 완료 처리 전)의 계좌 사이클 번호
- * @param data.sellAmount - 매도 체결 금액 (settle의 execution.amount)
- * @param data.profit - 실현 손익 (settle의 execution.profit)
  */
 export async function createProfitRecord(
-  data: {
-    accountId: string;
-    cycleNumber: number;
-    tier: number;
-    ticker: Ticker;
-    strategy: Strategy;
-    buyDate: string;
-    buyPrice: number;
-    buyQuantity: number;
-    sellDate: string;
-    sellPrice: number;
-    sellAmount: number;
-    profit: number;
-  },
+  sale: SettledSale,
   executor: DbExecutor = db
 ): Promise<ProfitRecord> {
-  const buyAmount = new Decimal(data.buyPrice).mul(data.buyQuantity);
+  const { holding, execution } = sale;
+  if (execution.order.type !== "SELL") {
+    throw new Error(`Tier ${execution.order.tier} execution is not a sell`);
+  }
+  if (execution.order.tier !== holding.tier) {
+    throw new Error(
+      `Sell execution for tier ${execution.order.tier} does not match holding tier ${holding.tier}`
+    );
+  }
+  if (execution.profit === undefined) {
+    throw new Error(`Sell execution for tier ${holding.tier} has no profit`);
+  }
+
+  const buyAmount = new Decimal(holding.buyPrice).mul(holding.shares);
 
   // 수익률 계산: 손익 / 매수금액 * 100
-  const profitRate = new Decimal(data.profit)
+  const profitRate = new Decimal(execution.profit)
     .div(buyAmount)
     .mul(100)
     .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
@@ -66,19 +81,19 @@ export async function createProfitRecord(
   const result = await executor
     .insert(profitRecords)
     .values({
-      accountId: data.accountId,
-      cycleNumber: data.cycleNumber,
-      tier: data.tier,
-      ticker: data.ticker,
-      strategy: data.strategy,
-      buyDate: data.buyDate,
-      buyPrice: data.buyPrice,
-      buyQuantity: data.buyQuantity,
-      sellDate: data.sellDate,
-      sellPrice: data.sellPrice,
+      accountId: sale.accountId,
+      cycleNumber: sale.cycleNumber,
+      tier: holding.tier,
+      ticker: sale.ticker,
+      strategy: sale.strategy,
+      buyDate: holding.buyDate,
+      buyPrice: holding.buyPrice,
+      buyQuantity: holding.shares,
+      sellDate: sale.sellDate,
+      sellPrice: execution.price,
       buyAmount: buyAmount.toNumber(),
-      sellAmount: data.sellAmount,
-      profit: data.profit,
+      sellAmount: execution.amount,
+      profit: execution.profit,
       profitRate,
     })
     .returning();

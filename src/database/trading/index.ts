@@ -61,4 +61,4 @@ export {
   aggregateProfits,
   groupProfitsByMonth,
 } from "./profits";
-export type { ProfitAggregate } from "./profits";
+export type { ProfitAggregate, SettledSale } from "./profits";

@@ -20,6 +20,7 @@ vi.mock("@/auth", () => ({
 }));
 
 import { hasDb } from "@/test-utils/db";
+import { settledSale } from "@/test-utils/settled-sale";
 import { mockLoggedIn, mockLoggedOut } from "@/lib/__tests__/auth-mock";
 import { db } from "@/database/db-drizzle";
 import { users } from "@/database/schema/auth";
@@ -63,19 +64,21 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
       shares: 10,
       buyDate: "2009-03-02",
     });
+    // 매수 $100 × 100주를 $25에 손절: 손익 -7,500
     await trading.createProfitRecord({
       accountId,
-      cycleNumber: 1,
-      tier: 2,
       ticker: "SOXL",
       strategy: "Pro2",
-      buyDate: "2009-03-02",
-      buyPrice: 100,
-      buyQuantity: 100,
+      cycleNumber: 1,
       sellDate: "2009-03-04",
-      sellPrice: 25,
-      sellAmount: 2_500,
-      profit: -7_500,
+      ...settledSale({
+        tier: 2,
+        buyDate: "2009-03-02",
+        buyPrice: 100,
+        shares: 100,
+        sellDate: "2009-03-04",
+        sellPrice: 25,
+      }),
     });
   });
 

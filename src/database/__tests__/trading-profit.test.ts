@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 import { hasDb } from "@/test-utils/db";
+import { settledSale } from "@/test-utils/settled-sale";
 import { db } from "../db-drizzle";
 import { users } from "../schema/auth";
 
@@ -59,17 +60,18 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // 매수금액은 보유 티어의 매수가 × 수량이다 (63.72 × 157 = 10,004.04)
       const record = await tradingModule.createProfitRecord({
         accountId: testAccountId,
-        cycleNumber: 1,
-        tier: 1,
         ticker: "SOXL",
         strategy: "Pro1",
-        buyDate: "2025-01-02",
-        buyPrice: 63.72,
-        buyQuantity: 157,
+        cycleNumber: 1,
         sellDate: "2025-01-03",
-        sellPrice: 64.0,
-        sellAmount: 10048.0,
-        profit: 43.96,
+        ...settledSale({
+          tier: 1,
+          buyDate: "2025-01-02",
+          buyPrice: 63.72,
+          shares: 157,
+          sellDate: "2025-01-03",
+          sellPrice: 64.0,
+        }),
       });
 
       expect(record.id).toBeDefined();
@@ -94,17 +96,18 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // SPEC: AC-003 손절 매도 시 음수 수익 기록
       const record = await tradingModule.createProfitRecord({
         accountId: testAccountId,
-        cycleNumber: 1,
-        tier: 2,
         ticker: "SOXL",
         strategy: "Pro2",
-        buyDate: "2025-01-02",
-        buyPrice: 100.0,
-        buyQuantity: 100,
-        sellDate: "2025-01-15", // stop-loss after 10+ days
-        sellPrice: 90.0, // 10% loss
-        sellAmount: 9000.0,
-        profit: -1000.0,
+        cycleNumber: 1,
+        sellDate: "2025-01-15", // stop-loss after 10+ days,
+        ...settledSale({
+          tier: 2,
+          buyDate: "2025-01-02",
+          buyPrice: 100.0,
+          shares: 100,
+          sellDate: "2025-01-15", // stop-loss after 10+ days,
+          sellPrice: 90.0, // 10% loss,
+        }),
       });
 
       expect(record.buyAmount).toBe(10000.0);
@@ -117,37 +120,70 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // SPEC: AC-002 다중 티어 동시 매도 시 개별 기록
       const record1 = await tradingModule.createProfitRecord({
         accountId: testAccountId,
-        cycleNumber: 1,
-        tier: 3,
         ticker: "SOXL",
         strategy: "Pro1",
-        buyDate: "2025-01-02",
-        buyPrice: 50.0,
-        buyQuantity: 100,
+        cycleNumber: 1,
         sellDate: "2025-01-03",
-        sellPrice: 51.0,
-        sellAmount: 5100.0,
-        profit: 100.0,
+        ...settledSale({
+          tier: 3,
+          buyDate: "2025-01-02",
+          buyPrice: 50.0,
+          shares: 100,
+          sellDate: "2025-01-03",
+          sellPrice: 51.0,
+        }),
       });
 
       const record2 = await tradingModule.createProfitRecord({
         accountId: testAccountId,
-        cycleNumber: 1,
-        tier: 4,
         ticker: "SOXL",
         strategy: "Pro1",
-        buyDate: "2025-01-02",
-        buyPrice: 50.0,
-        buyQuantity: 200,
+        cycleNumber: 1,
         sellDate: "2025-01-03",
-        sellPrice: 51.0,
-        sellAmount: 10200.0,
-        profit: 200.0,
+        ...settledSale({
+          tier: 4,
+          buyDate: "2025-01-02",
+          buyPrice: 50.0,
+          shares: 200,
+          sellDate: "2025-01-03",
+          sellPrice: 51.0,
+        }),
       });
 
       expect(record1.id).not.toBe(record2.id);
       expect(record1.tier).toBe(3);
       expect(record2.tier).toBe(4);
+    });
+
+    it("보유 티어와 다른 티어의 매도 체결은 기록하지 않는다", async () => {
+      const { execution } = settledSale({
+        tier: 5,
+        buyDate: "2025-01-02",
+        buyPrice: 50.0,
+        shares: 10,
+        sellDate: "2025-01-03",
+        sellPrice: 51.0,
+      });
+      const { holding } = settledSale({
+        tier: 6,
+        buyDate: "2025-01-02",
+        buyPrice: 50.0,
+        shares: 10,
+        sellDate: "2025-01-03",
+        sellPrice: 51.0,
+      });
+
+      await expect(
+        tradingModule.createProfitRecord({
+          accountId: testAccountId,
+          ticker: "SOXL",
+          strategy: "Pro1",
+          cycleNumber: 1,
+          sellDate: "2025-01-03",
+          holding,
+          execution,
+        })
+      ).rejects.toThrow("does not match holding tier 6");
     });
   });
 
@@ -183,17 +219,18 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       const record = (accountId: string, cycleNumber: number, tier: number, profit: number) =>
         tradingModule.createProfitRecord({
           accountId,
-          cycleNumber,
-          tier,
           ticker: "SOXL",
           strategy: "Pro3",
-          buyDate: "2025-04-01",
-          buyPrice: 10,
-          buyQuantity: 100,
+          cycleNumber,
           sellDate: "2025-04-10",
-          sellPrice: 10 + profit / 100,
-          sellAmount: 1000 + profit,
-          profit,
+          ...settledSale({
+            tier,
+            buyDate: "2025-04-01",
+            buyPrice: 10,
+            shares: 100,
+            sellDate: "2025-04-10",
+            sellPrice: 10 + profit / 100,
+          }),
         });
 
       try {
@@ -248,32 +285,34 @@ describe.skipIf(!hasDb)("Profit Records DB Functions", () => {
       // Two trades with different profit rates
       await tradingModule.createProfitRecord({
         accountId: isolatedAccount.id,
-        cycleNumber: 1,
-        tier: 1,
         ticker: "TQQQ",
         strategy: "Pro2",
-        buyDate: "2025-03-02",
-        buyPrice: 100.0,
-        buyQuantity: 100, // buyAmount: 10000
+        cycleNumber: 1,
         sellDate: "2025-03-10",
-        sellPrice: 102.0,
-        sellAmount: 10200, // profit: 200 (2%)
-        profit: 200,
+        ...settledSale({
+          tier: 1,
+          buyDate: "2025-03-02",
+          buyPrice: 100.0,
+          shares: 100, // buyAmount: 10000
+          sellDate: "2025-03-10",
+          sellPrice: 102.0,
+        }),
       });
 
       await tradingModule.createProfitRecord({
         accountId: isolatedAccount.id,
-        cycleNumber: 1,
-        tier: 2,
         ticker: "TQQQ",
         strategy: "Pro2",
-        buyDate: "2025-03-05",
-        buyPrice: 100.0,
-        buyQuantity: 100, // buyAmount: 10000
+        cycleNumber: 1,
         sellDate: "2025-03-15",
-        sellPrice: 104.0,
-        sellAmount: 10400, // profit: 400 (4%)
-        profit: 400,
+        ...settledSale({
+          tier: 2,
+          buyDate: "2025-03-05",
+          buyPrice: 100.0,
+          shares: 100, // buyAmount: 10000
+          sellDate: "2025-03-15",
+          sellPrice: 104.0,
+        }),
       });
 
       const result = await tradingModule.groupProfitsByMonth(isolatedAccount.id);
