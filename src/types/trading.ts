@@ -35,6 +35,26 @@ export interface TradingAccount {
 }
 
 /**
+ * 시드 이력의 한 줄 - 적용일부터 쓰이는 시드 금액 (ADR-0005)
+ */
+export interface SeedHistoryEntry {
+  effectiveDate: string;
+  seedCapital: number;
+}
+
+/**
+ * 화면에 보일 시드 상태 (ADR-0005)
+ * - current: 오늘의 시드
+ * - pending: 아직 적용되지 않은 변경 (적용일이 오늘 뒤). 없으면 null
+ * - appliedToday: 오늘 새 시드가 처음 적용됐으면 직전 거래일의 시드와 오늘의 시드. 아니면 null
+ */
+export interface SeedStatus {
+  current: number;
+  pending: SeedHistoryEntry | null;
+  appliedToday: { previous: number; current: number } | null;
+}
+
+/**
  * 티어별 보유 현황
  */
 export interface TierHolding {
