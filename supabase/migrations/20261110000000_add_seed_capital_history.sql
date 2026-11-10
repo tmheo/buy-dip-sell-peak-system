@@ -1,4 +1,4 @@
--- Add seed_capital_history (#116, ADR-0005) - 마이그레이션 A
+-- Add seed_capital_history (#116, ADR-0005)
 --
 -- 시드 금액을 적용일이 붙은 이력으로 남긴다. 바꾼 시드는 바꾼 날(서버의 UTC 날짜)의
 -- 다음 거래일 주문표부터 쓰이고, 어느 날의 사이클 자본은 이 이력에서 그날의 시드를 읽는다.
@@ -15,10 +15,14 @@
 -- - 줄이 없는 계좌가 남으면 실패시킨다. 사람이 데이터를 고친 뒤 다시 적용한다.
 --
 -- 옛 코드와 함께 돌아도 문제가 없다 - 옛 코드는 이 테이블을 모르고 seed_capital을 계속 쓴다.
--- 이 마이그레이션 뒤 배포 전까지 옛 코드가 만든 계좌나 바꾼 시드는 배포 뒤 확인 쿼리
--- (scripts/seed-capital-history-deploy.sh verify)가 잡는다.
+-- 이 마이그레이션 뒤 배포 전까지 옛 코드가 만든 계좌나 바꾼 시드는 배포 뒤 확인 쿼리가
+-- 잡았다. 운영 DB에는 2026-11-10에 적용했고, 그때 쓴 배포 스크립트
+-- (scripts/seed-capital-history-deploy.sh)는 #120에서 지웠다 - git 기록에 남아 있다.
 --
 -- CI는 drizzle 스키마로 테이블을 먼저 만든 뒤 이 파일을 다시 적용하므로 멱등하게 쓴다.
+-- 20261111000000_drop_trading_accounts_seed_capital.sql(#120)이 seed_capital 칸을 지운 뒤로는
+-- drizzle 스키마에도 칸이 없다.
+-- 칸이 없으면 첫 줄 채우기와 NOT NULL 풀기를 건너뛰고 줄이 없는 계좌 검사만 한다.
 -- 한 트랜잭션으로 적용한다(psql -1).
 
 CREATE TABLE IF NOT EXISTS public.seed_capital_history (
@@ -34,14 +38,29 @@ CREATE TABLE IF NOT EXISTS public.seed_capital_history (
 
 ALTER TABLE public.seed_capital_history ENABLE ROW LEVEL SECURITY;
 
--- 이미 이력이 있는 계좌는 건드리지 않는다 - 다시 적용해도 새 코드가 쓴 줄이 그대로 남는다
-INSERT INTO public.seed_capital_history (account_id, effective_date, seed_capital)
-SELECT a.id, coalesce(a.created_at::date, current_date), a.seed_capital
-FROM public.trading_accounts a
-WHERE a.seed_capital IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM public.seed_capital_history h WHERE h.account_id = a.id
-  );
+-- 이미 이력이 있는 계좌는 건드리지 않는다 - 다시 적용해도 새 코드가 쓴 줄이 그대로 남는다.
+-- plpgsql은 문장을 실행할 때 해석하므로, 칸이 없어 건너뛴 문장은 칸을 찾지 않는다.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_attribute
+    WHERE attrelid = 'public.trading_accounts'::regclass
+      AND attname = 'seed_capital'
+      AND NOT attisdropped
+  ) THEN
+    INSERT INTO public.seed_capital_history (account_id, effective_date, seed_capital)
+    SELECT a.id, coalesce(a.created_at::date, current_date), a.seed_capital
+    FROM public.trading_accounts a
+    WHERE a.seed_capital IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.seed_capital_history h WHERE h.account_id = a.id
+      );
+
+    ALTER TABLE public.trading_accounts
+      ALTER COLUMN seed_capital DROP NOT NULL;
+  END IF;
+END
+$$;
 
 DO $$
 DECLARE
@@ -59,6 +78,3 @@ BEGIN
   END IF;
 END
 $$;
-
-ALTER TABLE public.trading_accounts
-  ALTER COLUMN seed_capital DROP NOT NULL;

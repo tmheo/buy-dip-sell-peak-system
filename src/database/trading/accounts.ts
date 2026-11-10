@@ -2,7 +2,7 @@
  * 트레이딩 계좌 CRUD 함수 (PRD-TRADING-001)
  */
 
-import { eq, and, desc, getTableColumns, gte, isNull, or } from "drizzle-orm";
+import { eq, and, desc, gte, isNull, or } from "drizzle-orm";
 
 import { db, type DbExecutor } from "../db-drizzle";
 import { tradingAccounts, tierHoldings } from "../schema/index";
@@ -20,9 +20,6 @@ import { CycleInProgressError, TradingStartDateLockedError } from "./errors";
 import { mapDrizzleTradingAccount } from "./mappers";
 import { insertInitialSeed } from "./seed-capital";
 import { getTierHoldings, getTotalShares } from "./tier-holdings";
-
-// 계좌 행에서 읽는 칸 - seed_capital은 더 읽지 않는다. 시드는 시드 이력이 소유한다 (ADR-0005).
-const { seedCapital: _unusedSeedCapital, ...accountColumns } = getTableColumns(tradingAccounts);
 
 /**
  * 트레이딩 계좌 생성 (티어 홀딩 7개와 첫 시드를 함께 쓴다)
@@ -48,7 +45,7 @@ export async function createTradingAccount(
         // 생성자가 곧 조회하므로 활성 상태로 시작 (스케줄러 처리 대상에 포함)
         lastViewedAt: new Date(),
       })
-      .returning(accountColumns);
+      .returning();
 
     const account = accountResult[0];
 
@@ -73,7 +70,7 @@ export async function createTradingAccount(
  */
 export async function getTradingAccountsByUserId(userId: string): Promise<TradingAccount[]> {
   const rows = await db
-    .select(accountColumns)
+    .select()
     .from(tradingAccounts)
     .where(eq(tradingAccounts.userId, userId))
     .orderBy(desc(tradingAccounts.createdAt));
@@ -86,7 +83,7 @@ export async function getTradingAccountsByUserId(userId: string): Promise<Tradin
  * 일일 마감 처리 cron에서 특정 계좌 지정 처리 시 사용
  */
 export async function getAllTradingAccounts(): Promise<TradingAccount[]> {
-  const rows = await db.select(accountColumns).from(tradingAccounts);
+  const rows = await db.select().from(tradingAccounts);
   return rows.map(mapDrizzleTradingAccount);
 }
 
@@ -99,7 +96,7 @@ export async function getAllTradingAccounts(): Promise<TradingAccount[]> {
  */
 export async function getActiveTradingAccounts(since: Date): Promise<TradingAccount[]> {
   const rows = await db
-    .select(accountColumns)
+    .select()
     .from(tradingAccounts)
     .where(gte(tradingAccounts.lastViewedAt, since));
   return rows.map(mapDrizzleTradingAccount);
@@ -126,7 +123,7 @@ export async function getTradingAccountById(
   executor: DbExecutor = db
 ): Promise<TradingAccount | null> {
   const rows = await executor
-    .select(accountColumns)
+    .select()
     .from(tradingAccounts)
     .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)))
     .limit(1);
@@ -142,11 +139,7 @@ export async function getTradingAccountById(
 export async function getTradingAccountByIdWithoutOwnerCheck(
   id: string
 ): Promise<TradingAccount | null> {
-  const rows = await db
-    .select(accountColumns)
-    .from(tradingAccounts)
-    .where(eq(tradingAccounts.id, id))
-    .limit(1);
+  const rows = await db.select().from(tradingAccounts).where(eq(tradingAccounts.id, id)).limit(1);
 
   return rows[0] ? mapDrizzleTradingAccount(rows[0]) : null;
 }
