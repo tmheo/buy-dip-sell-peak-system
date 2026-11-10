@@ -50,6 +50,7 @@ export {
   getSeedStatus,
   seedCapitalAndCutOn,
   seedCapitalOn,
+  seedChangeEffectiveDate,
   seedStatus,
 } from "./seed-capital";
 export type { SeedCapitalAndCut } from "./seed-capital";

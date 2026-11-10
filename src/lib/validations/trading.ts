@@ -70,11 +70,12 @@ export const UpdateTradingAccountSchema = z.object({
 
 /**
  * 시드 변경 스키마 (PUT /api/trading/accounts/[id]/seed, ADR-0005, ADR-0006)
- * confirmCycleEnd는 사이클을 끝낼 수 있는 감액임을 사용자가 확인했다는 뜻이다.
+ * confirmedClassification은 사용자가 확인한 시드 변경 분류다 - 오늘 매수에 달린 감액(depends)
+ * 또는 사이클을 끝내는 감액(ends)임을 확인했다는 뜻이다. 확인하지 않았으면 보내지 않는다.
  */
 export const ChangeSeedCapitalSchema = z.object({
   seedCapital: SeedCapitalAmountSchema,
-  confirmCycleEnd: z.boolean().optional(),
+  confirmedClassification: z.enum(["depends", "ends"]).optional(),
 });
 
 export type CreateTradingAccountInput = z.infer<typeof CreateTradingAccountSchema>;

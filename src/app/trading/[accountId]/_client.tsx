@@ -9,15 +9,25 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AccountSettingsCard from "@/components/trading/AccountSettingsCard";
-import type { AccountSettingsChanges } from "@/components/trading/AccountSettingsCard";
+import type {
+  AccountSettingsChanges,
+  AccountSettingsSaveResult,
+} from "@/components/trading/AccountSettingsCard";
 import AssetSummary from "@/components/trading/AssetSummary";
 import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
 import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
 import { calculateAssetValues } from "@/components/trading/asset-values";
+import { pendingSeedOrdersNote } from "@/components/trading/account-settings";
 import { formatSeedAmount } from "@/components/trading/format";
 import type { LatestClose } from "@/database/trading";
-import type { CashBreakdown, ReducedBuy, UnaffordableBuy } from "@/strategy";
+import type {
+  CashBreakdown,
+  CycleEndingSeedChange,
+  ReducedBuy,
+  SeedCutLimits,
+  UnaffordableBuy,
+} from "@/strategy";
 import type { SeedCutSettlement } from "@/trading";
 import type { TradingAccountDetail, DailyOrder } from "@/types/trading";
 
@@ -29,11 +39,13 @@ interface TradingDetailClientProps {
  * 계좌 상세 응답
  * 예수금·계좌 현금·티어 금액(cashBreakdown)은 매매 규칙이 계산한 값을 그대로 쓴다 (ADR-0003).
  * 앞 사이클이 시드 감액으로 끝났으면 그 시드 감액 정산(seedCutSettlement)이 함께 온다 (#118).
+ * 사이클 중이면 감액 경계(seedCutLimits)가 함께 온다 - 시드 변경 화면이 감액을 분류하는 데 쓴다 (#119).
  */
 interface AccountResponse {
   account: TradingAccountDetail;
   cashBreakdown: CashBreakdown;
   latestClose: LatestClose | null;
+  seedCutLimits: SeedCutLimits | null;
   seedCutSettlement: SeedCutSettlement | null;
 }
 
@@ -48,25 +60,38 @@ interface AccountDetail {
   account: TradingAccountDetail;
   cash: CashBreakdown;
   latestClose: LatestClose | null;
+  seedCutLimits: SeedCutLimits | null;
   seedCutSettlement: SeedCutSettlement | null;
 }
 
-/**
- * JSON 본문으로 PUT을 보낸다. 실패하면 서버가 준 오류 문장으로 던진다 -
- * 검증 오류는 칸별 문장(details.fieldErrors)이 더 구체적이다.
- */
-async function putJson(url: string, body: unknown): Promise<void> {
-  const response = await fetch(url, {
+interface ErrorBody {
+  error?: string;
+  details?: { fieldErrors?: Record<string, string[]> };
+}
+
+/** JSON 본문으로 PUT을 보낸다 */
+function putJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (response.ok) return;
+}
 
-  const result: { error?: string; details?: { fieldErrors?: Record<string, string[]> } } =
-    await response.json().catch(() => ({}));
-  const fieldError = Object.values(result.details?.fieldErrors ?? {})[0]?.[0];
-  throw new Error(fieldError ?? result.error ?? "설정 저장에 실패했습니다.");
+/**
+ * 실패한 응답의 오류 문장 - 검증 오류는 칸별 문장(details.fieldErrors)이 더 구체적이다.
+ * 본문을 읽지 못하면 null
+ */
+async function errorMessage(response: Response): Promise<string | null> {
+  const result: ErrorBody = await response.json().catch(() => ({}));
+  return Object.values(result.details?.fieldErrors ?? {})[0]?.[0] ?? result.error ?? null;
+}
+
+/** 시드 변경 API의 409 본문 - 사이클을 끝낼 수 있는 감액이라며 지금의 분류로 다시 묻는다 */
+interface SeedChangeConflictBody {
+  classification: CycleEndingSeedChange;
+  seedCutLimits: SeedCutLimits;
+  effectiveDate: string;
 }
 
 export default function TradingDetailClient({
@@ -121,6 +146,7 @@ export default function TradingDetailClient({
           account: accountData.account,
           cash: accountData.cashBreakdown,
           latestClose: accountData.latestClose,
+          seedCutLimits: accountData.seedCutLimits,
           seedCutSettlement: accountData.seedCutSettlement,
         });
       } catch (err) {
@@ -136,23 +162,38 @@ export default function TradingDetailClient({
     fetchAccount();
   }, [fetchAccount]);
 
-  /** 바꾼 것만 보낸다 - 시드는 적용일이 붙은 이력으로 따로 바꾼다 (ADR-0005) */
-  async function handleSave(changes: AccountSettingsChanges): Promise<boolean> {
+  /**
+   * 바꾼 것만 보낸다 - 시드는 적용일이 붙은 이력으로 따로 바꾼다 (ADR-0005).
+   * 시드 변경이 확인을 요구하면(409) 알림창을 띄우지 않고 설정 카드가 다시 묻게 한다.
+   */
+  async function handleSave(changes: AccountSettingsChanges): Promise<AccountSettingsSaveResult> {
     setIsSaving(true);
 
     try {
       if (changes.settings) {
-        await putJson(`/api/trading/accounts/${accountId}`, changes.settings);
+        const response = await putJson(`/api/trading/accounts/${accountId}`, changes.settings);
+        if (!response.ok) {
+          throw new Error((await errorMessage(response)) ?? "설정 저장에 실패했습니다.");
+        }
       }
-      if (changes.seedCapital !== null) {
-        await putJson(`/api/trading/accounts/${accountId}/seed`, {
-          seedCapital: changes.seedCapital,
-        });
+      if (changes.seed) {
+        const response = await putJson(`/api/trading/accounts/${accountId}/seed`, changes.seed);
+        // 화면을 연 뒤 감액 경계가 바뀌었다 - 알림창 대신 설정 카드가 응답으로 다시 묻는다
+        if (response.status === 409) {
+          const conflict: SeedChangeConflictBody = await response.json();
+          return {
+            status: "needsConfirmation",
+            recheck: { seedCapital: changes.seed.seedCapital, ...conflict },
+          };
+        }
+        if (!response.ok) {
+          throw new Error((await errorMessage(response)) ?? "시드 저장에 실패했습니다.");
+        }
       }
-      return true;
+      return { status: "saved" };
     } catch (err) {
       alert(err instanceof Error ? err.message : "설정 저장에 실패했습니다.");
-      return false;
+      return { status: "failed" };
     } finally {
       // 일부만 저장됐어도 화면이 저장된 값을 보이게 다시 읽는다
       await fetchAccount(false);
@@ -209,8 +250,9 @@ export default function TradingDetailClient({
     );
   }
 
-  const { account, cash, latestClose, seedCutSettlement } = detail;
+  const { account, cash, latestClose, seedCutLimits, seedCutSettlement } = detail;
   const assetValues = calculateAssetValues(account.totalShares, cash, latestClose);
+  const pendingSeedNote = pendingSeedOrdersNote(account.seed);
 
   return (
     <div className="container py-4">
@@ -226,6 +268,7 @@ export default function TradingDetailClient({
         account={account}
         endsCycleBySeedCut={cash.endsCycleBySeedCut}
         seedCutSettlement={seedCutSettlement}
+        seedCutLimits={seedCutLimits}
         onSave={handleSave}
         isSaving={isSaving}
       />
@@ -249,6 +292,9 @@ export default function TradingDetailClient({
           오늘은 시드를 {formatSeedAmount(account.seed.current)}로 줄여 사이클을 끝내는 날입니다.
           보유 티어를 모두 MOC로 팔고, 매수 주문은 내지 않습니다.
         </div>
+      )}
+      {pendingSeedNote && (
+        <div className="small text-secondary mb-2 text-keep-all">* {pendingSeedNote}</div>
       )}
       {ordersError && (
         <div className="alert alert-warning mb-4" role="alert">

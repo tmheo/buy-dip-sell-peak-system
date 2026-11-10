@@ -277,6 +277,8 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         current: 10_000,
         pending: { seedCapital: 3_000, effectiveDate: "2026-11-16" },
         appliedToday: null,
+        // 지금 다시 바꿔도 같은 날부터 쓰인다 - 화면은 이 날짜로 적용일을 안내한다
+        changeEffectiveDate: "2026-11-16",
       });
       // 예수금은 오늘의 시드로 계산한다
       expect(body.cashBreakdown.cycleCapital).toBe(10_000);

@@ -47,11 +47,14 @@ export interface SeedHistoryEntry {
  * - current: 오늘의 시드
  * - pending: 아직 적용되지 않은 변경 (적용일이 오늘 뒤). 없으면 null
  * - appliedToday: 오늘 새 시드가 처음 적용됐으면 직전 거래일의 시드와 오늘의 시드. 아니면 null
+ * - changeEffectiveDate: 오늘 시드를 바꾸면 새 시드가 쓰이기 시작하는 날(적용일). 적용 전 변경이
+ *   있으면 그 적용일과 같다. 화면은 적용일을 브라우저 시계로 다시 계산하지 않고 이 값을 쓴다
  */
 export interface SeedStatus {
   current: number;
   pending: SeedHistoryEntry | null;
   appliedToday: { previous: number; current: number } | null;
+  changeEffectiveDate: string;
 }
 
 /**

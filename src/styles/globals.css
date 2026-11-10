@@ -215,6 +215,31 @@ body {
   max-width: 26rem;
 }
 
+/* 사이클 중 시드 감액의 감액 경계 막대와 입력한 감액의 위치 */
+.cut-zone-bar {
+  height: 14px;
+}
+
+.cut-zone-marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #000;
+}
+
+/* 사이클 중에 바꿀 수 없는 칸의 표시 */
+/* 위아래 음수 여백으로 이름 줄을 높이지 않는다 - 옆 칸의 입력과 높이가 같아야 한다 */
+.locked-in-cycle-tag {
+  font-size: 0.7rem;
+  padding: 0.15em 0.5em;
+  vertical-align: middle;
+  margin-block: -0.5em;
+}
+
 /* Loading Spinner */
 .loading-spinner {
   display: none;

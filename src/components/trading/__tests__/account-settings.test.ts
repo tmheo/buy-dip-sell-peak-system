@@ -5,12 +5,14 @@
  * - 고른 전략이 지금 전략과 다르면 경고 문장을 보인다. 저장은 막지 않는다.
  * - 적용 전 시드 변경이 있으면 지금 시드와 바꿀 시드, 적용일을 보인다 (ADR-0005).
  * - 시드 칸은 바꿀 시드(적용 전 변경이 있으면 그 값)로 시작하고, 그 값과 다를 때만 보낸다.
+ * - 적용 전 변경이 있으면 주문표 위에 오늘 주문표는 지금 시드 기준이라고 적는다 (#119).
  */
 import { describe, it, expect } from "vitest";
 import type { SeedStatus } from "@/types/trading";
 import {
   canEditTradingStartDate,
   pendingSeedChangeText,
+  pendingSeedOrdersNote,
   seedChangeToSend,
   seedInputValue,
   strategyChangeWarning,
@@ -21,8 +23,14 @@ const PENDING: SeedStatus = {
   current: 10_000,
   pending: { seedCapital: 3_000, effectiveDate: "2026-11-11" },
   appliedToday: null,
+  changeEffectiveDate: "2026-11-11",
 };
-const SETTLED: SeedStatus = { current: 10_000, pending: null, appliedToday: null };
+const SETTLED: SeedStatus = {
+  current: 10_000,
+  pending: null,
+  appliedToday: null,
+  changeEffectiveDate: "2026-11-11",
+};
 
 describe("canEditTradingStartDate()", () => {
   it("첫 일일 마감 전이면 운용 시작일을 편집할 수 있다", () => {
@@ -76,5 +84,15 @@ describe("seedChangeToSend()", () => {
     expect(seedChangeToSend(SETTLED, 3_000)).toBe(3_000);
     expect(seedChangeToSend(PENDING, 5_000)).toBe(5_000);
     expect(seedChangeToSend(PENDING, 10_000)).toBe(10_000);
+  });
+});
+
+describe("pendingSeedOrdersNote()", () => {
+  it("적용 전 변경이 있으면 오늘 주문표는 지금 시드 기준이라고만 적는다 - 새 시드와 적용일은 설정 카드가 보인다", () => {
+    expect(pendingSeedOrdersNote(PENDING)).toBe("오늘 주문표는 지금 시드 $10,000 기준입니다.");
+  });
+
+  it("적용 전 변경이 없으면 적을 것이 없다", () => {
+    expect(pendingSeedOrdersNote(SETTLED)).toBeNull();
   });
 });

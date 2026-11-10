@@ -12,11 +12,18 @@ import {
   getPreviousTradingClose,
   getTradingAccountById,
   runInReadSnapshot,
+  seedChangeEffectiveDate,
   type DbExecutor,
 } from "@/database/trading";
 import { isWeekday } from "@/lib/date";
 import type { CycleEndingSeedChange, CycleState, SeedCutLimits } from "@/strategy";
-import { classifySeedChange, isCycleInProgress, mayEndCycle, seedCutLimits } from "@/strategy";
+import {
+  classifySeedChange,
+  isCycleInProgress,
+  mayEndCycle,
+  needsSeedChangeConfirmation,
+  seedCutLimits,
+} from "@/strategy";
 import type { SeedStatus, TradingAccount } from "@/types/trading";
 
 import { loadCycleState } from "./orders";
@@ -57,8 +64,8 @@ export async function loadCycleStateWithSeedCutLimits(
 
 /**
  * 시드 변경 결과.
- * needsConfirmation은 사이클을 끝낼 수 있는 감액인데 확인이 없어 쓰지 않았다는 뜻이고,
- * 서버가 새로 계산한 분류와 감액 경계를 함께 담는다.
+ * needsConfirmation은 사이클을 끝낼 수 있는 감액인데 사용자가 그만큼 확인하지 않아 쓰지 않았다는
+ * 뜻이고, 서버가 새로 계산한 분류와 감액 경계, 지금 바꾸면 새 시드가 쓰이기 시작하는 날을 담는다.
  */
 export type SeedChangeOutcome =
   | { status: "changed"; seed: SeedStatus }
@@ -66,14 +73,16 @@ export type SeedChangeOutcome =
       status: "needsConfirmation";
       classification: CycleEndingSeedChange;
       seedCutLimits: SeedCutLimits;
+      effectiveDate: string;
     };
 
 /**
  * 시드를 바꾼다. 새 시드는 오늘의 다음 거래일부터 쓰인다 (ADR-0005).
  *
  * 사이클 중 감액은 오늘의 사이클 상태로 감액 경계를 새로 계산해 분류하고, 사이클을 끝낼 수 있는
- * 감액(mayEndCycle)이면 confirmCycleEnd가 true일 때만 쓴다 - 화면이 경계를 보인 뒤 주문표가
- * 체결됐을 수 있어, 서버가 지금의 상태로 다시 묻게 한다. 사이클 사이에는 묻지 않는다.
+ * 감액이면 사용자가 확인한 분류가 그만큼일 때만 쓴다(needsSeedChangeConfirmation) - 화면이 경계를
+ * 보인 뒤 주문표가 체결됐을 수 있어, 오늘 매수에 달림을 확인했는데 지금은 사이클 끝이면 서버가
+ * 지금의 분류로 다시 묻게 한다. 사이클 사이에는 묻지 않는다.
  *
  * 분류와 쓰기는 한 트랜잭션이 아니다. 그 사이에 일일 마감이 끝나 보유가 바뀌어도 판정은
  * 적용일 주문표가 그날의 상태로 다시 하므로 규칙이 어긋나지 않는다 - 이 분류는 사용자에게
@@ -81,7 +90,7 @@ export type SeedChangeOutcome =
  *
  * @param seedCapital - 새 시드 (검증은 호출 경로가 마쳤다)
  * @param today - 바꾼 날 (서버의 UTC 날짜, YYYY-MM-DD)
- * @param confirmCycleEnd - 사이클이 끝날 수 있음을 사용자가 확인했는지
+ * @param confirmedClassification - 사용자가 확인한 분류 (오늘 매수에 달림, 사이클 끝). 확인하지 않았으면 null
  * @returns 결과. 계좌가 없거나 다른 사용자의 것이면 null
  */
 export async function changeSeed(
@@ -89,7 +98,7 @@ export async function changeSeed(
   userId: string,
   seedCapital: number,
   today: string,
-  confirmCycleEnd: boolean
+  confirmedClassification: CycleEndingSeedChange | null
 ): Promise<SeedChangeOutcome | null> {
   const judged = await runInReadSnapshot(async (snapshot) => {
     const account = await getTradingAccountById(accountId, userId, snapshot);
@@ -101,10 +110,18 @@ export async function changeSeed(
   }
 
   const { state, seedCutLimits: limits } = judged;
-  if (limits && !confirmCycleEnd) {
+  if (limits) {
     const classification = classifySeedChange(state.cycleCapital, seedCapital, limits);
-    if (mayEndCycle(classification)) {
-      return { status: "needsConfirmation", classification, seedCutLimits: limits };
+    if (
+      mayEndCycle(classification) &&
+      needsSeedChangeConfirmation(classification, confirmedClassification)
+    ) {
+      return {
+        status: "needsConfirmation",
+        classification,
+        seedCutLimits: limits,
+        effectiveDate: seedChangeEffectiveDate(today),
+      };
     }
   }
 

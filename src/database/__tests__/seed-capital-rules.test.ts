@@ -136,7 +136,14 @@ describe("seedStatus", () => {
       current: 10_000,
       pending: { seedCapital: 3_000, effectiveDate: "2026-11-11" },
       appliedToday: null,
+      changeEffectiveDate: "2026-11-11",
     });
+  });
+
+  it("오늘 바꾸면 새 시드가 쓰이기 시작하는 날을 보인다 - 금요일과 주말에 바꾸면 월요일이다", () => {
+    expect(seedStatus(CREATED, "2026-11-12", "2026-11-11").changeEffectiveDate).toBe("2026-11-13");
+    expect(seedStatus(CREATED, "2026-11-13", "2026-11-12").changeEffectiveDate).toBe("2026-11-16");
+    expect(seedStatus(CREATED, "2026-11-14", "2026-11-13").changeEffectiveDate).toBe("2026-11-16");
   });
 
   it("적용일에는 새 시드가 오늘 처음 적용됐다고 보인다", () => {
@@ -146,6 +153,7 @@ describe("seedStatus", () => {
       current: 3_000,
       pending: null,
       appliedToday: { previous: 10_000, current: 3_000 },
+      changeEffectiveDate: "2026-11-12",
     });
     // 그다음 거래일에는 직전 거래일에도 새 시드였다
     expect(seedStatus(history, "2026-11-12", "2026-11-11").appliedToday).toBeNull();

@@ -642,14 +642,16 @@ describe("ChangeSeedCapitalSchema (ADR-0005)", () => {
     expect(ChangeSeedCapitalSchema.safeParse({}).success).toBe(false);
   });
 
-  it("사이클을 끝낼 수 있는 감액의 확인은 불리언으로만 받아야 한다 (ADR-0006)", () => {
-    for (const confirmCycleEnd of [true, false, undefined]) {
+  it("확인한 분류는 오늘 매수에 달림(depends)이나 사이클 끝(ends)으로만 받아야 한다 (ADR-0006)", () => {
+    for (const confirmedClassification of ["depends", "ends", undefined]) {
       expect(
-        ChangeSeedCapitalSchema.safeParse({ seedCapital: 3_000, confirmCycleEnd }).success
+        ChangeSeedCapitalSchema.safeParse({ seedCapital: 3_000, confirmedClassification }).success
       ).toBe(true);
     }
-    expect(
-      ChangeSeedCapitalSchema.safeParse({ seedCapital: 3_000, confirmCycleEnd: "true" }).success
-    ).toBe(false);
+    for (const confirmedClassification of ["keep", "increase", true]) {
+      expect(
+        ChangeSeedCapitalSchema.safeParse({ seedCapital: 3_000, confirmedClassification }).success
+      ).toBe(false);
+    }
   });
 });
