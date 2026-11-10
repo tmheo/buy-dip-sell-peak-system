@@ -313,6 +313,12 @@ body {
   --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23dee2e6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
 }
 
+/* 날짜 입력의 달력 아이콘도 브라우저 기본값이 짙은 색이라 어두운 배경에서 잘 보이지 않는다.
+   입력란의 색은 .bg-dark와 .text-light가 정하므로, 브라우저가 그리는 아이콘과 달력만 어두운 모드로 바꾼다. */
+.form-control.bg-dark[type="date"] {
+  color-scheme: dark;
+}
+
 /* Trading Stats Cards */
 .trading-stat-card {
   background-color: rgba(7, 54, 66, 0.5);
