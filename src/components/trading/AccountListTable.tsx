@@ -7,6 +7,7 @@
 import type React from "react";
 import Link from "next/link";
 import type { TradingAccount, TierHolding } from "@/types/trading";
+import { formatDate } from "./format";
 
 interface AccountWithHoldings extends TradingAccount {
   holdings: TierHolding[];
@@ -25,16 +26,6 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function formatDate(date: string): string {
-  const [year, month, day] = date.split("-");
-  const localDate = new Date(Number(year), Number(month) - 1, Number(day));
-  return localDate.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 function countHeldTiers(holdings: TierHolding[]): number {
@@ -100,15 +91,17 @@ export default function AccountListTable({
                     </button>
                   </div>
                 </div>
-                <div className="d-flex justify-content-between mt-2 small text-secondary">
-                  <span>시드: {formatCurrency(account.seedCapital)}</span>
-                  <span>
+                <div className="d-flex flex-wrap justify-content-between column-gap-3 mt-2 small text-secondary">
+                  <span className="text-nowrap">시드: {formatCurrency(account.seedCapital)}</span>
+                  <span className="text-nowrap">
                     보유:{" "}
                     <span className={heldTiers > 0 ? "text-success" : "text-secondary"}>
                       {heldTiers}/{totalTiers}
                     </span>
                   </span>
-                  <span>시작: {formatDate(account.cycleStartDate)}</span>
+                  <span className="text-nowrap">
+                    운용 시작일: {formatDate(account.cycleStartDate)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -130,7 +123,7 @@ export default function AccountListTable({
                     <th className="text-end">시드</th>
                     <th className="text-center">전략</th>
                     <th className="text-center">보유</th>
-                    <th className="text-center">시작일</th>
+                    <th className="text-center">운용 시작일</th>
                     <th className="text-center">회차</th>
                     <th className="text-center">작업</th>
                     <th className="text-center">삭제</th>

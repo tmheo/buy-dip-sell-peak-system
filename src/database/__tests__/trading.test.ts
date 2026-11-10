@@ -5,7 +5,7 @@
  * - createTradingAccount(): 계좌 생성 및 7개 티어 자동 생성 확인
  * - getTradingAccountsByUserId(): 사용자별 계좌 조회
  * - getTradingAccountById(): 단일 계좌 조회 (본인 확인)
- * - updateTradingAccount(): 계좌 수정 (사이클 미진행 시만)
+ * - updateTradingAccount(): 계좌 수정 (사이클 미진행 시만, 운용 시작일은 첫 일일 마감 전에만)
  * - deleteTradingAccount(): 계좌 삭제 (CASCADE 확인)
  * - getTierHoldings(): 티어별 보유 현황
  * - getTotalShares(): 총 보유 수량 계산
@@ -390,7 +390,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
 
       await expect(
         tradingModule.updateTradingAccount(created.id, TEST_USER_ID, { name: "새 이름" })
-      ).rejects.toThrow("Cannot update account while cycle is in progress");
+      ).rejects.toBeInstanceOf(tradingModule.CycleInProgressError);
     });
 
     it("빈 업데이트 요청 시 기존 계좌를 그대로 반환해야 한다", async () => {
@@ -410,42 +410,63 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       expect(result!.name).toBe("빈 수정 테스트");
     });
 
-    it("티커를 SOXL에서 TQQQ로 변경할 수 있어야 한다", async () => {
-      const request: CreateTradingAccountRequest = {
-        name: "티커 변경 테스트",
+    it("첫 일일 마감 전에는 운용 시작일을 바꿀 수 있어야 한다", async () => {
+      const created = await tradingModule.createTradingAccount(TEST_USER_ID, {
+        name: "운용 시작일 변경 테스트",
         ticker: "SOXL",
         seedCapital: 10000,
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
-      };
-      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
+      });
       createdAccountIds.push(created.id);
 
       const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
-        ticker: "TQQQ",
+        cycleStartDate: "2025-02-03",
       });
 
-      expect(updated).not.toBeNull();
-      expect(updated!.ticker).toBe("TQQQ");
+      expect(updated!.cycleStartDate).toBe("2025-02-03");
     });
 
-    it("사이클 시작일을 변경할 수 있어야 한다", async () => {
-      const request: CreateTradingAccountRequest = {
-        name: "시작일 변경 테스트",
-        ticker: "SOXL",
-        seedCapital: 10000,
-        strategy: "Pro1",
-        cycleStartDate: "2025-01-02",
-      };
-      const created = await tradingModule.createTradingAccount(TEST_USER_ID, request);
-      createdAccountIds.push(created.id);
+    describe("첫 일일 마감 뒤 (#112)", () => {
+      async function createClosedAccount(name: string) {
+        const created = await tradingModule.createTradingAccount(TEST_USER_ID, {
+          name,
+          ticker: "SOXL",
+          seedCapital: 10000,
+          strategy: "Pro1",
+          cycleStartDate: "2025-01-02",
+        });
+        createdAccountIds.push(created.id);
+        await tradingModule.updateAccountLastProcessedDate(created.id, "2025-01-03");
+        return created;
+      }
 
-      const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
-        cycleStartDate: "2025-02-01",
+      it("운용 시작일을 다른 날짜로 바꾸면 거절하고 계좌를 바꾸지 않아야 한다", async () => {
+        const created = await createClosedAccount("마감 뒤 시작일 변경 거절");
+
+        await expect(
+          tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
+            strategy: "Pro3",
+            cycleStartDate: "2025-02-03",
+          })
+        ).rejects.toBeInstanceOf(tradingModule.TradingStartDateLockedError);
+
+        const after = await tradingModule.getTradingAccountById(created.id, TEST_USER_ID);
+        expect(after!.cycleStartDate).toBe("2025-01-02");
+        expect(after!.strategy).toBe("Pro1");
       });
 
-      expect(updated).not.toBeNull();
-      expect(updated!.cycleStartDate).toBe("2025-02-01");
+      it("지금과 같은 운용 시작일을 함께 보내면 다른 설정은 저장되어야 한다", async () => {
+        const created = await createClosedAccount("마감 뒤 같은 시작일");
+
+        const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
+          strategy: "Pro3",
+          cycleStartDate: "2025-01-02",
+        });
+
+        expect(updated!.strategy).toBe("Pro3");
+        expect(updated!.cycleStartDate).toBe("2025-01-02");
+      });
     });
   });
 

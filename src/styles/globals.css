@@ -204,6 +204,12 @@ body {
   }
 }
 
+/* 한국어 문장이 줄바꿈될 때 낱말 중간에서 끊지 않는다.
+   부트스트랩 유틸리티처럼 !important를 붙여 다른 규칙보다 앞선다. */
+.text-keep-all {
+  word-break: keep-all !important;
+}
+
 /* Loading Spinner */
 .loading-spinner {
   display: none;
@@ -299,6 +305,18 @@ body {
 .trading-form .form-select:focus {
   border-color: #2aa198;
   box-shadow: 0 0 0 0.2rem rgba(42, 161, 152, 0.25);
+}
+
+/* Solar 테마의 선택 상자 화살표는 짙은 색이라 어두운 배경(.bg-dark)에서는 보이지 않는다.
+   부트스트랩이 다크 모드에서 쓰는 밝은 화살표로 바꾼다. */
+.form-select.bg-dark {
+  --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23dee2e6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
+/* 날짜 입력의 달력 아이콘도 브라우저 기본값이 짙은 색이라 어두운 배경에서 잘 보이지 않는다.
+   입력란의 색은 .bg-dark와 .text-light가 정하므로, 브라우저가 그리는 아이콘과 달력만 어두운 모드로 바꾼다. */
+.form-control.bg-dark[type="date"] {
+  color-scheme: dark;
 }
 
 /* Trading Stats Cards */
@@ -449,8 +467,9 @@ body {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
   }
-  .form-control-sm,
-  .form-select-sm {
+  /* 부트스트랩의 .form-control-sm min-height가 나중에 읽혀 이기지 않도록 두 클래스로 쓴다 */
+  .form-control.form-control-sm,
+  .form-select.form-select-sm {
     min-height: 44px;
   }
   .form-check-input {

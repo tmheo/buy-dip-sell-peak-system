@@ -1,7 +1,7 @@
 /**
  * 트레이딩 계좌 상세 API (PRD-TRADING-001)
  * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 예수금 내역, 가장 최근 종가 포함)
- * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만)
+ * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만, 종목은 받지 않는다)
  * DELETE /api/trading/accounts/[id] - 계좌 삭제
  */
 
@@ -18,6 +18,8 @@ import {
   getTradingAccountWithHoldings,
   getLatestClose,
   updateTradingAccount,
+  CycleInProgressError,
+  TradingStartDateLockedError,
   deleteTradingAccount,
   markAccountViewed,
   runInReadSnapshot,
@@ -76,6 +78,9 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
 /**
  * PUT /api/trading/accounts/[id]
  * 계좌 설정 수정 (사이클 미진행 시만)
+ *
+ * 종목(ticker)이 들어 있으면 검증 오류로 거절한다 - 종목은 계좌를 만들 때 정한다.
+ * 운용 시작일은 첫 일일 마감 전에만 다른 날짜로 바꿀 수 있다 (#112).
  */
 export async function PUT(request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -105,11 +110,8 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
 
     return NextResponse.json({ account });
   } catch (error) {
-    if (error instanceof Error && error.message.includes("cycle is in progress")) {
-      return NextResponse.json(
-        { error: "사이클 진행 중에는 계좌 설정을 수정할 수 없습니다" },
-        { status: 400 }
-      );
+    if (error instanceof CycleInProgressError || error instanceof TradingStartDateLockedError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     console.error("Failed to update trading account:", error);

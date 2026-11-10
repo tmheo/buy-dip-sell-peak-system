@@ -341,7 +341,7 @@ export function getNextTradingDate(date: string): string {
  *   중간에 중단(타임아웃 등)되어도 다음 실행이 이어받을 수 있게 한다
  * - deadline이 지정되면 그 시각을 넘기기 전에 루프를 중단 (Vercel 함수 제한 대응)
  *
- * @param account - 계좌 (사이클 시작일·마지막 처리일. 종목·전략 등은 날짜마다 다시 읽는다)
+ * @param account - 계좌 (운용 시작일·마지막 처리일. 종목·전략 등은 날짜마다 다시 읽는다)
  * @param currentDate - 현재 날짜 (YYYY-MM-DD)
  * @param deadline - 처리를 중단할 시각 (Date.now() 기준 ms, 선택)
  * @returns 전체 체결 결과 목록
@@ -354,7 +354,7 @@ export async function processHistoricalOrders(
   const { id: accountId, cycleStartDate, lastProcessedDate } = account;
   const allResults: ExecutionResult[] = [];
 
-  // 처리 시작일: 마지막 처리일의 다음 거래일, 최초 실행이면 사이클 시작일
+  // 처리 시작일: 마지막 처리일의 다음 거래일, 최초 실행이면 운용 시작일
   let processingDate = lastProcessedDate ? getNextTradingDate(lastProcessedDate) : cycleStartDate;
   const yesterday = getPreviousTradingDate(currentDate);
 

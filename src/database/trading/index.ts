@@ -34,6 +34,8 @@ export {
   getTradingAccountByIdWithoutOwnerCheck,
   getTradingAccountWithHoldings,
   updateTradingAccount,
+  CycleInProgressError,
+  TradingStartDateLockedError,
   deleteTradingAccount,
   completeCycleAndIncrement,
   updateAccountLastProcessedDate,

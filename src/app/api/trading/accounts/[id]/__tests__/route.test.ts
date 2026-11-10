@@ -90,7 +90,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
   });
 
   afterAll(async () => {
-    // 계좌·홀딩·수익 기록 CASCADE 삭제
+    // 계좌·티어 보유·수익 기록 CASCADE 삭제
     await db.delete(users).where(eq(users.id, OWNER_ID));
     await db.delete(users).where(eq(users.id, OTHER_USER_ID));
   });
@@ -263,5 +263,123 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     const response = await get(accountId);
 
     expect(response.status).toBe(401);
+  });
+});
+
+/**
+ * PUT /api/trading/accounts/[id] 테스트 (#112)
+ *
+ * 종목은 계좌를 만든 뒤 바꿀 수 없다 - 종목을 바꾸면 체결 전 오늘 주문표가 새 종목으로
+ * 다시 만들어져 체결된다. 운용 시작일은 첫 일일 마감 전에만 바꿀 수 있다 - 그 뒤에는
+ * 일일 마감이 이 값을 읽지 않아 화면 표시만 달라진다.
+ */
+describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
+  const PUT_OWNER_ID = randomUUID();
+  let route: typeof import("../route");
+  let trading: typeof import("@/database/trading");
+
+  function put(id: string, body: unknown): Promise<Response> {
+    return route.PUT(
+      new Request(`http://localhost/api/trading/accounts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      { params: Promise.resolve({ id }) }
+    );
+  }
+
+  async function createAccount(options: { closed: boolean }): Promise<string> {
+    const account = await trading.createTradingAccount(PUT_OWNER_ID, {
+      name: "설정 수정 테스트 계좌",
+      ticker: "SOXL",
+      seedCapital: 10_000,
+      strategy: "Pro1",
+      cycleStartDate: "2025-01-02",
+    });
+    if (options.closed) {
+      await trading.updateAccountLastProcessedDate(account.id, "2025-01-03");
+    }
+    return account.id;
+  }
+
+  beforeAll(async () => {
+    await db
+      .insert(users)
+      .values({ id: PUT_OWNER_ID, email: `test-${PUT_OWNER_ID}@test.com` })
+      .onConflictDoNothing();
+    trading = await import("@/database/trading");
+    route = await import("../route");
+  });
+
+  afterAll(async () => {
+    // 계좌·티어 보유 CASCADE 삭제
+    await db.delete(users).where(eq(users.id, PUT_OWNER_ID));
+  });
+
+  it("종목이 든 요청은 400을 돌려주고 계좌의 종목을 바꾸지 않아야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+
+    const response = await put(id, { ticker: "TQQQ", strategy: "Pro2" });
+
+    expect(response.status).toBe(400);
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+    expect(after!.ticker).toBe("SOXL");
+    expect(after!.strategy).toBe("Pro1");
+  });
+
+  it("보유 티어가 있는 동안에는 400과 한국어 오류를 돌려주고 계좌를 바꾸지 않아야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+    await trading.updateTierHolding(id, 1, { buyPrice: 100, shares: 10, buyDate: "2025-01-02" });
+
+    const response = await put(id, { strategy: "Pro2" });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("사이클 진행 중에는 계좌 설정을 수정할 수 없습니다");
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+    expect(after!.strategy).toBe("Pro1");
+  });
+
+  it("첫 일일 마감 전에는 운용 시작일을 바꿀 수 있어야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+
+    const response = await put(id, { cycleStartDate: "2025-02-03" });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.account.cycleStartDate).toBe("2025-02-03");
+  });
+
+  it("첫 일일 마감 뒤에 운용 시작일을 다른 날짜로 바꾸면 400과 한국어 오류를 돌려줘야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: true });
+
+    const response = await put(id, { strategy: "Pro2", cycleStartDate: "2025-02-03" });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("첫 일일 마감 뒤에는 운용 시작일을 바꿀 수 없습니다");
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+    expect(after!.cycleStartDate).toBe("2025-01-02");
+    expect(after!.strategy).toBe("Pro1");
+  });
+
+  it("첫 일일 마감 뒤에도 지금과 같은 운용 시작일을 함께 보내면 저장되어야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: true });
+
+    const response = await put(id, {
+      seedCapital: 10_000,
+      strategy: "Pro2",
+      cycleStartDate: "2025-01-02",
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.account.strategy).toBe("Pro2");
   });
 });

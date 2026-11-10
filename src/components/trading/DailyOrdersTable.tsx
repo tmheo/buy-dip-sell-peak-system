@@ -93,7 +93,7 @@ export default function DailyOrdersTable({
                       <span className="badge trading-buy">매수</span>
                     </td>
                     {/* 좁은 화면에서 줄이 바뀔 때 낱말 중간에서 끊지 않는다 */}
-                    <td className="text-secondary" colSpan={3} style={{ wordBreak: "keep-all" }}>
+                    <td className="text-secondary text-keep-all" colSpan={3}>
                       예수금 {formatCurrency(unaffordableBuy.availableCash)}로는 1주도 살 수 없어
                       주문하지 않습니다
                     </td>

@@ -2,11 +2,16 @@
 
 /**
  * 계좌 설정 카드 컴포넌트
+ *
+ * 종목은 계좌를 만들 때 정하므로 편집 모드에서도 읽기 전용이고, 운용 시작일은 첫 일일
+ * 마감 뒤에 읽기 전용이 된다 (#112).
  */
 
 import type React from "react";
 import { useState } from "react";
-import type { TradingAccountWithHoldings, Ticker, Strategy } from "@/types/trading";
+import type { TradingAccountWithHoldings, Strategy } from "@/types/trading";
+import { canEditTradingStartDate, strategyChangeWarning } from "./account-settings";
+import { formatLongDate } from "./format";
 
 interface AccountSettingsCardProps {
   account: TradingAccountWithHoldings;
@@ -14,23 +19,58 @@ interface AccountSettingsCardProps {
   isSaving: boolean;
 }
 
+// 종목은 바꿀 수 없으므로 보내지 않는다. 운용 시작일은 바꾸지 않았어도 함께 보낸다 -
+// 지금 값과 같은 날짜는 첫 일일 마감 뒤에도 받는다.
 export interface UpdateAccountData {
-  ticker: Ticker;
   seedCapital: number;
   strategy: Strategy;
   cycleStartDate: string;
 }
 
-const TICKER_OPTIONS: Ticker[] = ["SOXL", "TQQQ"];
 const STRATEGY_OPTIONS: Strategy[] = ["Pro1", "Pro2", "Pro3"];
 
-function formatDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+/** 편집을 시작하거나 취소할 때의 입력값 - 저장된 계좌 설정 그대로 */
+function savedSettings(account: TradingAccountWithHoldings): UpdateAccountData {
+  return {
+    seedCapital: account.seedCapital,
+    strategy: account.strategy,
+    cycleStartDate: account.cycleStartDate,
+  };
+}
+
+/** 편집 모드에서 바꿀 수 없는 칸 - 다른 칸과 같은 모양의 읽기 전용 입력 */
+function ReadOnlyField({
+  id,
+  label,
+  value,
+  hint,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  hint?: string;
+}): React.ReactElement {
+  const hintId = `${id}-hint`;
+  return (
+    <>
+      <label htmlFor={id} className="form-label text-secondary small">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        readOnly
+        className="form-control form-control-sm bg-secondary bg-opacity-25 text-light border-secondary"
+        value={value}
+        aria-describedby={hint ? hintId : undefined}
+      />
+      {hint && (
+        <div id={hintId} className="form-text text-secondary text-keep-all">
+          {hint}
+        </div>
+      )}
+    </>
+  );
 }
 
 export default function AccountSettingsCard({
@@ -40,14 +80,11 @@ export default function AccountSettingsCard({
 }: AccountSettingsCardProps): React.ReactElement {
   const [isEditing, setIsEditing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<UpdateAccountData>({
-    ticker: account.ticker,
-    seedCapital: account.seedCapital,
-    strategy: account.strategy,
-    cycleStartDate: account.cycleStartDate,
-  });
+  const [formData, setFormData] = useState<UpdateAccountData>(() => savedSettings(account));
 
   const canEdit = !account.isCycleInProgress;
+  const startDateEditable = canEditTradingStartDate(account);
+  const strategyWarning = strategyChangeWarning(account.strategy, formData.strategy);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void {
     const { name, value, type } = e.target;
@@ -58,12 +95,7 @@ export default function AccountSettingsCard({
   }
 
   function handleCancel(): void {
-    setFormData({
-      ticker: account.ticker,
-      seedCapital: account.seedCapital,
-      strategy: account.strategy,
-      cycleStartDate: account.cycleStartDate,
-    });
+    setFormData(savedSettings(account));
     setIsEditing(false);
   }
 
@@ -100,24 +132,19 @@ export default function AccountSettingsCard({
         {isEditing ? (
           <div className="row g-3">
             <div className="col-md-6 col-lg-4">
-              <label className="form-label text-secondary small">종목(Ticker)</label>
-              <select
-                className="form-select form-select-sm bg-dark text-light border-secondary"
-                name="ticker"
-                value={formData.ticker}
-                onChange={handleChange}
-                disabled={isSaving}
-              >
-                {TICKER_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <ReadOnlyField
+                id="settings-ticker"
+                label="종목(Ticker)"
+                value={account.ticker}
+                hint="계좌를 만들 때 정하며 바꿀 수 없습니다."
+              />
             </div>
             <div className="col-md-6 col-lg-4">
-              <label className="form-label text-secondary small">시드($)</label>
+              <label htmlFor="settings-seed" className="form-label text-secondary small">
+                시드($)
+              </label>
               <input
+                id="settings-seed"
                 type="number"
                 className="form-control form-control-sm bg-dark text-light border-secondary"
                 name="seedCapital"
@@ -129,13 +156,17 @@ export default function AccountSettingsCard({
               />
             </div>
             <div className="col-md-6 col-lg-4">
-              <label className="form-label text-secondary small">전략</label>
+              <label htmlFor="settings-strategy" className="form-label text-secondary small">
+                전략
+              </label>
               <select
+                id="settings-strategy"
                 className="form-select form-select-sm bg-dark text-light border-secondary"
                 name="strategy"
                 value={formData.strategy}
                 onChange={handleChange}
                 disabled={isSaving}
+                aria-describedby={strategyWarning ? "settings-strategy-warning" : undefined}
               >
                 {STRATEGY_OPTIONS.map((s) => (
                   <option key={s} value={s}>
@@ -143,23 +174,47 @@ export default function AccountSettingsCard({
                   </option>
                 ))}
               </select>
+              {strategyWarning && (
+                <div
+                  id="settings-strategy-warning"
+                  className="form-text text-warning text-keep-all"
+                  role="alert"
+                >
+                  {strategyWarning}
+                </div>
+              )}
             </div>
             <div className="col-md-6 col-lg-4">
-              <label className="form-label text-secondary small">사이클 시작일</label>
-              <input
-                type="date"
-                className="form-control form-control-sm bg-dark text-light border-secondary"
-                name="cycleStartDate"
-                value={formData.cycleStartDate}
-                onChange={handleChange}
-                disabled={isSaving}
+              {startDateEditable ? (
+                <>
+                  <label htmlFor="settings-start-date" className="form-label text-secondary small">
+                    운용 시작일
+                  </label>
+                  <input
+                    id="settings-start-date"
+                    type="date"
+                    className="form-control form-control-sm bg-dark text-light border-secondary"
+                    name="cycleStartDate"
+                    value={formData.cycleStartDate}
+                    onChange={handleChange}
+                    disabled={isSaving}
+                  />
+                </>
+              ) : (
+                <ReadOnlyField
+                  id="settings-start-date"
+                  label="운용 시작일"
+                  value={formatLongDate(account.cycleStartDate)}
+                  hint="첫 일일 마감이 끝나 바꿀 수 없습니다."
+                />
+              )}
+            </div>
+            <div className="col-md-6 col-lg-4">
+              <ReadOnlyField
+                id="settings-cycle-number"
+                label="회차(Cycle)"
+                value={String(account.cycleNumber)}
               />
-            </div>
-            <div className="col-md-6 col-lg-4">
-              <label className="form-label text-secondary small">회차(Cycle)</label>
-              <div className="form-control form-control-sm bg-secondary bg-opacity-25 text-light border-secondary">
-                {account.cycleNumber}
-              </div>
             </div>
             {saveError && (
               <div className="col-12">
@@ -210,8 +265,8 @@ export default function AccountSettingsCard({
               </div>
             </div>
             <div className="col-md-6 col-lg-4">
-              <div className="text-secondary small mb-1">사이클 시작일</div>
-              <div className="text-light">{formatDate(account.cycleStartDate)}</div>
+              <div className="text-secondary small mb-1">운용 시작일</div>
+              <div className="text-light">{formatLongDate(account.cycleStartDate)}</div>
             </div>
             <div className="col-md-6 col-lg-4">
               <div className="text-secondary small mb-1">회차(Cycle)</div>

@@ -42,6 +42,7 @@ export const tradingAccounts = pgTable(
     ticker: text().notNull().$type<AllowedTicker>(),
     seedCapital: numeric("seed_capital", { precision: 14, scale: 2, mode: "number" }).notNull(),
     strategy: text().notNull().$type<AllowedStrategy>(),
+    // 운용 시작일(첫 사이클의 시작일). 사이클이 끝나도 바뀌지 않으며 첫 일일 마감 전에만 바꿀 수 있다.
     cycleStartDate: date("cycle_start_date").notNull(),
     cycleNumber: integer("cycle_number").notNull().default(1),
     // 마감 처리 스케줄러가 마지막으로 처리 완료한 거래일.

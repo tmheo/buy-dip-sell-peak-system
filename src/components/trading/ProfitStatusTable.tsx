@@ -8,18 +8,10 @@
 import type React from "react";
 import { useState, useEffect, useCallback } from "react";
 import type { ProfitStatusResponse, MonthlyProfitSummary, ProfitRecord } from "@/types/trading";
-import { formatCurrency, formatPercent } from "./format";
+import { formatCurrency, formatDate, formatPercent } from "./format";
 
 interface ProfitStatusTableProps {
   accountId: string;
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 function getProfitColorClass(value: number): string {
