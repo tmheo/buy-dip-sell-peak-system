@@ -22,6 +22,7 @@ vi.mock("@/database/trading", () => ({
   getDailyOrders: vi.fn(),
   getTierHoldings: vi.fn(),
   getPreviousTradingClose: vi.fn(),
+  getSeedCapitalOn: vi.fn(),
   listTradingDatesBetween: vi.fn(),
   replaceDailyOrders: vi.fn(),
   // 읽기 시점은 대역 저장 함수에 그대로 넘겨지기만 하므로 빈 실행자로 work를 바로 부른다
@@ -33,6 +34,7 @@ import {
   getDailyOrders,
   getTierHoldings,
   getPreviousTradingClose,
+  getSeedCapitalOn,
   listTradingDatesBetween,
   replaceDailyOrders,
   type NewDailyOrder,
@@ -44,6 +46,7 @@ const mockedGetCycleRealizedPnl = vi.mocked(getCycleRealizedPnl);
 const mockedGetDailyOrders = vi.mocked(getDailyOrders);
 const mockedGetTierHoldings = vi.mocked(getTierHoldings);
 const mockedGetPreviousTradingClose = vi.mocked(getPreviousTradingClose);
+const mockedGetSeedCapitalOn = vi.mocked(getSeedCapitalOn);
 const mockedListTradingDatesBetween = vi.mocked(listTradingDatesBetween);
 const mockedReplaceDailyOrders = vi.mocked(replaceDailyOrders);
 
@@ -91,7 +94,6 @@ function createAccount(overrides: Partial<TradingAccount> = {}): TradingAccount 
     userId: "user-1",
     name: "테스트 계좌",
     ticker: "SOXL",
-    seedCapital: 100_000,
     strategy: "Pro2",
     cycleStartDate: "2026-07-01",
     cycleNumber: 1,
@@ -144,6 +146,7 @@ beforeEach(() => {
   ]);
   mockedListTradingDatesBetween.mockResolvedValue(TRADING_DATES_SINCE_TIER1_BUY);
   mockedGetCycleRealizedPnl.mockResolvedValue(0); // 이번 사이클에 아직 매도 기록이 없다
+  mockedGetSeedCapitalOn.mockResolvedValue(100_000); // 그날의 시드
   mockedGetPreviousTradingClose.mockResolvedValue({ date: "2026-07-14", adjClose: 50 });
   mockedReplaceDailyOrders.mockResolvedValue(REGENERATED);
 });
@@ -166,12 +169,13 @@ async function expectKept(account: TradingAccount, existing: DailyOrder[]): Prom
 }
 
 describe("getFreshDailyOrders - 계좌 설정 변경", () => {
-  it("시드 금액이 바뀌어 매수 수량이 달라지면 낡은 것으로 보고 다시 만든다", async () => {
+  it("그날의 시드 금액이 달라 매수 수량이 달라지면 낡은 것으로 보고 다시 만든다", async () => {
     // 수정 시각은 그대로다 - 판정은 수정 시각이 아니라 주문 내용으로 한다
     mockedGetDailyOrders.mockResolvedValue(storedOrders(FRESH_ROWS));
+    mockedGetSeedCapitalOn.mockResolvedValue(50_000);
 
     // 시드 $50,000: 티어 2 금액 7,500 → floor(7,500 ÷ 49.99) = 150주
-    await expectReplacedWith(createAccount({ seedCapital: 50_000 }), [
+    await expectReplacedWith(createAccount(), [
       { tier: 2, type: "BUY", orderMethod: "LOC", limitPrice: 49.99, shares: 150 },
       { tier: 1, type: "SELL", orderMethod: "LOC", limitPrice: 48.72, shares: 208 },
     ]);

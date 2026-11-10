@@ -63,7 +63,6 @@ function createAccount(id: string): TradingAccount {
     userId: "user-1",
     name: `계좌 ${id}`,
     ticker: "SOXL",
-    seedCapital: 100_000,
     strategy: "Pro2",
     cycleStartDate: "2026-07-01",
     cycleNumber: 1,
