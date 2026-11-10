@@ -16,7 +16,7 @@
  * 계좌: Pro2(티어 1 10%, 티어 2 15%, 매수 지정가 = floor(직전 종가 × 0.9999, 2),
  * 매도 지정가 = floor(매수가 × 1.015, 2)), 시드 $10,000.
  *
- * 손으로 계산한 흐름 (두 경우 모두 같다, 첫날 = 사이클 시작일):
+ * 손으로 계산한 흐름 (두 경우 모두 같다, 첫날 = 운용 시작일):
  * - 첫날: 티어 1을 지정가 $99.99로 floor(1,000 ÷ 99.99) = 10주, 종가 $99에 체결 → $990
  * - 둘째 날: 티어 2를 지정가 $98.99로 floor(1,500 ÷ 98.99) = 15주, 종가 $98에 체결 → $1,470.
  *   티어 1 매도 지정가 $100.48 > $98이라 팔지 않는다. 이날 시드를 $2,000로 줄인다.
@@ -42,7 +42,7 @@ interface Scenario {
   ticker: Ticker;
   createdOn: string;
   prices: Array<{ date: string; adjClose: number }>;
-  // 사이클 시작일, 시드를 줄이는 날, 모두 파는 날, 다음 사이클의 첫 매수일
+  // 운용 시작일, 시드를 줄이는 날, 모두 파는 날, 다음 사이클의 첫 매수일
   firstDay: string;
   changedOn: string;
   sellAllOn: string;
@@ -162,7 +162,28 @@ describe.skipIf(!hasDb)("예수금보다 큰 시드 감액으로 끝나는 사�
 
       // 둘째 날 아침까지 마감한 뒤(첫날 티어 1 체결) 둘째 날에 시드를 줄인다
       await trading.processHistoricalOrders(await reload(), scenario.changedOn);
-      await storage.changeSeedCapital(created.id, TEST_USER_ID, 2_000, scenario.changedOn);
+      // 오늘 티어 2 매수($98.99 × 15주 = $1,484.85)가 체결되면 예수금 9,010 → $7,525.15라
+      // 감액 $8,000은 오늘 체결에 달렸다. 확인 없이는 쓰지 않고, 확인하면 쓴다
+      const unconfirmed = await trading.changeSeed(
+        created.id,
+        TEST_USER_ID,
+        2_000,
+        scenario.changedOn,
+        false
+      );
+      expect(unconfirmed).toEqual({
+        status: "needsConfirmation",
+        classification: "depends",
+        seedCutLimits: { closedCash: 9_010, cashIfTodayBuyFills: 7_525.15 },
+      });
+      const confirmed = await trading.changeSeed(
+        created.id,
+        TEST_USER_ID,
+        2_000,
+        scenario.changedOn,
+        true
+      );
+      expect(confirmed?.status).toBe("changed");
 
       // 둘째 날을 마감하고(티어 2 체결) 모두 파는 날 아침의 주문표를 본다
       await trading.processHistoricalOrders(await reload(), scenario.sellAllOn);

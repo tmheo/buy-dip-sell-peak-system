@@ -34,7 +34,7 @@ describe("seedCapitalOn", () => {
     expect(seedCapitalOn(history, "2026-11-20")).toBe(8_000);
   });
 
-  it("첫 변경 전의 모든 날짜에는 첫 시드가 쓰인다 - 계좌를 만든 날보다 앞선 사이클 시작일에도", () => {
+  it("첫 변경 전의 모든 날짜에는 첫 시드가 쓰인다 - 계좌를 만든 날보다 앞선 운용 시작일에도", () => {
     const history = [
       { effectiveDate: "2026-11-05", seedCapital: 3_000 },
       { effectiveDate: "2026-11-02", seedCapital: 10_000 },
