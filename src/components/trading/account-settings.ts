@@ -43,6 +43,16 @@ export function pendingSeedChangeText(seed: SeedStatus): string | null {
   return `${formatSeedAmount(seed.current)} → ${formatSeedAmount(seedCapital)}, ${formatMonthDayWithWeekday(effectiveDate)} 주문표부터`;
 }
 
+/**
+ * 적용 전 변경이 있을 때 주문표 위에 적을 문장 - 오늘 주문표는 지금 시드로 만들어졌다.
+ * 적용 전 변경이 없으면 null.
+ */
+export function pendingSeedOrdersNote(seed: SeedStatus): string | null {
+  if (!seed.pending) return null;
+  const { seedCapital, effectiveDate } = seed.pending;
+  return `오늘 주문표는 지금 시드 ${formatSeedAmount(seed.current)} 기준입니다. 새 시드 ${formatSeedAmount(seedCapital)}는 ${formatMonthDayWithWeekday(effectiveDate)} 주문표부터 쓰입니다.`;
+}
+
 /** 시드 칸의 시작 값 - 적용 전 변경이 있으면 그 값이다(다시 바꾸면 그 변경을 덮어쓴다). */
 export function seedInputValue(seed: SeedStatus): number {
   return seed.pending?.seedCapital ?? seed.current;
