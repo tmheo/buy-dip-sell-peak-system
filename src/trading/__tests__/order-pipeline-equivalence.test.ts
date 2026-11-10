@@ -127,6 +127,7 @@ function runReferenceLoop(): Map<string, NormalizedOrder[]> {
   let state: CycleState = {
     strategy: getStrategyParams(STRATEGY),
     cycleCapital: SEED_CAPITAL,
+    capitalCut: 0,
     holdings: [],
     cycleNumber: 1,
     realizedPnl: 0,

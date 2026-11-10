@@ -23,6 +23,8 @@ const CASH: CashBreakdown = {
   netRealizedLoss: 500,
   isCashReduced: true,
   tiers: [],
+  endsCycleBySeedCut: false,
+  unwithdrawnCut: 0,
 };
 
 describe("calculateAssetValues", () => {

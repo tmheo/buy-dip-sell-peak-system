@@ -2,6 +2,7 @@
  * 주문표 생성
  * #43: planOrders(state) → OrderIntent[] - 전일 종가(adjClose) 기준 주문표 생성, 순수 함수.
  * #98: planOrdersDetailed는 같은 주문표에 예수금 때문에 덜 사거나 사지 않는 매수를 함께 낸다.
+ * #117: 예수금보다 큰 시드 감액의 적용일에는 매수 없이 보유 티어를 모두 MOC로 판다 (ADR-0006).
  *
  * 주문 순서 불변식: 매수 티어는 상태 변이 전(전일 마감 시점의 보유 상태) 기준으로 결정된다.
  * 모든 주문은 장 마감 전에 동시에 제출되므로, 당일 매도로 비워질 티어는
@@ -19,6 +20,7 @@ import {
   calculateBuyLimitPrice,
   calculateBuyQuantity,
   calculateSellLimitPrice,
+  endsCycleBySeedCut,
   nextBuyTier,
   nominalTierAmount,
   tierAmount,
@@ -49,20 +51,28 @@ export function planOrdersDetailed(state: CycleState, prevClose: number): Detail
     throw new Error("prevClose must be greater than 0");
   }
 
+  const holdings = [...state.holdings].sort((a, b) => a.tier - b.tier);
+
+  // 예수금보다 큰 시드 감액의 적용일: 매수 없이 보유 티어를 모두 MOC로 판다 (ADR-0006).
+  // 매수가 하나라도 체결되면 보유 티어가 남아 사이클이 끝나지 않으므로 매수를 내지 않고,
+  // LOC 목표가 매도도 MOC가 대신한다. 체결은 손절과 같이 그날 종가로 기록된다.
+  if (endsCycleBySeedCut(state)) {
+    return {
+      intents: holdings.map((holding) => mocSell(holding.tier, holding.shares)),
+      unaffordableBuy: null,
+      reducedBuy: null,
+      endsCycleBySeedCut: true,
+    };
+  }
+
   const { intent, unaffordableBuy, reducedBuy } = decideBuy(state, prevClose);
   const intents: OrderIntent[] = intent ? [intent] : [];
 
-  for (const holding of [...state.holdings].sort((a, b) => a.tier - b.tier)) {
+  for (const holding of holdings) {
     // 손절일 도달 판정: 당일 마감 시점의 보유 거래일 수(holdingDays + 1) >= 손절일
     const reachesStopLoss = holding.holdingDays + 1 >= state.strategy.stopLossDays;
     if (reachesStopLoss) {
-      intents.push({
-        type: "SELL",
-        tier: holding.tier,
-        orderMethod: "MOC",
-        limitPrice: null,
-        shares: holding.shares,
-      });
+      intents.push(mocSell(holding.tier, holding.shares));
     } else {
       intents.push({
         type: "SELL",
@@ -74,7 +84,12 @@ export function planOrdersDetailed(state: CycleState, prevClose: number): Detail
     }
   }
 
-  return { intents, unaffordableBuy, reducedBuy };
+  return { intents, unaffordableBuy, reducedBuy, endsCycleBySeedCut: false };
+}
+
+/** 보유 티어 하나를 그날 종가로 파는 MOC 매도 (내부 헬퍼) */
+function mocSell(tier: number, shares: number): OrderIntent {
+  return { type: "SELL", tier, orderMethod: "MOC", limitPrice: null, shares };
 }
 
 /** 그날의 매수 판단: 낼 매수 주문과, 예수금 때문에 덜 사거나 사지 않는 이유 (내부 헬퍼) */

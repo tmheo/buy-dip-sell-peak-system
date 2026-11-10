@@ -122,6 +122,9 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         { tier: 6, amount: 0, nominalAmount: 1_000, isReduced: true },
         { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
+      // 시드를 줄이지 않았으므로 모두 파는 날이 아니다 (ADR-0006)
+      endsCycleBySeedCut: false,
+      unwithdrawnCut: 0,
     });
   });
 
@@ -282,6 +285,74 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     }
   });
 
+  it("사이클 중이면 오늘 시드를 줄일 때의 감액 경계를 함께 돌려줘야 한다 (ADR-0006)", async () => {
+    // Pro1 시드 $20,000, 티어 1을 $100 × 100주 보유: 직전 마감 예수금 $10,000.
+    // 오늘 주문표의 티어 2 매수: 지정가 $99.99로 floor(2,000 ÷ 99.99) = 20주 = $1,999.80
+    // → 체결된다고 치면 예수금 $8,000.20. 직전 종가는 SOXL 상장 이전 날짜의 합성 시세다.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2009-12-11T12:00:00Z"));
+    const inserted = await db
+      .insert(schema.dailyPrices)
+      .values({
+        ticker: "SOXL",
+        date: "2009-12-10",
+        open: 100,
+        high: 100,
+        low: 100,
+        close: 100,
+        adjClose: 100,
+        volume: 1000,
+      })
+      .onConflictDoNothing()
+      .returning({ id: schema.dailyPrices.id });
+    try {
+      const trading = await import("@/database/trading");
+      const create = (name: string) =>
+        trading.createTradingAccount(OWNER_ID, {
+          name,
+          ticker: "SOXL",
+          seedCapital: 20_000,
+          strategy: "Pro1",
+          cycleStartDate: "2009-12-08",
+        });
+      const inCycle = await create("감액 경계 테스트 계좌");
+      await trading.updateTierHolding(inCycle.id, 1, {
+        buyPrice: 100,
+        shares: 100,
+        buyDate: "2009-12-09",
+      });
+      const betweenCycles = await create("사이클 사이 계좌");
+      mockLoggedIn(OWNER_ID);
+
+      const inCycleBody = await (await get(inCycle.id)).json();
+      const betweenBody = await (await get(betweenCycles.id)).json();
+
+      expect(inCycleBody.seedCutLimits).toEqual({
+        closedCash: 10_000,
+        cashIfTodayBuyFills: 8_000.2,
+      });
+      expect(betweenBody.seedCutLimits).toBeNull();
+
+      // 주말(2009-12-12, 토)에는 오늘 주문표가 체결되지 않아 오늘 매수가 없다
+      vi.setSystemTime(new Date("2009-12-12T12:00:00Z"));
+      const weekendBody = await (await get(inCycle.id)).json();
+      expect(weekendBody.seedCutLimits).toEqual({
+        closedCash: 10_000,
+        cashIfTodayBuyFills: 10_000,
+      });
+    } finally {
+      vi.useRealTimers();
+      if (inserted.length > 0) {
+        await db.delete(schema.dailyPrices).where(
+          inArray(
+            schema.dailyPrices.id,
+            inserted.map((row) => row.id)
+          )
+        );
+      }
+    }
+  });
+
   it("다른 사용자의 계좌는 404를 돌려줘야 한다", async () => {
     mockLoggedIn(OTHER_USER_ID);
 
@@ -374,7 +445,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
     expect((await trading.getSeedStatus(after!, "2099-01-01")).current).toBe(10_000);
   });
 
-  it("보유 티어가 있는 동안에는 400과 한국어 오류를 돌려주고 계좌를 바꾸지 않아야 한다", async () => {
+  it("보유 티어가 있는 동안에는 400과 한국어 오류를 돌려주고 투자 전략을 바꾸지 않아야 한다", async () => {
     mockLoggedIn(PUT_OWNER_ID);
     const id = await createAccount({ closed: false });
     await trading.updateTierHolding(id, 1, { buyPrice: 100, shares: 10, buyDate: "2025-01-02" });
@@ -383,9 +454,25 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
 
     expect(response.status).toBe(400);
     const body = await response.json();
-    expect(body.error).toBe("사이클 진행 중에는 계좌 설정을 수정할 수 없습니다");
+    // 시드는 사이클 중에도 PUT .../seed로 바꿀 수 있으므로 문구는 막히는 것만 적는다 (ADR-0004)
+    expect(body.error).toBe("사이클 중에는 계좌 이름·투자 전략·운용 시작일을 바꿀 수 없습니다");
     const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
     expect(after!.strategy).toBe("Pro1");
+  });
+
+  it("보유 티어가 있는 동안 계좌 이름만 바꿔도 400을 돌려주고 문구가 계좌 이름이 막혔음을 알려야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+    await trading.updateTierHolding(id, 1, { buyPrice: 100, shares: 10, buyDate: "2025-01-02" });
+    const before = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+
+    const response = await put(id, { name: "새 이름" });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("계좌 이름");
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+    expect(after!.name).toBe(before!.name);
   });
 
   it("첫 일일 마감 전에는 운용 시작일을 바꿀 수 있어야 한다", async () => {

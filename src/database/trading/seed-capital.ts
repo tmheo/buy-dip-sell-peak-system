@@ -7,6 +7,7 @@
  * 두지 않아, 지난 날짜에 지금 시드를 쓰는 길이 구조로 막힌다.
  */
 
+import Decimal from "decimal.js";
 import { and, asc, eq, gt } from "drizzle-orm";
 
 import { getNextWeekday } from "@/lib/date";
@@ -15,13 +16,11 @@ import type { SeedHistoryEntry, SeedStatus, TradingAccount } from "@/types/tradi
 import { db, type DbExecutor } from "../db-drizzle";
 import { seedCapitalHistory, tradingAccounts } from "../schema/index";
 
-import { CycleInProgressError } from "./errors";
 import { getPreviousTradingClose } from "./orders";
-import { getTotalShares } from "./tier-holdings";
 
 /**
  * 어느 날의 시드 - 적용일이 그날 이하인 가장 최근 줄, 없으면 첫 줄.
- * 첫 시드는 첫 변경 전의 모든 날짜에 쓰인다. 그래서 사이클 시작일이 계좌를 만든 날보다
+ * 첫 시드는 첫 변경 전의 모든 날짜에 쓰인다. 그래서 운용 시작일이 계좌를 만든 날보다
  * 앞이든 뒤든 이력을 고칠 일이 없다.
  *
  * @param history - 계좌의 시드 이력 (순서는 상관없다)
@@ -35,8 +34,37 @@ export function seedCapitalOn(history: readonly SeedHistoryEntry[], date: string
   const sorted = [...history].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
   const applied = sorted.filter((entry) => entry.effectiveDate <= date);
   // 적용된 줄이 없으면 첫 줄을 쓴다. 첫 줄의 적용일은 계좌를 만든 날이지만, 이 대체 덕분에
-  // 사이클 시작일이 그보다 앞서도 첫 시드가 사이클 시작일부터 쓰인다(ADR-0005).
+  // 운용 시작일이 그보다 앞서도 첫 시드가 운용 시작일부터 쓰인다(ADR-0005).
   return (applied.at(-1) ?? sorted[0]).seedCapital;
+}
+
+/** 어느 거래일의 시드(그날의 사이클 자본)와, 그날 줄어든 사이클 자본 (ADR-0006) */
+export interface SeedCapitalAndCut {
+  seedCapital: number;
+  capitalCut: number;
+}
+
+/**
+ * 어느 거래일의 시드와, 그날 줄어든 사이클 자본 (ADR-0006)
+ * capitalCut = 직전 거래일의 시드 - 그날 시드, 줄지 않았으면 0.
+ * 직전 거래일은 가격 행 기준이다 - 적용일은 주말만 건너뛰어 정하므로 휴장일일 수 있고,
+ * 그러면 적용일 뒤의 실제 첫 거래일이 시드가 처음 줄어든 날이 된다.
+ *
+ * @param history - 계좌의 시드 이력
+ * @param date - 기준일 (주문표 날짜 또는 체결 처리일)
+ * @param previousTradingDate - 기준일의 직전 거래일 (가격 행 기준). 모르면 null - 줄어든 것으로 보지 않는다
+ */
+export function seedCapitalAndCutOn(
+  history: readonly SeedHistoryEntry[],
+  date: string,
+  previousTradingDate: string | null
+): SeedCapitalAndCut {
+  const seedCapital = seedCapitalOn(history, date);
+  if (previousTradingDate === null) {
+    return { seedCapital, capitalCut: 0 };
+  }
+  const cut = new Decimal(seedCapitalOn(history, previousTradingDate)).sub(seedCapital);
+  return { seedCapital, capitalCut: Decimal.max(0, cut).toNumber() };
 }
 
 /**
@@ -133,17 +161,23 @@ export async function insertInitialSeed(
 }
 
 /**
- * 어느 날의 시드 - 그날 주문표·체결의 사이클 자본이다.
+ * 어느 날의 시드와 그날 줄어든 사이클 자본 (seedCapitalAndCutOn) - 그날 사이클 상태의 입력이다.
+ * 이력과 직전 거래일을 같은 실행자로 읽는다.
  *
+ * @param account - 계좌 (직전 거래일을 가격 행으로 찾으려고 종목을 쓴다)
  * @param date - 기준일 (주문표 날짜 또는 체결 처리일, YYYY-MM-DD)
  * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등)
  */
-export async function getSeedCapitalOn(
-  accountId: string,
+export async function getSeedCapitalAndCutOn(
+  account: Pick<TradingAccount, "id" | "ticker">,
   date: string,
   executor: DbExecutor = db
-): Promise<number> {
-  return seedCapitalOn(await getSeedHistory(accountId, executor), date);
+): Promise<SeedCapitalAndCut> {
+  const [history, previousClose] = await Promise.all([
+    getSeedHistory(account.id, executor),
+    getPreviousTradingClose(account.ticker, date, executor),
+  ]);
+  return seedCapitalAndCutOn(history, date, previousClose?.date ?? null);
 }
 
 /**
@@ -169,8 +203,8 @@ export async function getSeedStatus(
  * 같은 계좌의 동시 변경은 계좌 행 잠금으로 차례를 세운다 - 나중 변경은 먼저 커밋된 변경을
  * 보고 그 위에 덮어쓴다. (계좌, 적용일) 유일 제약은 이 잠금을 거치지 않는 쓰기까지 막는다.
  *
- * 사이클 중 변경(ADR-0004)은 #117에서 연다. 그때까지는 보유 티어가 있으면
- * CycleInProgressError를 던진다.
+ * 사이클 중에도 바꿀 수 있다(ADR-0004). 사이클을 끝낼 수 있는 감액인지 묻는 일은 호출 경로가
+ * 한다 - 이 함수는 이력만 쓴다.
  *
  * @param seedCapital - 새 시드 (검증은 호출 경로가 마쳤다)
  * @param today - 바꾼 날 (서버의 UTC 날짜, YYYY-MM-DD)
@@ -192,10 +226,6 @@ export async function changeSeedCapital(
       .for("update");
     if (!account) {
       return null;
-    }
-
-    if ((await getTotalShares(accountId, tx)) > 0) {
-      throw new CycleInProgressError();
     }
 
     const history = changeSeedHistory(await getSeedHistory(accountId, tx), seedCapital, today);

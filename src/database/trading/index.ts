@@ -46,11 +46,13 @@ export { CycleInProgressError, TradingStartDateLockedError } from "./errors";
 export {
   changeSeedCapital,
   changeSeedHistory,
-  getSeedCapitalOn,
+  getSeedCapitalAndCutOn,
   getSeedStatus,
+  seedCapitalAndCutOn,
   seedCapitalOn,
   seedStatus,
 } from "./seed-capital";
+export type { SeedCapitalAndCut } from "./seed-capital";
 
 // DailyOrder CRUD
 export {

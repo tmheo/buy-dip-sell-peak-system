@@ -21,10 +21,19 @@ describe("startNextCycle", () => {
     expect(next).toEqual({
       strategy: state.strategy,
       cycleCapital: 10100,
+      capitalCut: 0,
       holdings: [],
       cycleNumber: 3,
       realizedPnl: 0,
     });
+  });
+
+  it("시드 감액으로 끝난 사이클이어도 새 사이클의 줄어든 사이클 자본은 0이어야 한다 (ADR-0006)", () => {
+    // 사이클 자본이 줄어든 날은 그 거래일 하나다 - 새 사이클로 이어지면 안 된다
+    const state = createState({ capitalCut: 1_500 });
+    const next = startNextCycle(state, 8_500);
+
+    expect(next.capitalCut).toBe(0);
   });
 
   it("사이클 경계에서 실현손익을 0으로 되돌려 새 사이클 예수금이 자본 전액이어야 한다 (ADR-0003)", () => {

@@ -34,6 +34,7 @@ export function settledSale(input: SettledSaleInput): {
     {
       strategy: getStrategyParams(input.strategy ?? "Pro2"),
       cycleCapital: input.buyPrice * input.shares,
+      capitalCut: 0,
       holdings: [holding],
       cycleNumber: 1,
       realizedPnl: 0,

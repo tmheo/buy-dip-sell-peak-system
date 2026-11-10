@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getNextWeekday, getTodayTradingDate } from "../date";
+import { getNextWeekday, getTodayTradingDate, isWeekday } from "../date";
 
 describe("getTodayTradingDate", () => {
   it("실계좌 거래일의 오늘은 로컬 타임존이 아니라 UTC 날짜다", () => {
@@ -22,5 +22,17 @@ describe("getNextWeekday", () => {
 
   it("달과 해가 바뀌어도 날짜로 센다", () => {
     expect(getNextWeekday("2026-12-31")).toBe("2027-01-01"); // 목 → 금
+  });
+});
+
+describe("isWeekday", () => {
+  it("월요일부터 금요일까지는 평일이다", () => {
+    expect(isWeekday("2026-11-09")).toBe(true); // 월
+    expect(isWeekday("2026-11-13")).toBe(true); // 금
+  });
+
+  it("토요일과 일요일은 평일이 아니다", () => {
+    expect(isWeekday("2026-11-14")).toBe(false); // 토
+    expect(isWeekday("2026-11-15")).toBe(false); // 일
   });
 });

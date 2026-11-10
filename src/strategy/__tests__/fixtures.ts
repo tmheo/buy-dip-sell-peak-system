@@ -8,6 +8,7 @@ export function createState(overrides: Partial<CycleState> = {}): CycleState {
   return {
     strategy: getStrategyParams("Pro2"),
     cycleCapital: 10000,
+    capitalCut: 0,
     holdings: [],
     cycleNumber: 1,
     realizedPnl: 0,
