@@ -1,30 +1,16 @@
 /**
  * profit_records.cycle_number 마이그레이션의 번호 매기기와 검사 (#97, ADR-0003)
+ * (20261109000000_add_profit_records_cycle_number.sql)
  *
  * CI는 이 마이그레이션을 빈 테이블에 적용하므로, 기존 기록에 사이클 번호를 되살리는
- * 로직과 실패 검사는 거기서 검증되지 않는다. 이 테스트는 마이그레이션 SQL 본문을
- * 픽스처 데이터에 그대로 돌려 본다.
- *
- * 실제 테이블은 건드리지 않는다. 한 트랜잭션 안에서 세 테이블(trading_accounts,
- * tier_holdings, profit_records)의 구조를 임시 테이블로 복제하고 profit_records 복제본에서
- * cycle_number를 지워 마이그레이션 전 상태를 만든 뒤, 마이그레이션의 `public.`을
- * `pg_temp.`로 바꿔 그 복제본에 적용한다. 트랜잭션은 매번 되돌린다.
- * 그래서 로컬 DB에 마이그레이션이 이미 적용돼 있어도, 다른 테스트가 같은 테이블을
- * 동시에 쓰고 있어도 결과가 같다.
+ * 로직과 실패 검사는 거기서 검증되지 않는다. 이 테스트는 세 테이블(trading_accounts,
+ * tier_holdings, profit_records)을 임시 테이블로 복제하고 profit_records 복제본에서
+ * cycle_number를 지워 마이그레이션 전 상태를 만든 뒤 마이그레이션을 돌려 본다
+ * (방식은 src/test-utils/migration-clone.ts 참고).
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import postgres from "postgres";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { hasDb } from "@/test-utils/db";
-
-const MIGRATION_PATH = path.resolve(
-  __dirname,
-  "../../../supabase/migrations/20261109000000_add_profit_records_cycle_number.sql"
-);
-
-/** 트랜잭션을 되돌리기 위해 던지는 표식 */
-class Rollback extends Error {}
+import { cloneTable, setUpMigrationClone } from "@/test-utils/migration-clone";
 
 /** 픽스처의 계좌·수익 기록·보유 티어 */
 interface Fixture {
@@ -39,40 +25,17 @@ interface MigratedRecord {
 }
 
 describe.skipIf(!hasDb)("profit_records.cycle_number 마이그레이션", () => {
-  let sql: postgres.Sql;
-  let migrationSql: string;
-
-  beforeAll(() => {
-    sql = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false, onnotice: () => {} });
-    migrationSql = readFileSync(MIGRATION_PATH, "utf8").replaceAll("public.", "pg_temp.");
-  });
-
-  afterAll(async () => {
-    await sql.end();
-  });
+  const clone = setUpMigrationClone("20261109000000_add_profit_records_cycle_number.sql");
 
   /**
    * 마이그레이션 전 상태의 임시 복제본에 픽스처를 넣고 마이그레이션을 적용한다.
    * 성공하면 사이클 번호를, 실패하면 마이그레이션이 던진 에러를 돌려준다.
    */
-  async function migrate(
-    fixture: Fixture
-  ): Promise<
-    | { ok: true; cycles: Record<string, number>; nullable: string; indexes: string[] }
-    | { ok: false; error: string }
-  > {
-    let outcome:
-      | { ok: true; cycles: Record<string, number>; nullable: string; indexes: string[] }
-      | { ok: false; error: string }
-      | undefined;
-    try {
-      await sql.begin(async (transaction) => {
-        // postgres-js의 TransactionSql 타입은 Omit 때문에 호출 시그니처를 잃는다 - 런타임은 Sql과 같다
-        const tx = transaction as unknown as postgres.Sql;
+  function migrate(fixture: Fixture) {
+    return clone.run({
+      setup: async (tx) => {
         for (const table of ["trading_accounts", "tier_holdings", "profit_records"]) {
-          await tx.unsafe(
-            `CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`
-          );
+          await cloneTable(tx, table, ["DEFAULTS", "CONSTRAINTS"]);
         }
         await tx.unsafe("ALTER TABLE pg_temp.profit_records DROP COLUMN cycle_number");
 
@@ -97,14 +60,8 @@ describe.skipIf(!hasDb)("profit_records.cycle_number 마이그레이션", () => 
             VALUES (${`${h.account}-h${h.tier}`}, ${h.account}, ${h.tier},
                     ${shares > 0 ? 10 : null}, ${shares}, ${h.buy})`;
         }
-
-        try {
-          await tx.unsafe(migrationSql);
-        } catch (error) {
-          outcome = { ok: false, error: error instanceof Error ? error.message : String(error) };
-          throw new Rollback();
-        }
-
+      },
+      inspect: async (tx) => {
         const rows = await tx<MigratedRecord[]>`
           SELECT id, cycle_number FROM pg_temp.profit_records ORDER BY id`;
         const [column] = await tx<{ is_nullable: string }[]>`
@@ -115,19 +72,13 @@ describe.skipIf(!hasDb)("profit_records.cycle_number 마이그레이션", () => 
           SELECT indexname FROM pg_indexes
           WHERE schemaname = pg_my_temp_schema()::regnamespace::text
             AND tablename = 'profit_records'`;
-        outcome = {
-          ok: true,
+        return {
           cycles: Object.fromEntries(rows.map((r) => [r.id, r.cycle_number])),
           nullable: column.is_nullable,
           indexes: indexes.map((i) => i.indexname),
         };
-        throw new Rollback();
-      });
-    } catch (error) {
-      if (!(error instanceof Rollback)) throw error;
-    }
-    if (!outcome) throw new Error("migration outcome missing");
-    return outcome;
+      },
+    });
   }
 
   it("계좌별로 매수일 순으로 묶어 사이클 번호를 1부터 매기고 NOT NULL로 바꾼다", async () => {
