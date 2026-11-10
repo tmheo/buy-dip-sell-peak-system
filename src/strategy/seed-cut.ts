@@ -19,11 +19,12 @@ import type { CycleState, SeedChangeKind, SeedCutLimits } from "./types";
  * - closedCash: 직전 거래일까지 마감된 예수금. 이보다 큰 감액은 사이클을 끝낸다.
  * - cashIfTodayBuyFills: 오늘 주문표의 매수가 지정가 × 수량으로 체결된다고 쳤을 때의 예수금(0 하한).
  *   이보다 큰 감액은 오늘 매수가 체결되면 사이클을 끝낸다. 당일 매도는 예수금을 줄이지 않으므로
- *   (매도 대금이 손실을 늘 넘는다) 매수만 뺀다. 오늘 매수가 없으면 closedCash와 같다.
+ *   (매도 대금이 손실을 늘 넘는다) 매수만 뺀다. 오늘 체결될 매수가 없으면 closedCash와 같다.
  *
  * @param state - 오늘의 사이클 상태 (loadCycleState(account, 오늘))
- * @param prevClose - 오늘 주문표를 만드는 직전 거래일 종가 (adjClose). 없으면 null - 주문표를
- *   만들 수 없어 오늘 매수도 없다
+ * @param prevClose - 오늘 주문표를 만드는 직전 거래일 종가 (adjClose). 오늘 체결될 매수가 없으면
+ *   null이다 - 오늘이 거래일이 아니어서 오늘 주문표가 체결되지 않거나, 직전 종가가 없어 주문표를
+ *   만들 수 없을 때다
  */
 export function seedCutLimits(state: CycleState, prevClose: number | null): SeedCutLimits {
   const closedCash = availableCash(state);

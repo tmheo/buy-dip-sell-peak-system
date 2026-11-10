@@ -348,6 +348,24 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed - 사이클 중 감
     expect(await nextSeed(id)).toBe(2_000);
   });
 
+  it("주말에는 체결될 오늘 매수가 없으므로 직전 마감 예수금 이내의 감액을 확인 없이 받아야 한다", async () => {
+    // 2009-12-05(토): 오늘 주문표가 없어 평일이면 depends인 감액도 사이클이 이어진다.
+    // 적용일은 다음 평일 2009-12-07(월)이다
+    vi.setSystemTime(new Date("2009-12-05T12:00:00Z"));
+    const id = await createAccountInCycle();
+
+    const kept = await put(id, { seedCapital: 11_999.79 });
+    expect(kept.status).toBe(200);
+    expect(await nextSeed(id)).toBe(11_999.79);
+
+    const ended = await put(id, { seedCapital: 9_999.99 });
+    expect(ended.status).toBe(409);
+    expect(await ended.json()).toMatchObject({
+      classification: "ends",
+      seedCutLimits: { closedCash: 10_000, cashIfTodayBuyFills: 10_000 },
+    });
+  });
+
   it("다른 사용자의 계좌는 분류하기 전에 404를 돌려줘야 한다", async () => {
     const id = await createAccountInCycle();
     mockLoggedIn(randomUUID());

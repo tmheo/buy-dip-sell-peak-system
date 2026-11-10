@@ -14,6 +14,7 @@ import {
   runInReadSnapshot,
   type DbExecutor,
 } from "@/database/trading";
+import { isWeekday } from "@/lib/date";
 import type { CycleState, SeedCutLimits } from "@/strategy";
 import { classifySeedChange, seedCutLimits } from "@/strategy";
 import type { SeedStatus, TradingAccount } from "@/types/trading";
@@ -23,6 +24,11 @@ import { loadCycleState } from "./orders";
 /**
  * 사이클 중 오늘 시드를 줄일 때의 감액 경계. 보유 티어가 없으면(사이클 사이) null이다.
  * 오늘 매수는 오늘 주문표를 만드는 직전 거래일 종가로 계산한다 - 주문표와 같은 입력이다.
+ *
+ * 오늘이 주말이면 오늘 주문표는 체결되지 않으므로(일일 마감은 가격 행이 있는 거래일만 체결한다)
+ * 오늘 매수도 없다. 오늘이 거래일인지는 오늘의 가격 행이 아직 없어 평일로 어림한다 - 적용일을
+ * 정할 때처럼 앞으로의 휴장일은 알 수 없다. 그래서 평일 휴장일에는 체결되지 않을 오늘 매수를
+ * 빼고 경계를 낮게 잡아, 사이클이 이어지는 감액도 확인을 한 번 더 받는다.
  *
  * @param account - 계좌 (종목)
  * @param today - 오늘 (서버의 UTC 날짜, YYYY-MM-DD)
@@ -38,7 +44,9 @@ export async function loadSeedCutLimits(
   if (state.holdings.length === 0) {
     return null;
   }
-  const prevClose = await getPreviousTradingClose(account.ticker, today, executor);
+  const prevClose = isWeekday(today)
+    ? await getPreviousTradingClose(account.ticker, today, executor)
+    : null;
   return seedCutLimits(state, prevClose?.adjClose ?? null);
 }
 

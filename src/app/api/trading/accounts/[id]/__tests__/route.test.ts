@@ -332,6 +332,14 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         cashIfTodayBuyFills: 8_000.2,
       });
       expect(betweenBody.seedCutLimits).toBeNull();
+
+      // 주말(2009-12-12, 토)에는 오늘 주문표가 체결되지 않아 오늘 매수가 없다
+      vi.setSystemTime(new Date("2009-12-12T12:00:00Z"));
+      const weekendBody = await (await get(inCycle.id)).json();
+      expect(weekendBody.seedCutLimits).toEqual({
+        closedCash: 10_000,
+        cashIfTodayBuyFills: 10_000,
+      });
     } finally {
       vi.useRealTimers();
       if (inserted.length > 0) {

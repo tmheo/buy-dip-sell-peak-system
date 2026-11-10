@@ -65,6 +65,17 @@ export function getPreviousTradingDate(date: string): string {
 }
 
 /**
+ * 평일인지 (UTC 기준). 앞으로의 휴장일은 알 수 없으므로 실계좌는 오늘과 앞날의 거래일을
+ * 평일로 어림한다 - 지난 날짜의 거래일은 가격 행으로 가린다.
+ *
+ * @param date - 날짜 (YYYY-MM-DD)
+ */
+export function isWeekday(date: string): boolean {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return day !== 0 && day !== 6;
+}
+
+/**
  * 다음 평일 (주말만 건너뛴다 - 휴장일은 알 수 없다)
  * UTC 기준으로 계산하여 타임존 문제 방지
  *
@@ -76,7 +87,7 @@ export function getNextWeekday(date: string): string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   do {
     dt.setUTCDate(dt.getUTCDate() + 1);
-  } while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6);
+  } while (!isWeekday(formatUtcDate(dt)));
 
   return formatUtcDate(dt);
 }
