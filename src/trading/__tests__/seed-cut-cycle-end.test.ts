@@ -43,9 +43,11 @@ interface Scenario {
   ticker: Ticker;
   createdOn: string;
   prices: Array<{ date: string; adjClose: number }>;
-  // 운용 시작일, 시드를 줄이는 날, 시드 감액으로 사이클을 끝내는 날, 다음 사이클의 첫 매수일
+  // 운용 시작일, 시드를 줄이는 날, 적용일(다음 평일), 시드 감액으로 사이클을 끝내는 날,
+  // 다음 사이클의 첫 매수일
   firstDay: string;
   changedOn: string;
+  effectiveDate: string;
   endsCycleOn: string;
   nextCycleOn: string;
 }
@@ -64,6 +66,7 @@ const SCENARIOS: Scenario[] = [
     ],
     firstDay: "2009-11-02",
     changedOn: "2009-11-03",
+    effectiveDate: "2009-11-04",
     endsCycleOn: "2009-11-04",
     nextCycleOn: "2009-11-05",
   },
@@ -79,7 +82,8 @@ const SCENARIOS: Scenario[] = [
       { date: "2009-11-30", adjClose: 96 },
     ],
     firstDay: "2009-11-24",
-    changedOn: "2009-11-25", // 적용일 11-26(목)은 휴장
+    changedOn: "2009-11-25",
+    effectiveDate: "2009-11-26", // 휴장
     endsCycleOn: "2009-11-27",
     nextCycleOn: "2009-11-30",
   },
@@ -170,19 +174,20 @@ describe.skipIf(!hasDb)("예수금보다 큰 시드 감액으로 끝나는 사�
         TEST_USER_ID,
         2_000,
         scenario.changedOn,
-        false
+        null
       );
       expect(unconfirmed).toEqual({
         status: "needsConfirmation",
         classification: "depends",
         seedCutLimits: { closedCash: 9_010, cashIfTodayBuyFills: 7_525.15 },
+        effectiveDate: scenario.effectiveDate,
       });
       const confirmed = await trading.changeSeed(
         created.id,
         TEST_USER_ID,
         2_000,
         scenario.changedOn,
-        true
+        "depends"
       );
       expect(confirmed?.status).toBe("changed");
 

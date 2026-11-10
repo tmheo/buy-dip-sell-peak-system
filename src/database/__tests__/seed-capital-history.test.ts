@@ -84,6 +84,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       current: 10_000,
       pending: null,
       appliedToday: null,
+      changeEffectiveDate: "2009-06-04",
     });
     // 운용 시작일(2009-06-01)은 만든 날보다 앞이다
     expect(await seedOn(account, "2009-06-01")).toBe(10_000);
@@ -98,6 +99,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       current: 10_000,
       pending: { seedCapital: 3_000, effectiveDate: "2009-06-08" },
       appliedToday: null,
+      changeEffectiveDate: "2009-06-08",
     });
     expect(await seedOn(account, "2009-06-05")).toBe(10_000);
     expect(await seedOn(account, "2009-06-08")).toBe(3_000);
@@ -121,7 +123,12 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       10_000,
       "2009-06-02"
     );
-    expect(reverted).toEqual({ current: 10_000, pending: null, appliedToday: null });
+    expect(reverted).toEqual({
+      current: 10_000,
+      pending: null,
+      appliedToday: null,
+      changeEffectiveDate: "2009-06-03",
+    });
     expect(await seedOn(account, "2009-06-03")).toBe(10_000);
   });
 

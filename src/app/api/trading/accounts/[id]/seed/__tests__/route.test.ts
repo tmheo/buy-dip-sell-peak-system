@@ -3,9 +3,9 @@
  *
  * 바꾼 시드는 바꾼 날(서버의 UTC 날짜)의 다음 거래일 주문표부터 쓰인다. 응답은 바꾼 뒤의
  * 시드 상태(seed)다. 서버가 최소 $2,000, 최대 10억, 센트 단위를 검사한다.
- * 사이클 중에도 받는다. 사이클을 끝낼 수 있는 감액(depends, ends)은 본문에 confirmCycleEnd: true가
- * 없으면 409로 거절하고 서버가 새로 계산한 분류와 감액 경계를 돌려준다 - 오래 열려 있던 화면이
- * 사용자에게 다시 묻게 하려는 것이다.
+ * 사이클 중에도 받는다. 사이클을 끝낼 수 있는 감액(depends, ends)은 본문의 confirmedClassification이
+ * 서버가 새로 계산한 분류만큼 확인하지 않았으면 409로 거절하고, 그 분류와 감액 경계와 적용일을
+ * 돌려준다 - 오래 열려 있던 화면이 사용자에게 지금의 분류로 다시 묻게 하려는 것이다.
  *
  * 오늘은 2026-11-13(금)으로 정해 적용일이 2026-11-16(월)이 되게 한다.
  * 사이클 중 감액은 직전 종가가 있어야 오늘 매수를 알 수 있으므로, SOXL 상장(2010-03-11) 이전인
@@ -102,6 +102,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed", () => {
         current: 10_000,
         pending: { seedCapital: 3_000, effectiveDate: "2026-11-16" },
         appliedToday: null,
+        changeEffectiveDate: "2026-11-16",
       },
     });
     expect(await seedOn(id, TODAY)).toBe(10_000);
@@ -120,6 +121,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed", () => {
       current: 10_000,
       pending: null,
       appliedToday: null,
+      changeEffectiveDate: "2026-11-16",
     });
   });
 
@@ -168,11 +170,13 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed", () => {
     expect((await put(id, "not json")).status).toBe(400);
   });
 
-  it("확인 칸이 불리언이 아니면 400을 돌려줘야 한다", async () => {
+  it("확인한 분류가 사이클을 끝낼 수 있는 분류가 아니면 400을 돌려줘야 한다", async () => {
     mockLoggedIn(OWNER_ID);
     const id = await createAccount();
 
-    expect((await put(id, { seedCapital: 3_000, confirmCycleEnd: "yes" })).status).toBe(400);
+    expect((await put(id, { seedCapital: 3_000, confirmedClassification: "keep" })).status).toBe(
+      400
+    );
   });
 
   it("다른 사용자의 계좌는 404를 돌려주고 시드를 바꾸지 않아야 한다", async () => {
@@ -310,7 +314,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed - 사이클 중 감
     ["직전 마감 예수금과 같은 감액", 10_000, "depends"],
     ["직전 마감 예수금보다 큰 감액", 9_999.99, "ends"],
   ])(
-    "%s은 확인이 없으면 409로 분류와 감액 경계를 돌려주고 시드를 바꾸지 않아야 한다",
+    "%s은 확인이 없으면 409로 분류와 감액 경계와 적용일을 돌려주고 시드를 바꾸지 않아야 한다",
     async (_label, seedCapital, classification) => {
       const id = await createAccountInCycle();
 
@@ -318,35 +322,57 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed - 사이클 중 감
 
       expect(response.status).toBe(409);
       const body = await response.json();
-      expect(body).toMatchObject({ classification, seedCutLimits: LIMITS });
+      expect(body).toMatchObject({
+        classification,
+        seedCutLimits: LIMITS,
+        effectiveDate: "2009-12-07",
+      });
       expect(typeof body.error).toBe("string");
       expect(await nextSeed(id)).toBe(20_000);
     }
   );
 
-  it("확인 칸이 false여도 409로 다시 물어야 한다", async () => {
+  it("오늘 매수에 달린 감액으로 확인했는데 지금은 사이클을 끝내는 감액이면 409로 다시 물어야 한다", async () => {
+    // 화면이 경계를 보인 뒤 예수금이 줄어 같은 감액이 사이클 끝이 된 경우다
     const id = await createAccountInCycle();
 
-    const response = await put(id, { seedCapital: 2_000, confirmCycleEnd: false });
+    const response = await put(id, { seedCapital: 2_000, confirmedClassification: "depends" });
 
     expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ classification: "ends" });
     expect(await nextSeed(id)).toBe(20_000);
   });
 
-  it("확인하고 다시 보내면 사이클을 끝내는 감액도 받아야 한다", async () => {
+  it("사이클을 끝내는 감액으로 확인하고 다시 보내면 받아야 한다", async () => {
     const id = await createAccountInCycle();
     expect((await put(id, { seedCapital: 2_000 })).status).toBe(409);
 
-    const response = await put(id, { seedCapital: 2_000, confirmCycleEnd: true });
+    const response = await put(id, { seedCapital: 2_000, confirmedClassification: "ends" });
 
     expect(response.status).toBe(200);
     expect((await response.json()).seed).toEqual({
       current: 20_000,
       pending: { seedCapital: 2_000, effectiveDate: "2009-12-07" },
       appliedToday: null,
+      changeEffectiveDate: "2009-12-07",
     });
     expect(await nextSeed(id)).toBe(2_000);
   });
+
+  it.each([
+    ["오늘 매수에 달린 감액", 11_999.79],
+    ["사이클이 이어지는 감액", 15_000],
+  ])(
+    "사이클을 끝내는 감액으로 확인했는데 지금은 %s이면 그대로 받아야 한다",
+    async (_label, seedCapital) => {
+      const id = await createAccountInCycle();
+
+      const response = await put(id, { seedCapital, confirmedClassification: "ends" });
+
+      expect(response.status).toBe(200);
+      expect(await nextSeed(id)).toBe(seedCapital);
+    }
+  );
 
   it("주말에는 체결될 오늘 매수가 없으므로 직전 마감 예수금 이내의 감액을 확인 없이 받아야 한다", async () => {
     // 2009-12-05(토): 오늘 주문표가 없어 평일이면 depends인 감액도 사이클이 이어진다.

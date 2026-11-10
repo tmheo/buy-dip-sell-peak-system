@@ -68,9 +68,19 @@ export function seedCapitalAndCutOn(
 }
 
 /**
+ * 오늘 시드를 바꾸면 새 시드가 쓰이기 시작하는 날(적용일) - 오늘의 다음 거래일이다.
+ * 앞으로의 휴장일은 알 수 없으므로 주말만 건너뛴다 - 적용일이 휴장일이면 그다음 거래일이
+ * 실제 첫 적용일이 된다(seedStatus).
+ *
+ * @param today - 바꾸는 날 (서버의 UTC 날짜, YYYY-MM-DD)
+ */
+export function seedChangeEffectiveDate(today: string): string {
+  return getNextWeekday(today);
+}
+
+/**
  * 시드를 바꾼 뒤의 이력.
- * 적용일은 오늘의 다음 거래일이다. 앞으로의 휴장일은 알 수 없으므로 주말만 건너뛴다 -
- * 적용일이 휴장일이면 그다음 거래일이 실제 첫 적용일이 된다(seedStatus).
+ * 적용일은 seedChangeEffectiveDate(오늘)이다.
  * 적용 전 줄(적용일이 오늘 뒤)은 많아야 하나이고, 새 변경이 그 줄을 지우고 쓴다.
  * 새 시드가 오늘의 시드와 같으면 적용 전 줄만 지운다(되돌리기).
  * 오늘 이하의 줄은 이미 주문표에 쓰였을 수 있으므로 고치지 않는다.
@@ -88,11 +98,12 @@ export function changeSeedHistory(
   if (seedCapital === seedCapitalOn(history, today)) {
     return kept;
   }
-  return [...kept, { effectiveDate: getNextWeekday(today), seedCapital }];
+  return [...kept, { effectiveDate: seedChangeEffectiveDate(today), seedCapital }];
 }
 
 /**
  * 화면에 보일 시드 상태.
+ * 오늘 바꾸면 쓰이기 시작하는 날(changeEffectiveDate)은 seedChangeEffectiveDate(오늘)이다.
  * 오늘 새 시드가 처음 적용됐는지는 "직전 거래일의 시드 ≠ 오늘의 시드"로 판정한다 -
  * 적용일이 휴장일이면 그다음 거래일이 실제 첫 적용일이기 때문이다.
  *
@@ -114,6 +125,7 @@ export function seedStatus(
     current,
     pending: pending && { ...pending },
     appliedToday: previous === current ? null : { previous, current },
+    changeEffectiveDate: seedChangeEffectiveDate(today),
   };
 }
 

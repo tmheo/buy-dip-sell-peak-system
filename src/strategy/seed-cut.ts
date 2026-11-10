@@ -79,3 +79,24 @@ export type CycleEndingSeedChange = Extract<SeedChangeKind, "depends" | "ends">;
 export function mayEndCycle(kind: SeedChangeKind): kind is CycleEndingSeedChange {
   return kind === "depends" || kind === "ends";
 }
+
+/** 사이클을 끝낼 가능성의 순서 - 이어감 < 오늘 매수에 달림 < 사이클 끝 */
+const CYCLE_END_RANK: Record<CycleEndingSeedChange, number> = { depends: 1, ends: 2 };
+
+/**
+ * 사용자가 확인한 분류로는 모자라 이 시드 변경을 저장하기 전에 다시 확인받아야 하는지.
+ *
+ * 화면이 분류를 보인 뒤 오늘 주문표가 체결돼 경계가 바뀌었을 수 있다. 지금의 분류가 사이클을
+ * 끝낼 수 있고, 사용자가 확인한 것보다 더 끝날 수 있는 분류이면(오늘 매수에 달림을 확인했는데
+ * 사이클 끝이 됐다) 다시 묻는다. 확인한 것보다 덜 끝나는 분류가 됐으면 그대로 저장한다.
+ *
+ * @param kind - 지금의 감액 경계로 본 분류 (classifySeedChange)
+ * @param confirmed - 사용자가 확인한 분류. 확인하지 않았으면 null
+ */
+export function needsSeedChangeConfirmation(
+  kind: SeedChangeKind,
+  confirmed: CycleEndingSeedChange | null
+): boolean {
+  if (!mayEndCycle(kind)) return false;
+  return confirmed === null || CYCLE_END_RANK[kind] > CYCLE_END_RANK[confirmed];
+}

@@ -62,6 +62,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts", () => {
         current: 10_000,
         pending: { seedCapital: 3_000, effectiveDate: "2026-11-11" },
         appliedToday: null,
+        changeEffectiveDate: "2026-11-11",
       });
     } finally {
       vi.useRealTimers();

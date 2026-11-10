@@ -31,6 +31,7 @@ describe("appliedSeedNotice()", () => {
       current: 8_000,
       pending: null,
       appliedToday: { previous: 10_000, current: 8_000 },
+      changeEffectiveDate: "2026-11-12",
     };
 
     expect(appliedSeedNotice(applied, false)).toBe(
@@ -43,6 +44,7 @@ describe("appliedSeedNotice()", () => {
       current: 12_000,
       pending: null,
       appliedToday: { previous: 10_000, current: 12_000 },
+      changeEffectiveDate: "2026-11-12",
     };
 
     expect(appliedSeedNotice(applied, false)).toBe(
@@ -55,13 +57,19 @@ describe("appliedSeedNotice()", () => {
       current: 3_000,
       pending: null,
       appliedToday: { previous: 10_000, current: 3_000 },
+      changeEffectiveDate: "2026-11-12",
     };
 
     expect(appliedSeedNotice(applied, true)).toBeNull();
   });
 
   it("오늘 처음 쓰이는 새 시드가 없으면 안내하지 않는다", () => {
-    const settled: SeedStatus = { current: 10_000, pending: null, appliedToday: null };
+    const settled: SeedStatus = {
+      current: 10_000,
+      pending: null,
+      appliedToday: null,
+      changeEffectiveDate: "2026-11-12",
+    };
 
     expect(appliedSeedNotice(settled, false)).toBeNull();
   });

@@ -23,8 +23,14 @@ const PENDING: SeedStatus = {
   current: 10_000,
   pending: { seedCapital: 3_000, effectiveDate: "2026-11-11" },
   appliedToday: null,
+  changeEffectiveDate: "2026-11-11",
 };
-const SETTLED: SeedStatus = { current: 10_000, pending: null, appliedToday: null };
+const SETTLED: SeedStatus = {
+  current: 10_000,
+  pending: null,
+  appliedToday: null,
+  changeEffectiveDate: "2026-11-11",
+};
 
 describe("canEditTradingStartDate()", () => {
   it("첫 일일 마감 전이면 운용 시작일을 편집할 수 있다", () => {
@@ -82,10 +88,8 @@ describe("seedChangeToSend()", () => {
 });
 
 describe("pendingSeedOrdersNote()", () => {
-  it("적용 전 변경이 있으면 오늘 주문표는 지금 시드 기준이고 새 시드는 적용일부터 쓰인다고 적는다", () => {
-    expect(pendingSeedOrdersNote(PENDING)).toBe(
-      "오늘 주문표는 지금 시드 $10,000 기준입니다. 새 시드 $3,000는 11월 11일(수) 주문표부터 쓰입니다."
-    );
+  it("적용 전 변경이 있으면 오늘 주문표는 지금 시드 기준이라고만 적는다 - 새 시드와 적용일은 설정 카드가 보인다", () => {
+    expect(pendingSeedOrdersNote(PENDING)).toBe("오늘 주문표는 지금 시드 $10,000 기준입니다.");
   });
 
   it("적용 전 변경이 없으면 적을 것이 없다", () => {

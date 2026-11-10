@@ -21,7 +21,13 @@ import { calculateAssetValues } from "@/components/trading/asset-values";
 import { pendingSeedOrdersNote } from "@/components/trading/account-settings";
 import { formatSeedAmount } from "@/components/trading/format";
 import type { LatestClose } from "@/database/trading";
-import type { CashBreakdown, ReducedBuy, SeedCutLimits, UnaffordableBuy } from "@/strategy";
+import type {
+  CashBreakdown,
+  CycleEndingSeedChange,
+  ReducedBuy,
+  SeedCutLimits,
+  UnaffordableBuy,
+} from "@/strategy";
 import type { SeedCutSettlement } from "@/trading";
 import type { TradingAccountDetail, DailyOrder } from "@/types/trading";
 
@@ -58,44 +64,34 @@ interface AccountDetail {
   seedCutSettlement: SeedCutSettlement | null;
 }
 
-/**
- * 시드 변경 API가 사이클을 끝낼 수 있는 감액이라며 확인을 요구했다 (409).
- * 화면을 연 뒤 감액 경계가 바뀐 경우다 - 응답의 경계로 다시 그려 다시 확인받는다.
- */
-class SeedChangeNeedsConfirmationError extends Error {
-  constructor(
-    message: string,
-    readonly seedCutLimits: SeedCutLimits
-  ) {
-    super(message);
-  }
-}
-
-interface PutErrorBody {
+interface ErrorBody {
   error?: string;
   details?: { fieldErrors?: Record<string, string[]> };
-  seedCutLimits?: SeedCutLimits;
 }
 
-/**
- * JSON 본문으로 PUT을 보낸다. 실패하면 서버가 준 오류 문장으로 던진다 -
- * 검증 오류는 칸별 문장(details.fieldErrors)이 더 구체적이다. 시드 변경의 확인 요구(409)는
- * SeedChangeNeedsConfirmationError로 던진다.
- */
-async function putJson(url: string, body: unknown): Promise<void> {
-  const response = await fetch(url, {
+/** JSON 본문으로 PUT을 보낸다 */
+function putJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (response.ok) return;
+}
 
-  const result: PutErrorBody = await response.json().catch(() => ({}));
-  if (response.status === 409 && result.seedCutLimits) {
-    throw new SeedChangeNeedsConfirmationError(result.error ?? "", result.seedCutLimits);
-  }
-  const fieldError = Object.values(result.details?.fieldErrors ?? {})[0]?.[0];
-  throw new Error(fieldError ?? result.error ?? "설정 저장에 실패했습니다.");
+/**
+ * 실패한 응답의 오류 문장 - 검증 오류는 칸별 문장(details.fieldErrors)이 더 구체적이다.
+ * 본문을 읽지 못하면 null
+ */
+async function errorMessage(response: Response): Promise<string | null> {
+  const result: ErrorBody = await response.json().catch(() => ({}));
+  return Object.values(result.details?.fieldErrors ?? {})[0]?.[0] ?? result.error ?? null;
+}
+
+/** 시드 변경 API의 409 본문 - 사이클을 끝낼 수 있는 감액이라며 지금의 분류로 다시 묻는다 */
+interface SeedChangeConflictBody {
+  classification: CycleEndingSeedChange;
+  seedCutLimits: SeedCutLimits;
+  effectiveDate: string;
 }
 
 export default function TradingDetailClient({
@@ -175,16 +171,27 @@ export default function TradingDetailClient({
 
     try {
       if (changes.settings) {
-        await putJson(`/api/trading/accounts/${accountId}`, changes.settings);
+        const response = await putJson(`/api/trading/accounts/${accountId}`, changes.settings);
+        if (!response.ok) {
+          throw new Error((await errorMessage(response)) ?? "설정 저장에 실패했습니다.");
+        }
       }
       if (changes.seed) {
-        await putJson(`/api/trading/accounts/${accountId}/seed`, changes.seed);
+        const response = await putJson(`/api/trading/accounts/${accountId}/seed`, changes.seed);
+        // 화면을 연 뒤 감액 경계가 바뀌었다 - 알림창 대신 설정 카드가 응답으로 다시 묻는다
+        if (response.status === 409) {
+          const conflict: SeedChangeConflictBody = await response.json();
+          return {
+            status: "needsConfirmation",
+            recheck: { seedCapital: changes.seed.seedCapital, ...conflict },
+          };
+        }
+        if (!response.ok) {
+          throw new Error((await errorMessage(response)) ?? "시드 저장에 실패했습니다.");
+        }
       }
       return { status: "saved" };
     } catch (err) {
-      if (err instanceof SeedChangeNeedsConfirmationError) {
-        return { status: "needsConfirmation", seedCutLimits: err.seedCutLimits };
-      }
       alert(err instanceof Error ? err.message : "설정 저장에 실패했습니다.");
       return { status: "failed" };
     } finally {

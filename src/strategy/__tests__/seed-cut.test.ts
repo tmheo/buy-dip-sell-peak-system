@@ -18,6 +18,7 @@ import {
   endsCycleBySeedCut,
   isCycleInProgress,
   mayEndCycle,
+  needsSeedChangeConfirmation,
   planOrdersDetailed,
   seedCutLimits,
 } from "@/strategy";
@@ -214,6 +215,26 @@ describe("mayEndCycle - 사이클을 끝낼 수 있어 확인을 받는 분류",
     ["ends", true],
   ] as const)("%s는 %s", (kind, expected) => {
     expect(mayEndCycle(kind)).toBe(expected);
+  });
+});
+
+describe("needsSeedChangeConfirmation - 저장하기 전에 다시 확인받아야 하는지", () => {
+  // 사이클을 끝낼 가능성은 이어감 < 오늘 매수에 달림 < 사이클 끝 순서로 커진다.
+  // 사용자가 확인한 것보다 더 끝날 수 있는 분류가 되면 다시 묻고, 덜 끝나는 분류가 되면 저장한다
+  it.each([
+    ["increase", null, false],
+    ["keep", null, false],
+    ["depends", null, true],
+    ["ends", null, true],
+    ["increase", "depends", false],
+    ["keep", "depends", false],
+    ["depends", "depends", false],
+    ["ends", "depends", true],
+    ["keep", "ends", false],
+    ["depends", "ends", false],
+    ["ends", "ends", false],
+  ] as const)("서버의 분류가 %s이고 확인한 분류가 %s이면 %s", (kind, confirmed, expected) => {
+    expect(needsSeedChangeConfirmation(kind, confirmed)).toBe(expected);
   });
 });
 

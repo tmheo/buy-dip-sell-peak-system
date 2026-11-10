@@ -11,11 +11,10 @@
  *
  * 사이클 중에는 "시드 변경"으로 시드 칸만 열리고 전략·운용 시작일에는 "사이클 중 잠김"을 붙인다
  * (ADR-0004, #119). 입력은 새 시드이고, 입금·출금할 금액은 입력 아래 안내가 알려 준다. 감액이면
- * 세 구간 막대(이어감, 오늘 매수에 달림, 사이클 끝)에 입력한 감액의 위치를 보인다. 경계는 계좌 상세
- * 응답의 seedCutLimits, 분류는 서버와 같은 src/strategy의 classifySeedChange를 쓴다 - 화면이 규칙을
- * 다시 계산하지 않는다. 사이클을 끝낼 수 있는 감액은 확인 체크를 해야 저장된다. 서버가 그사이 바뀐
- * 경계로 다시 묻으면(409) 그 경계로 막대와 안내를 다시 그리고 다시 확인받는다.
- * 저장한 변경의 안내는 적용될 때까지 카드 안에 남는다.
+ * 감액 경계 막대(이어감, 오늘 매수에 달림, 사이클 끝)에 입력한 감액의 위치를 보인다. 사이클을 끝낼
+ * 수 있는 감액은 확인 체크를 해야 저장된다. 서버가 지금의 분류로 다시 물으면(409) 그 응답의 분류와
+ * 감액 경계로 막대와 안내를 다시 그리고 다시 확인받는다. 안내·확인·보낼 변경은 seed-change-form.ts가
+ * 정하고, 이 카드는 그리기만 한다. 저장한 변경의 안내는 적용될 때까지 카드 안에 남는다.
  *
  * 새 시드가 쓰이기 시작한 뒤의 안내도 이 카드가 맡는다 (#118, ADR-0006).
  * - 새 시드가 처음 쓰이는 날(사이클이 이어질 때): 감액이면 이제 출금, 증액이면 아직이면 입금
@@ -27,16 +26,13 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { getNextWeekday, getTodayTradingDate } from "@/lib/date";
 import { MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE } from "@/lib/validations/seed-capital-bounds";
-import { classifySeedChange, mayEndCycle } from "@/strategy";
-import type { SeedChangeKind, SeedCutLimits } from "@/strategy";
+import type { SeedCutLimits } from "@/strategy";
 import type { SeedCutSettlement } from "@/trading";
 import type { TradingAccountDetail, Strategy } from "@/types/trading";
 import {
   canEditTradingStartDate,
   pendingSeedChangeText,
-  seedChangeToSend,
   seedInputValue,
   strategyChangeWarning,
 } from "./account-settings";
@@ -48,11 +44,17 @@ import {
 } from "./applied-seed-notices";
 import { formatLongDate, formatSeedAmount } from "./format";
 import {
+  pendingSeedChangeNotice,
+  seedChangeForm,
+  type CycleEndConfirmation,
+  type SeedChangeRecheck,
+  type SeedChangeRequest,
+} from "./seed-change-form";
+import {
   cutZoneBar,
   cycleEndConfirmation,
-  seedChangeNotice,
+  seedChangeColor,
   type SeedChangeNotice,
-  type SeedChangeTone,
 } from "./seed-change-notices";
 
 interface AccountSettingsCardProps {
@@ -77,22 +79,21 @@ export interface AccountSettingsUpdate {
 
 /**
  * 저장할 변경. settings는 전략·운용 시작일(PUT /api/trading/accounts/[id]),
- * seed는 새 시드(PUT /api/trading/accounts/[id]/seed)이고, 바꾸지 않았으면 null이다.
- * confirmCycleEnd는 사이클을 끝낼 수 있는 감액을 사용자가 확인했는지다.
+ * seed는 새 시드와 사용자가 확인한 분류(PUT /api/trading/accounts/[id]/seed)이고, 바꾸지 않았으면 null이다.
  */
 export interface AccountSettingsChanges {
   settings: AccountSettingsUpdate | null;
-  seed: { seedCapital: number; confirmCycleEnd: boolean } | null;
+  seed: SeedChangeRequest | null;
 }
 
 /**
- * 저장 결과. needsConfirmation은 서버가 그사이 바뀐 감액 경계로 이 감액이 사이클을 끝낼 수 있다며
- * 확인을 요구한 경우다(409) - 그 경계로 다시 그리고 다시 확인받는다.
+ * 저장 결과. needsConfirmation은 서버가 지금의 감액 경계로 이 감액이 사용자가 확인한 것보다 더
+ * 사이클을 끝낼 수 있다며 다시 물은 경우다(409) - 그 응답의 분류와 경계로 다시 그리고 다시 확인받는다.
  */
 export type AccountSettingsSaveResult =
   | { status: "saved" }
   | { status: "failed" }
-  | { status: "needsConfirmation"; seedCutLimits: SeedCutLimits };
+  | { status: "needsConfirmation"; recheck: SeedChangeRecheck };
 
 interface SettingsForm extends AccountSettingsUpdate {
   seedCapital: number;
@@ -157,19 +158,7 @@ function LockedInCycleTag(): React.ReactElement {
   );
 }
 
-const ZONE_BAR_CLASS: Record<Exclude<SeedChangeKind, "increase">, string> = {
-  keep: "bg-success",
-  depends: "bg-warning",
-  ends: "bg-danger",
-};
-
-const ZONE_LEGEND_CLASS: Record<Exclude<SeedChangeKind, "increase">, string> = {
-  keep: "text-success",
-  depends: "text-warning",
-  ends: "text-danger",
-};
-
-/** 감액 구간 막대 - 줄일 수 있는 금액 전체에서 세 구간과 입력한 감액의 위치 */
+/** 감액 경계 막대 - 줄일 수 있는 금액 전체에서 시드 변경 분류마다의 칸과 입력한 감액의 위치 */
 function CutZoneBar({
   currentSeed,
   newSeed,
@@ -192,7 +181,7 @@ function CutZoneBar({
           {zones.map((zone) => (
             <div
               key={zone.kind}
-              className={ZONE_BAR_CLASS[zone.kind]}
+              className={`bg-${seedChangeColor(zone.kind)}`}
               style={{ width: `${zone.percent}%` }}
             />
           ))}
@@ -202,7 +191,7 @@ function CutZoneBar({
       <div className="d-flex flex-wrap column-gap-3 row-gap-1 small text-secondary mt-2">
         {zones.map((zone) => (
           <span key={zone.kind} className="text-nowrap">
-            <span className={ZONE_LEGEND_CLASS[zone.kind]} aria-hidden="true">
+            <span className={`text-${seedChangeColor(zone.kind)}`} aria-hidden="true">
               ■
             </span>{" "}
             {zone.label}
@@ -212,20 +201,6 @@ function CutZoneBar({
     </div>
   );
 }
-
-const NOTICE_TITLE_CLASS: Record<SeedChangeTone, string> = {
-  info: "text-info",
-  success: "text-success",
-  warning: "text-warning",
-  danger: "text-danger",
-};
-
-const NOTICE_ALERT_CLASS: Record<SeedChangeTone, string> = {
-  info: "alert-info",
-  success: "alert-success",
-  warning: "alert-warning",
-  danger: "alert-danger",
-};
 
 /** 시드 변경 안내의 제목과 문장 */
 function NoticeLines({
@@ -298,10 +273,10 @@ export default function AccountSettingsCard({
   const [formData, setFormData] = useState<SettingsForm>(() => savedSettings(account));
   // "다시 바꾸기"나 사이클 중 "시드 변경"으로 편집을 열면 시드 칸에 바로 입력할 수 있게 한다
   const [focusSeed, setFocusSeed] = useState(false);
-  // 사이클을 끝낼 수 있는 감액을 확인했는지 - 새 시드나 경계가 바뀌면 다시 확인받는다
-  const [cycleEndConfirmed, setCycleEndConfirmed] = useState(false);
-  // 서버가 그사이 바뀐 경계로 다시 물었을 때(409) 그 경계. 편집을 마치면 지운다
-  const [changedLimits, setChangedLimits] = useState<SeedCutLimits | null>(null);
+  // 사용자가 한 확인 - 확인한 분류·새 시드·감액 경계 중 하나라도 바뀌면 풀린다(seedChangeForm)
+  const [confirmation, setConfirmation] = useState<CycleEndConfirmation | null>(null);
+  // 서버가 지금의 분류로 다시 물었을 때(409) 그 응답. 편집을 마치거나 저장에 실패하면 지운다
+  const [recheck, setRecheck] = useState<SeedChangeRecheck | null>(null);
   const seedInputRef = useRef<HTMLInputElement>(null);
 
   const inCycle = account.isCycleInProgress;
@@ -310,46 +285,16 @@ export default function AccountSettingsCard({
   const pendingSeedText = pendingSeedChangeText(account.seed);
   const appliedNotice = appliedSeedNotice(account.seed, endsCycleBySeedCut);
   const currentSeed = account.seed.current;
-  const pending = account.seed.pending;
-  // 새 시드가 쓰이기 시작하는 날 - 서버와 같은 규칙(오늘의 다음 평일)이다.
-  // 적용 전 변경이 있으면 그 적용일이고, 같은 날 다시 바꿔도 적용일은 같다
-  const effectiveDate = pending?.effectiveDate ?? getNextWeekday(getTodayTradingDate());
-
-  // 편집 중인 새 시드의 분류와 안내 - 경계는 사이클 중에만 있다
-  const editLimits = changedLimits ?? seedCutLimits;
   const enteredSeed = formData.seedCapital;
-  const seedToSend = seedChangeToSend(account.seed, enteredSeed);
-  const enteredKind =
-    editLimits && enteredSeed >= MIN_SEED_CAPITAL
-      ? classifySeedChange(currentSeed, enteredSeed, editLimits)
-      : null;
-  const enteredNotice =
-    editLimits && enteredKind
-      ? seedChangeNotice({
-          kind: enteredKind,
-          currentSeed,
-          newSeed: enteredSeed,
-          limits: editLimits,
-          effectiveDate,
-        })
-      : null;
-  const showsCutZoneBar = enteredKind !== null && enteredSeed < currentSeed;
-  // 보낼 변경이 사이클을 끝낼 수 있으면 확인받는다
-  const confirmationKind =
-    enteredKind && seedToSend !== null && mayEndCycle(enteredKind) ? enteredKind : null;
-  const revertsPending = pending !== null && seedToSend === currentSeed;
-
-  // 저장한(적용 전) 변경의 안내 - 적용될 때까지 카드 안에 남는다
-  const pendingNotice =
-    seedCutLimits && pending
-      ? seedChangeNotice({
-          kind: classifySeedChange(currentSeed, pending.seedCapital, seedCutLimits),
-          currentSeed,
-          newSeed: pending.seedCapital,
-          limits: seedCutLimits,
-          effectiveDate: pending.effectiveDate,
-        })
-      : null;
+  const seedForm = seedChangeForm({
+    seed: account.seed,
+    enteredSeed,
+    seedCutLimits,
+    recheck,
+    confirmation,
+  });
+  const { notice: enteredNotice, confirmationKind } = seedForm;
+  const pendingNotice = pendingSeedChangeNotice(account.seed, seedCutLimits);
 
   useEffect(() => {
     if (isEditing && focusSeed) {
@@ -362,8 +307,8 @@ export default function AccountSettingsCard({
   function resetEditState(): void {
     setFormData(savedSettings(account));
     setSaveError(null);
-    setCycleEndConfirmed(false);
-    setChangedLimits(null);
+    setConfirmation(null);
+    setRecheck(null);
   }
 
   function startEditing(options: { focusSeed: boolean }): void {
@@ -379,7 +324,6 @@ export default function AccountSettingsCard({
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void {
     const { name, value, type } = e.target;
-    if (name === "seedCapital") setCycleEndConfirmed(false);
     setFormData((prev) => ({
       ...prev,
       [name]: type === "number" ? Number(value) : value,
@@ -391,7 +335,7 @@ export default function AccountSettingsCard({
       setSaveError(`${MIN_SEED_CAPITAL_MESSAGE}.`);
       return;
     }
-    if (confirmationKind && !cycleEndConfirmed) return;
+    if (!seedForm.canSave) return;
     setSaveError(null);
 
     // 사이클 중에는 전략·운용 시작일이 잠겨 있다
@@ -403,10 +347,7 @@ export default function AccountSettingsCard({
       settings: settingsChanged
         ? { strategy: formData.strategy, cycleStartDate: formData.cycleStartDate }
         : null,
-      seed:
-        seedToSend === null
-          ? null
-          : { seedCapital: seedToSend, confirmCycleEnd: confirmationKind !== null },
+      seed: seedForm.request,
     };
     if (changes.settings === null && changes.seed === null) {
       stopEditing();
@@ -417,22 +358,20 @@ export default function AccountSettingsCard({
     if (result.status === "saved") {
       stopEditing();
     } else if (result.status === "needsConfirmation") {
-      setChangedLimits(result.seedCutLimits);
-      setCycleEndConfirmed(false);
+      setRecheck(result.recheck);
+      setConfirmation(null);
+    } else {
+      // 화면은 다시 읽은 감액 경계로 그린다 - 예전 409 응답의 경계를 붙들지 않는다
+      setRecheck(null);
     }
   }
 
   /** 적용 전 변경을 지운다 - 지금 시드를 보내면 서버가 그 변경을 지운다 */
   async function handleRevertSeed(): Promise<void> {
-    await onSave({ settings: null, seed: { seedCapital: currentSeed, confirmCycleEnd: false } });
+    await onSave({ settings: null, seed: { seedCapital: currentSeed } });
   }
 
-  const seedHint = [
-    pending && `지금 시드는 ${formatSeedAmount(currentSeed)}입니다.`,
-    !enteredNotice && !revertsPending && "바꾼 시드는 다음 거래일 주문표부터 쓰입니다.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const seedHint = seedForm.hint;
   const seedDescribedBy =
     [seedHint && "settings-seed-hint", inCycle && "settings-seed-change"]
       .filter(Boolean)
@@ -453,7 +392,7 @@ export default function AccountSettingsCard({
             inCycle && <span className="badge bg-warning text-dark">사이클 진행 중</span>
           )}
           {/* 사이클 중 적용 전 변경이 있으면 시드 칸의 "다시 바꾸기"가 같은 일을 한다 */}
-          {!isEditing && !(inCycle && pending) && (
+          {!isEditing && !(inCycle && account.seed.pending) && (
             <button
               type="button"
               className="btn btn-sm btn-outline-primary text-nowrap"
@@ -507,30 +446,27 @@ export default function AccountSettingsCard({
                   className="border border-secondary rounded p-3 small text-light"
                   aria-live="polite"
                 >
-                  {changedLimits && (
+                  {recheck && (
                     <div className="alert alert-warning py-2 mb-3 text-keep-all" role="alert">
-                      화면을 연 뒤 예수금이나 오늘 매수가 바뀌어 감액 구간이 달라졌습니다. 바뀐
+                      화면을 연 뒤 예수금이나 오늘 매수가 바뀌어 감액 경계가 달라졌습니다. 바뀐
                       안내를 확인하고 다시 저장하세요.
                     </div>
                   )}
-                  {editLimits && showsCutZoneBar && (
+                  {seedForm.limits && seedForm.showsCutZoneBar && (
                     <CutZoneBar
                       currentSeed={currentSeed}
                       newSeed={enteredSeed}
-                      limits={editLimits}
+                      limits={seedForm.limits}
                     />
                   )}
                   {enteredNotice && (
                     <NoticeLines
                       notice={enteredNotice}
-                      titleClassName={NOTICE_TITLE_CLASS[enteredNotice.tone]}
+                      titleClassName={`text-${seedChangeColor(enteredNotice.kind)}`}
                     />
                   )}
-                  {revertsPending && (
-                    <div className="mb-1 text-keep-all">
-                      저장하면 적용 전 변경을 지우고 지금 시드 {formatSeedAmount(currentSeed)}를
-                      그대로 씁니다.
-                    </div>
+                  {seedForm.revertNote && (
+                    <div className="mb-1 text-keep-all">{seedForm.revertNote}</div>
                   )}
                   {confirmationKind && (
                     <div className="form-check mt-2 mb-1">
@@ -538,21 +474,23 @@ export default function AccountSettingsCard({
                         id="settings-seed-confirm"
                         type="checkbox"
                         className="form-check-input"
-                        checked={cycleEndConfirmed}
-                        onChange={(e) => setCycleEndConfirmed(e.target.checked)}
+                        checked={seedForm.confirmed}
+                        onChange={(e) =>
+                          setConfirmation(e.target.checked ? seedForm.confirmationTarget : null)
+                        }
                         disabled={isSaving}
                       />
                       <label
                         htmlFor="settings-seed-confirm"
                         className="form-check-label text-keep-all"
                       >
-                        {cycleEndConfirmation(confirmationKind, effectiveDate)}
+                        {cycleEndConfirmation(confirmationKind, seedForm.effectiveDate)}
                       </label>
                     </div>
                   )}
                   <div
                     className={`text-secondary text-keep-all ${
-                      enteredNotice || revertsPending ? "mt-2" : ""
+                      enteredNotice || seedForm.revertNote ? "mt-2" : ""
                     }`}
                   >
                     사이클 중에는 시드만 바꿀 수 있습니다. 전략은 사이클이 끝나 보유 티어가 없을 때
@@ -644,7 +582,7 @@ export default function AccountSettingsCard({
                 type="button"
                 className={`btn btn-sm me-2 ${confirmationKind === "ends" ? "btn-danger" : "btn-primary"}`}
                 onClick={handleSave}
-                disabled={isSaving || (confirmationKind !== null && !cycleEndConfirmed)}
+                disabled={isSaving || !seedForm.canSave}
               >
                 {isSaving
                   ? "저장 중..."
@@ -717,7 +655,7 @@ export default function AccountSettingsCard({
         )}
         {!isEditing && pendingNotice && (
           <div
-            className={`alert ${NOTICE_ALERT_CLASS[pendingNotice.tone]} py-2 mb-0 mt-3 small`}
+            className={`alert alert-${seedChangeColor(pendingNotice.kind)} py-2 mb-0 mt-3 small`}
             role="status"
           >
             <NoticeLines notice={pendingNotice} titleClassName="" />
