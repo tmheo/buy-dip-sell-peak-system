@@ -4,6 +4,7 @@
  * - tier_holdings: 티어별 보유 현황
  * - daily_orders: 일일 주문
  * - profit_records: 수익 기록
+ * - seed_capital_history: 시드 이력 (ADR-0005)
  */
 
 import {
@@ -16,6 +17,7 @@ import {
   index,
   uniqueIndex,
   boolean,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
@@ -40,7 +42,9 @@ export const tradingAccounts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text().notNull(),
     ticker: text().notNull().$type<AllowedTicker>(),
-    seedCapital: numeric("seed_capital", { precision: 14, scale: 2, mode: "number" }).notNull(),
+    // 더 읽지도 쓰지도 않는다 - 시드는 seed_capital_history가 소유한다 (ADR-0005).
+    // 되돌릴 일이 없다고 확인되면 칸을 지운다 (#120).
+    seedCapital: numeric("seed_capital", { precision: 14, scale: 2, mode: "number" }),
     strategy: text().notNull().$type<AllowedStrategy>(),
     // 운용 시작일(첫 사이클의 시작일). 사이클이 끝나도 바뀌지 않으며 첫 일일 마감 전에만 바꿀 수 있다.
     cycleStartDate: date("cycle_start_date").notNull(),
@@ -150,6 +154,25 @@ export const profitRecords = pgTable(
   ]
 );
 
+/**
+ * seed_capital_history 테이블
+ * 계좌의 시드 금액 이력 - 줄마다 적용일부터 쓰이는 시드 (ADR-0005)
+ * 계좌를 만들 때 첫 줄(적용일 = 만든 날)을 쓰고, 시드를 바꾸면 다음 평일을 적용일로 쓴다.
+ * 한 계좌에 같은 적용일은 하나뿐이다 - 같은 계좌의 동시 변경이 두 줄을 남기지 않는다.
+ */
+export const seedCapitalHistory = pgTable(
+  "seed_capital_history",
+  {
+    accountId: text("account_id")
+      .notNull()
+      .references(() => tradingAccounts.id, { onDelete: "cascade" }),
+    effectiveDate: date("effective_date").notNull(),
+    seedCapital: numeric("seed_capital", { precision: 14, scale: 2, mode: "number" }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.accountId, table.effectiveDate] })]
+);
+
 // 타입 추론
 export type TradingAccount = typeof tradingAccounts.$inferSelect;
 export type NewTradingAccount = typeof tradingAccounts.$inferInsert;
@@ -159,3 +182,4 @@ export type DailyOrder = typeof dailyOrders.$inferSelect;
 export type NewDailyOrder = typeof dailyOrders.$inferInsert;
 export type ProfitRecord = typeof profitRecords.$inferSelect;
 export type NewProfitRecord = typeof profitRecords.$inferInsert;
+export type SeedCapitalHistoryRow = typeof seedCapitalHistory.$inferSelect;
