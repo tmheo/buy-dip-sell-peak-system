@@ -5,9 +5,11 @@
  *
  * 아직 안 산 티어의 할당 시드는 cashBreakdown이 정한 금액을 그대로 보이고, 예수금 때문에 비율대로
  * 못 사는 티어에는 "예수금 부족으로 축소"를 붙인다 (#98, ADR-0003, 결정은 #93). 보유 중인 기본
- * 티어의 할당 시드는 비워 둔다 - 산 금액은 매수시드 열에 있다 (#118). 시드 감액으로 모두 파는
- * 날에는 보유 티어에 "오늘 모두 매도"와 매도목표 MOC를 보인다 (ADR-0006). 데스크톱 표와
- * 휴대폰 카드가 같은 정보를 보인다.
+ * 티어의 할당 시드는 비워 둔다 - 산 금액은 매수시드 열에 있다 (#118). 시드 감액으로 사이클을
+ * 끝내는 날에는 보유 티어에 "오늘 모두 매도"와 매도목표 MOC를 보인다 (ADR-0006).
+ * 무엇을 보일지는 티어 줄(tier-rows.ts)이 정하고, 이 컴포넌트는 그대로 그린다.
+ *
+ * 휴대폰 카드는 칸이 좁아, 보유 티어에는 늘 비어 있는 할당 시드 대신 매도목표를 보인다.
  */
 
 import type React from "react";
@@ -15,7 +17,7 @@ import type { TierHolding, Strategy } from "@/types/trading";
 import type { CashBreakdown } from "@/strategy";
 import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
 import { formatCurrency, formatDate, getTierLabel } from "./format";
-import { buildTierRows, reductionNotice, type TierRow } from "./tier-rows";
+import { buildTierRows, reductionNotice, type TierRow, type TierRowBadge } from "./tier-rows";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
@@ -30,27 +32,22 @@ function calculateHoldingDays(buyDate: string | null): string {
   return `${tradingDays}일`;
 }
 
-/** 할당 시드 아래 배지: 축소 표시나 모두 파는 날의 매도 표시. 표와 카드가 같은 문구를 쓴다. */
+const BADGES: Record<TierRowBadge, React.ReactElement> = {
+  reduced: <span className="badge bg-warning text-dark fw-normal">예수금 부족으로 축소</span>,
+  sellAllToday: <span className="badge bg-danger fw-normal">오늘 모두 매도</span>,
+};
+
+/** 할당 시드 아래 배지. 표와 카드가 같은 문구를 쓴다. 배지가 없는 줄에는 아무것도 그리지 않는다 */
 function RowBadge({ row }: { row: TierRow }): React.ReactElement | null {
-  if (row.soldAllToday) {
-    return <span className="badge bg-danger fw-normal">오늘 모두 매도</span>;
-  }
-  if (row.reducedFrom !== null) {
-    return <span className="badge bg-warning text-dark fw-normal">예수금 부족으로 축소</span>;
-  }
-  return null;
+  return row.badge === null ? null : <div className="mt-1">{BADGES[row.badge]}</div>;
 }
 
-function hasRowBadge(row: TierRow): boolean {
-  return row.soldAllToday || row.reducedFrom !== null;
-}
-
-/** 매도목표. 모두 파는 날의 보유 티어는 지정가 없이 MOC로 판다 */
+/** 매도목표: 지정가, 시드 감액으로 사이클을 끝내는 날의 보유 티어는 MOC */
 function SellTarget({ row }: { row: TierRow }): React.ReactElement {
-  if (row.soldAllToday) {
+  if (row.sellTarget === "MOC") {
     return <span className="text-danger">MOC</span>;
   }
-  return <>{formatCurrency(row.holding?.sellTargetPrice ?? null)}</>;
+  return <>{formatCurrency(row.sellTarget)}</>;
 }
 
 /** 할당 시드 금액. 축소된 티어는 비율대로의 금액을 지우고 실제 금액을 강조한다. */
@@ -65,6 +62,22 @@ function AllocatedSeed({ row }: { row: TierRow }): React.ReactElement {
     <>
       <s className="text-secondary me-2">{formatCurrency(row.reducedFrom)}</s>
       <span className="text-warning">{formatCurrency(row.allocatedSeed)}</span>
+    </>
+  );
+}
+
+/**
+ * 표의 할당 시드 칸: 금액과 그 아래 배지.
+ * 할당 시드가 비어 있는데 배지가 있는 줄(오늘 모두 파는 보유 티어)은 "-" 대신 배지만 보인다.
+ */
+function AllocatedSeedCell({ row }: { row: TierRow }): React.ReactElement {
+  if (row.allocatedSeed === null && row.badge !== null) {
+    return BADGES[row.badge];
+  }
+  return (
+    <>
+      <AllocatedSeed row={row} />
+      <RowBadge row={row} />
     </>
   );
 }
@@ -114,13 +127,7 @@ export default function TierHoldingsTable({
                         {isReserveTier ? "-" : `${ratioPercent.toFixed(1)}%`}
                       </td>
                       <td className="text-end">
-                        {/* 오늘 모두 파는 보유 티어는 비운 할당 시드 대신 배지만 보인다 */}
-                        {!row.soldAllToday && <AllocatedSeed row={row} />}
-                        {hasRowBadge(row) && (
-                          <div className={row.soldAllToday ? undefined : "mt-1"}>
-                            <RowBadge row={row} />
-                          </div>
-                        )}
+                        <AllocatedSeedCell row={row} />
                       </td>
                       <td className="text-center">{formatDate(holding?.buyDate ?? null)}</td>
                       <td className="text-end">
@@ -183,16 +190,18 @@ export default function TierHoldingsTable({
                     </span>
                   </div>
                   <div className="d-flex justify-content-between gap-2 small text-secondary">
-                    <span>
-                      할당: <AllocatedSeed row={row} />
-                    </span>
+                    {hasShares ? (
+                      <span>
+                        매도목표: <SellTarget row={row} />
+                      </span>
+                    ) : (
+                      <span>
+                        할당: <AllocatedSeed row={row} />
+                      </span>
+                    )}
                     <span>보유: {calculateHoldingDays(holding?.buyDate ?? null)}</span>
                   </div>
-                  {hasRowBadge(row) && (
-                    <div className="mt-1">
-                      <RowBadge row={row} />
-                    </div>
-                  )}
+                  <RowBadge row={row} />
                 </div>
               </div>
             );

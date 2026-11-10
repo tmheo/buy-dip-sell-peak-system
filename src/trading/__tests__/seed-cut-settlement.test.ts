@@ -7,7 +7,7 @@
  * 마지막 매도일 아침 상태를 수익 기록과 시드 이력으로 다시 조립해 주문표와 같은 판정 함수로 본다.
  *
  * 합성 시세 (TQQQ, 상장 2010-02-11 이전이라 실제 시세와 겹치지 않는다):
- * 2009-08-17(월) - 2009-08-21(금). 판정은 매도일과 그 직전 거래일(가격 행 기준)의 시드를 견준다.
+ * 2009-08-17(월) - 2009-08-24(월). 판정은 매도일과 그 직전 거래일(가격 행 기준)의 시드를 견준다.
  * 계좌는 모두 시드 $10,000, 2009-08-17에 만들고, 마지막 매도일은 2009-08-20(목)이다.
  * 시드 변경은 바꾼 날의 다음 거래일부터 쓰이므로 08-19에 바꾸면 08-20부터 쓰인다.
  *
@@ -25,12 +25,20 @@ import { settledSale } from "@/test-utils/settled-sale";
 import { db } from "@/database/db-drizzle";
 import { users } from "@/database/schema/auth";
 import { dailyPrices } from "@/database/schema/index";
+import { cashBreakdown } from "@/strategy";
 import type { TradingAccount } from "@/types/trading";
 
 const TEST_USER_ID = randomUUID();
 const CREATED_ON = "2009-08-17";
 const SELL_DAY = "2009-08-20";
-const PRICE_DATES = ["2009-08-17", "2009-08-18", "2009-08-19", "2009-08-20", "2009-08-21"];
+const PRICE_DATES = [
+  "2009-08-17",
+  "2009-08-18",
+  "2009-08-19",
+  "2009-08-20",
+  "2009-08-21",
+  "2009-08-24",
+];
 
 interface Sale {
   tier: number;
@@ -145,6 +153,7 @@ describe.skipIf(!hasDb)("시드 감액으로 끝난 사이클의 출금액", () 
       endedCycleNumber: 1,
       previousSeed: 10_000,
       realizedPnl: -140.2,
+      cashAtCycleEnd: 9_859.8,
       newSeed: 3_000,
       withdrawal: 6_859.8,
     });
@@ -174,6 +183,7 @@ describe.skipIf(!hasDb)("시드 감액으로 끝난 사이클의 출금액", () 
       endedCycleNumber: 1,
       previousSeed: 10_000,
       realizedPnl: 159.8,
+      cashAtCycleEnd: 10_159.8,
       newSeed: 3_000,
       withdrawal: 7_159.8,
     });
@@ -203,6 +213,7 @@ describe.skipIf(!hasDb)("시드 감액으로 끝난 사이클의 출금액", () 
       endedCycleNumber: 1,
       previousSeed: 10_000,
       realizedPnl: -9_140.2,
+      cashAtCycleEnd: 859.8,
       newSeed: 9_000,
       withdrawal: -8_140.2,
     });
@@ -211,7 +222,7 @@ describe.skipIf(!hasDb)("시드 감액으로 끝난 사이클의 출금액", () 
   it("예수금 이내 감액의 적용일에 보유 티어가 모두 팔려 끝난 사이클은 시드 감액으로 끝난 사이클이 아니다", async () => {
     // 시드 $10,000 → $9,000가 적용된 날 두 티어가 모두 MOC로 팔렸다(손절일에 걸린 날과 같다).
     // 그날 아침 예수금 = 9,000 - 3,960 = $5,040 ≥ 0 → 사이클이 이어지는 감액이었다.
-    // 감액분 $1,000은 적용일 전에 이미 출금할 수 있었으므로 정산할 것이 없다.
+    // 감액분 $1,000은 적용일 전에 이미 출금할 수 있었으므로 시드 감액 정산이 없다.
     const account = await endedCycle(
       [{ changedOn: "2009-08-19", seedCapital: 9_000 }],
       [TIER_1_ON_SELL_DAY, TIER_2_ON_SELL_DAY]
@@ -237,8 +248,37 @@ describe.skipIf(!hasDb)("시드 감액으로 끝난 사이클의 출금액", () 
       endedCycleNumber: 1,
       previousSeed: 15_000,
       realizedPnl: -110,
+      cashAtCycleEnd: 14_890,
       newSeed: 4_000,
       withdrawal: 10_890,
+    });
+  });
+
+  it("사이클 2를 시드 감액으로 끝내는 날에도 아직 사이클 1의 시드 감액 정산을 내야 한다", async () => {
+    // 사이클 1은 $10,000 → $3,000로 끝났다(출금 $6,859.80). 사이클 2는 08-21에 티어 1을
+    // $100 × 3주($300)로 샀고, 같은 날 시드를 $200로 줄여 08-24부터 쓰인다.
+    // 08-24 아침: 새 시드 $200 - 투자 중 $300 < 0 → 사이클 2를 시드 감액으로 끝내는 날이다.
+    // 사이클 2의 시드 감액 정산은 그 매도가 체결되어 사이클 3으로 넘어간 뒤에 나온다
+    const account = await endedCycle(
+      [{ changedOn: "2009-08-19", seedCapital: 3_000 }],
+      [TIER_1_ON_SELL_DAY, TIER_2_ON_SELL_DAY]
+    );
+    await storage.updateTierHolding(account.id, 1, {
+      buyPrice: 100,
+      shares: 3,
+      buyDate: "2009-08-21",
+    });
+    await storage.changeSeedCapital(account.id, TEST_USER_ID, 200, "2009-08-21");
+
+    const cycleTwoEndsToday = cashBreakdown(await trading.loadCycleState(account, "2009-08-24"));
+    expect(cycleTwoEndsToday.endsCycleBySeedCut).toBe(true);
+    expect(await trading.loadSeedCutSettlement(account)).toEqual({
+      endedCycleNumber: 1,
+      previousSeed: 10_000,
+      realizedPnl: -140.2,
+      cashAtCycleEnd: 9_859.8,
+      newSeed: 3_000,
+      withdrawal: 6_859.8,
     });
   });
 

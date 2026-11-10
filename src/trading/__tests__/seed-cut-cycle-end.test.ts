@@ -43,10 +43,10 @@ interface Scenario {
   ticker: Ticker;
   createdOn: string;
   prices: Array<{ date: string; adjClose: number }>;
-  // 운용 시작일, 시드를 줄이는 날, 모두 파는 날, 다음 사이클의 첫 매수일
+  // 운용 시작일, 시드를 줄이는 날, 시드 감액으로 사이클을 끝내는 날, 다음 사이클의 첫 매수일
   firstDay: string;
   changedOn: string;
-  sellAllOn: string;
+  endsCycleOn: string;
   nextCycleOn: string;
 }
 
@@ -64,7 +64,7 @@ const SCENARIOS: Scenario[] = [
     ],
     firstDay: "2009-11-02",
     changedOn: "2009-11-03",
-    sellAllOn: "2009-11-04",
+    endsCycleOn: "2009-11-04",
     nextCycleOn: "2009-11-05",
   },
   {
@@ -80,7 +80,7 @@ const SCENARIOS: Scenario[] = [
     ],
     firstDay: "2009-11-24",
     changedOn: "2009-11-25", // 적용일 11-26(목)은 휴장
-    sellAllOn: "2009-11-27",
+    endsCycleOn: "2009-11-27",
     nextCycleOn: "2009-11-30",
   },
 ];
@@ -186,22 +186,22 @@ describe.skipIf(!hasDb)("예수금보다 큰 시드 감액으로 끝나는 사�
       );
       expect(confirmed?.status).toBe("changed");
 
-      // 둘째 날을 마감하고(티어 2 체결) 모두 파는 날 아침의 주문표를 본다
-      await trading.processHistoricalOrders(await reload(), scenario.sellAllOn);
-      const sellAll = await trading.getFreshDailyOrders(await reload(), scenario.sellAllOn);
-      expect(orderLines(sellAll.orders)).toEqual([
+      // 둘째 날을 마감하고(티어 2 체결) 시드 감액으로 사이클을 끝내는 날 아침의 주문표를 본다
+      await trading.processHistoricalOrders(await reload(), scenario.endsCycleOn);
+      const endsCycle = await trading.getFreshDailyOrders(await reload(), scenario.endsCycleOn);
+      expect(orderLines(endsCycle.orders)).toEqual([
         { tier: 1, type: "SELL", orderMethod: "MOC", shares: 10 },
         { tier: 2, type: "SELL", orderMethod: "MOC", shares: 15 },
       ]);
 
-      // 모두 파는 날을 마감한다: 종가로 체결되고 사이클이 끝난다
+      // 시드 감액으로 사이클을 끝내는 날을 마감한다: 종가로 체결되고 사이클이 끝난다
       await trading.processHistoricalOrders(await reload(), scenario.nextCycleOn);
       const afterSell = await reload();
       expect(afterSell.cycleNumber).toBe(2);
       const holdings = await storage.getTierHoldings(created.id);
       expect(holdings.filter((holding) => holding.shares > 0)).toEqual([]);
       const soldOnSellAll = (await storage.getProfitRecords(created.id)).filter(
-        (record) => record.sellDate === scenario.sellAllOn
+        (record) => record.sellDate === scenario.endsCycleOn
       );
       expect(
         soldOnSellAll.map((record) => ({
@@ -220,6 +220,7 @@ describe.skipIf(!hasDb)("예수금보다 큰 시드 감액으로 끝나는 사�
         endedCycleNumber: 1,
         previousSeed: 10_000,
         realizedPnl: -35,
+        cashAtCycleEnd: 9_965,
         newSeed: 2_000,
         withdrawal: 7_965,
       };

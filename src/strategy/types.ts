@@ -208,7 +208,7 @@ export interface CashBreakdown {
   tiers: TierCash[];
   // 시드 감액으로 보유 티어를 모두 MOC로 팔아 사이클을 끝내는 날인지 (calculations.ts의 endsCycleBySeedCut)
   endsCycleBySeedCut: boolean;
-  // 모두 파는 날의 감액분(그날의 capitalCut), 다른 날은 0. 이날 사이클 자본은 이미 새 시드라
+  // 시드 감액으로 사이클을 끝내는 날의 감액분(그날의 capitalCut), 다른 날은 0. 이날 사이클 자본은 이미 새 시드라
   // 계좌 현금은 음수로 계산되지만 감액분은 팔기 전이라 아직 출금되지 않았다 - 화면은 총자산을
   // 계좌 현금 + 감액분 + 평가금으로 보인다 (ADR-0006)
   unwithdrawnCut: number;

@@ -122,7 +122,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         { tier: 6, amount: 0, nominalAmount: 1_000, isReduced: true },
         { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
-      // 시드를 줄이지 않았으므로 모두 파는 날이 아니다 (ADR-0006)
+      // 시드를 줄이지 않았으므로 시드 감액으로 사이클을 끝내는 날이 아니다 (ADR-0006)
       endsCycleBySeedCut: false,
       unwithdrawnCut: 0,
     });
@@ -353,7 +353,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     }
   });
 
-  it("앞 사이클이 시드 감액으로 끝났으면 출금액 정산을 함께 돌려줘야 한다 (#118)", async () => {
+  it("앞 사이클이 시드 감액으로 끝났으면 시드 감액 정산을 함께 돌려줘야 한다 (#118)", async () => {
     // 시드 $10,000 → $3,000(09-16에 바꿔 09-17부터). 09-17 아침 투자 중 $3,960 > $3,000이라
     // 그날 두 티어를 모두 팔았다: 티어 1 $100 × 20주를 $97.50(-$50), 티어 2 $98 × 20주를
     // $93.49(-$90.20). 출금액 = 10,000 - 140.20 - 3,000 = $6,859.80.
@@ -412,6 +412,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         endedCycleNumber: 1,
         previousSeed: 10_000,
         realizedPnl: -140.2,
+        cashAtCycleEnd: 9_859.8,
         newSeed: 3_000,
         withdrawal: 6_859.8,
       });

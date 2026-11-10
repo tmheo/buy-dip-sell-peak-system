@@ -136,7 +136,7 @@ export class BacktestEngine {
     let state: CycleState = {
       strategy: currentStrategy,
       cycleCapital: request.initialCapital,
-      // 백테스트에는 사이클 중 시드 변경이 없다 - 시드 감액으로 모두 파는 주문표가 나오지 않는다 (ADR-0006)
+      // 백테스트에는 사이클 중 시드 변경이 없다 - 시드 감액으로 사이클을 끝내는 주문표가 나오지 않는다 (ADR-0006)
       capitalCut: 0,
       holdings: [],
       cycleNumber: 1,

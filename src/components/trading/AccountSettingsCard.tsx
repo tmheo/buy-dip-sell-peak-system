@@ -11,8 +11,10 @@
  *
  * 새 시드가 쓰이기 시작한 뒤의 안내도 이 카드가 맡는다 (#118, ADR-0006).
  * - 새 시드가 처음 쓰이는 날(사이클이 이어질 때): 감액이면 이제 출금, 증액이면 아직이면 입금
- * - 시드 감액으로 모두 파는 날: 머리에 "사이클 종료 매도일" 배지 (안내 문장은 주문표 위 한 곳)
- * - 시드 감액으로 끝난 다음 사이클 동안: 증권사 잔고를 새 시드에 맞추라는 안내와 출금액 계산 과정
+ * - 시드 감액으로 사이클을 끝내는 날: 머리에 "사이클 종료 매도일" 배지 (안내 문장은 주문표 위 한 곳)
+ * - 시드 감액으로 끝난 다음 사이클 동안: 증권사 잔고를 새 시드에 맞추라는 안내와 시드 감액 정산의
+ *   계산 과정
+ * 안내 문장과 계산 과정의 줄은 applied-seed-notices.ts가 만든다.
  */
 
 import type React from "react";
@@ -21,23 +23,25 @@ import { MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE } from "@/lib/validations/se
 import type { SeedCutSettlement } from "@/trading";
 import type { TradingAccountDetail, Strategy } from "@/types/trading";
 import {
-  appliedSeedNotice,
   canEditTradingStartDate,
   pendingSeedChangeText,
   seedChangeToSend,
-  seedCutSettlementLines,
-  seedCutSettlementTitle,
   seedInputValue,
   strategyChangeWarning,
-  type SettlementLine,
 } from "./account-settings";
+import {
+  appliedSeedNotice,
+  seedCutSettlementLines,
+  seedCutSettlementTitle,
+  type SettlementLine,
+} from "./applied-seed-notices";
 import { formatLongDate, formatSeedAmount } from "./format";
 
 interface AccountSettingsCardProps {
   account: TradingAccountDetail;
-  /** 오늘이 시드 감액으로 보유 티어를 모두 파는 날인지 (cashBreakdown.endsCycleBySeedCut) */
+  /** 오늘이 시드 감액으로 사이클을 끝내는 날인지 (cashBreakdown.endsCycleBySeedCut) */
   endsCycleBySeedCut: boolean;
-  /** 앞 사이클이 시드 감액으로 끝났으면 그 정산 (계좌 상세 응답의 seedCutSettlement) */
+  /** 앞 사이클이 시드 감액으로 끝났으면 그 시드 감액 정산 (계좌 상세 응답의 seedCutSettlement) */
   seedCutSettlement: SeedCutSettlement | null;
   /** 바꾼 것만 보낸다. 저장에 성공하면 true */
   onSave: (changes: AccountSettingsChanges) => Promise<boolean>;
@@ -117,7 +121,7 @@ const SETTLEMENT_TONE_CLASS: Record<SettlementLine["tone"], string> = {
   total: "text-light fw-bold",
 };
 
-/** 시드 감액으로 끝난 사이클의 출금액 계산 과정. 마지막 줄(출금·입금할 금액) 위에 구분선을 둔다 */
+/** 시드 감액 정산의 계산 과정. 마지막 줄(출금·입금할 금액) 위에 구분선을 둔다 */
 function SettlementBreakdown({
   settlement,
 }: {

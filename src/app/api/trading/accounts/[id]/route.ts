@@ -48,8 +48,10 @@ import { loadCycleStateWithSeedCutLimits, loadSeedCutSettlement } from "@/tradin
  * 체결된다고 쳤을 때의 예수금)를 함께 돌려준다 (ADR-0006). 사이클 사이에는 null이다.
  * 시드 변경 API가 같은 함수로 경계를 다시 계산해 확인이 필요한 감액인지 가린다.
  *
- * 지금 사이클이 시드 감액으로 끝난 사이클 바로 다음 사이클인 동안 그 정산(seedCutSettlement:
- * 옛 시드, 끝난 사이클 실현손익, 새 시드, 출금할 금액)을 함께 돌려준다 (#118). 아니면 null이다.
+ * 지금 사이클이 시드 감액으로 끝난 사이클 바로 다음 사이클인 동안 그 시드 감액 정산
+ * (seedCutSettlement: 옛 시드, 끝난 사이클 실현손익, 사이클이 끝났을 때 증권사에 있어야 할 현금,
+ * 새 시드, 출금할 금액)을 함께 돌려준다 (#118). 아니면 null이다. 화면은 이 값을 다시 계산하지
+ * 않고 그대로 보인다(ADR-0003).
  */
 export async function GET(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();

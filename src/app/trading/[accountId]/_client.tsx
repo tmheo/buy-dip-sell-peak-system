@@ -28,7 +28,7 @@ interface TradingDetailClientProps {
 /**
  * 계좌 상세 응답
  * 예수금·계좌 현금·티어 금액(cashBreakdown)은 매매 규칙이 계산한 값을 그대로 쓴다 (ADR-0003).
- * 앞 사이클이 시드 감액으로 끝났으면 그 정산(seedCutSettlement)이 함께 온다 (#118).
+ * 앞 사이클이 시드 감액으로 끝났으면 그 시드 감액 정산(seedCutSettlement)이 함께 온다 (#118).
  */
 interface AccountResponse {
   account: TradingAccountDetail;
@@ -243,7 +243,7 @@ export default function TradingDetailClient({
       <TierHoldingsTable holdings={account.holdings} strategy={account.strategy} cash={cash} />
 
       {/* Daily Orders Section */}
-      {/* 시드 감액으로 모두 파는 날의 안내는 이 한 줄이 맡는다 (ADR-0006) - 여러 곳에 흩지 않는다 */}
+      {/* 시드 감액으로 사이클을 끝내는 날의 안내는 이 한 줄이 맡는다 (ADR-0006) - 여러 곳에 흩지 않는다 */}
       {cash.endsCycleBySeedCut && (
         <div className="alert alert-danger py-2 mb-2 small text-keep-all" role="status">
           오늘은 시드를 {formatSeedAmount(account.seed.current)}로 줄여 사이클을 끝내는 날입니다.
