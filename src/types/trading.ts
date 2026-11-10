@@ -127,6 +127,15 @@ export interface TradingAccountWithHoldings extends TradingAccount {
 }
 
 /**
+ * 계좌 목록 응답의 계좌 - 목록의 시드 열은 오늘의 시드(seed.current)다 (ADR-0005)
+ */
+export interface TradingAccountListItem extends TradingAccount {
+  holdings: TierHolding[];
+  totalShares: number;
+  seed: SeedStatus;
+}
+
+/**
  * 계좌 상세 응답의 계좌 - 시드 상태를 붙인다 (ADR-0005)
  */
 export interface TradingAccountDetail extends TradingAccountWithHoldings {

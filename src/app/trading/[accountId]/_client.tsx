@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AccountSettingsCard from "@/components/trading/AccountSettingsCard";
-import type { UpdateAccountData } from "@/components/trading/AccountSettingsCard";
+import type { AccountSettingsChanges } from "@/components/trading/AccountSettingsCard";
 import AssetSummary from "@/components/trading/AssetSummary";
 import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
@@ -17,7 +17,7 @@ import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
 import { calculateAssetValues } from "@/components/trading/asset-values";
 import type { LatestClose } from "@/database/trading";
 import type { CashBreakdown, ReducedBuy, UnaffordableBuy } from "@/strategy";
-import type { TradingAccountWithHoldings, DailyOrder } from "@/types/trading";
+import type { TradingAccountDetail, DailyOrder } from "@/types/trading";
 
 interface TradingDetailClientProps {
   accountId: string;
@@ -28,7 +28,7 @@ interface TradingDetailClientProps {
  * 예수금·계좌 현금·티어 금액(cashBreakdown)은 매매 규칙이 계산한 값을 그대로 쓴다 (ADR-0003).
  */
 interface AccountResponse {
-  account: TradingAccountWithHoldings;
+  account: TradingAccountDetail;
   cashBreakdown: CashBreakdown;
   latestClose: LatestClose | null;
 }
@@ -41,9 +41,27 @@ interface OrdersResponse {
 }
 
 interface AccountDetail {
-  account: TradingAccountWithHoldings;
+  account: TradingAccountDetail;
   cash: CashBreakdown;
   latestClose: LatestClose | null;
+}
+
+/**
+ * JSON 본문으로 PUT을 보낸다. 실패하면 서버가 준 오류 문장으로 던진다 -
+ * 검증 오류는 칸별 문장(details.fieldErrors)이 더 구체적이다.
+ */
+async function putJson(url: string, body: unknown): Promise<void> {
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (response.ok) return;
+
+  const result: { error?: string; details?: { fieldErrors?: Record<string, string[]> } } =
+    await response.json().catch(() => ({}));
+  const fieldError = Object.values(result.details?.fieldErrors ?? {})[0]?.[0];
+  throw new Error(fieldError ?? result.error ?? "설정 저장에 실패했습니다.");
 }
 
 export default function TradingDetailClient({
@@ -58,77 +76,80 @@ export default function TradingDetailClient({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchAccount = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
-    setError(null);
+  // 저장 뒤 다시 읽을 때는 화면 전체를 로딩 표시로 바꾸지 않는다 - 보던 자리가 그대로 남는다
+  const fetchAccount = useCallback(
+    async (showLoading = true): Promise<void> => {
+      if (showLoading) setIsLoading(true);
+      setError(null);
 
-    try {
-      // 두 API는 서로 독립적이므로 병렬 호출 (마감 처리는 스케줄러가 담당)
-      // 주문 조회는 비치명 경로이므로 allSettled로 부분 실패를 격리한다.
-      const [ordersResult, accountResult] = await Promise.allSettled([
-        fetch(`/api/trading/accounts/${accountId}/orders`),
-        fetch(`/api/trading/accounts/${accountId}`),
-      ]);
+      try {
+        // 두 API는 서로 독립적이므로 병렬 호출 (마감 처리는 스케줄러가 담당)
+        // 주문 조회는 비치명 경로이므로 allSettled로 부분 실패를 격리한다.
+        const [ordersResult, accountResult] = await Promise.allSettled([
+          fetch(`/api/trading/accounts/${accountId}/orders`),
+          fetch(`/api/trading/accounts/${accountId}`),
+        ]);
 
-      setOrdersError(null);
-      if (ordersResult.status === "fulfilled" && ordersResult.value.ok) {
-        const ordersData: OrdersResponse = await ordersResult.value.json();
-        setDailyOrders(ordersData);
-      } else {
-        setOrdersError("주문 정보를 불러오는데 실패했습니다.");
-        setDailyOrders(null);
-      }
-
-      if (accountResult.status === "rejected") {
-        throw new Error("계좌 정보를 불러오는데 실패했습니다.");
-      }
-      const accountRes = accountResult.value;
-      if (!accountRes.ok) {
-        if (accountRes.status === 404) {
-          router.push("/trading");
-          return;
+        setOrdersError(null);
+        if (ordersResult.status === "fulfilled" && ordersResult.value.ok) {
+          const ordersData: OrdersResponse = await ordersResult.value.json();
+          setDailyOrders(ordersData);
+        } else {
+          setOrdersError("주문 정보를 불러오는데 실패했습니다.");
+          setDailyOrders(null);
         }
-        throw new Error("계좌 정보를 불러오는데 실패했습니다.");
-      }
 
-      const accountData: AccountResponse = await accountRes.json();
-      setDetail({
-        account: accountData.account,
-        cash: accountData.cashBreakdown,
-        latestClose: accountData.latestClose,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accountId, router]);
+        if (accountResult.status === "rejected") {
+          throw new Error("계좌 정보를 불러오는데 실패했습니다.");
+        }
+        const accountRes = accountResult.value;
+        if (!accountRes.ok) {
+          if (accountRes.status === 404) {
+            router.push("/trading");
+            return;
+          }
+          throw new Error("계좌 정보를 불러오는데 실패했습니다.");
+        }
+
+        const accountData: AccountResponse = await accountRes.json();
+        setDetail({
+          account: accountData.account,
+          cash: accountData.cashBreakdown,
+          latestClose: accountData.latestClose,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [accountId, router]
+  );
 
   useEffect(() => {
     fetchAccount();
   }, [fetchAccount]);
 
-  async function handleSave(data: UpdateAccountData): Promise<void> {
+  /** 바꾼 것만 보낸다 - 시드는 적용일이 붙은 이력으로 따로 바꾼다 (ADR-0005) */
+  async function handleSave(changes: AccountSettingsChanges): Promise<boolean> {
     setIsSaving(true);
 
     try {
-      const response = await fetch(`/api/trading/accounts/${accountId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || "설정 저장에 실패했습니다.");
+      if (changes.settings) {
+        await putJson(`/api/trading/accounts/${accountId}`, changes.settings);
       }
-
-      await fetchAccount();
+      if (changes.seedCapital !== null) {
+        await putJson(`/api/trading/accounts/${accountId}/seed`, {
+          seedCapital: changes.seedCapital,
+        });
+      }
+      return true;
     } catch (err) {
       alert(err instanceof Error ? err.message : "설정 저장에 실패했습니다.");
+      return false;
     } finally {
+      // 일부만 저장됐어도 화면이 저장된 값을 보이게 다시 읽는다
+      await fetchAccount(false);
       setIsSaving(false);
     }
   }
@@ -154,7 +175,11 @@ export default function TradingDetailClient({
         <div className="card bg-dark border-danger">
           <div className="card-body text-center py-5">
             <p className="text-danger mb-3">{error}</p>
-            <button type="button" className="btn btn-outline-primary" onClick={fetchAccount}>
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={() => fetchAccount()}
+            >
               다시 시도
             </button>
           </div>

@@ -6,10 +6,10 @@
 
 import type React from "react";
 import { useState } from "react";
-import type { Ticker, Strategy, TradingAccount } from "@/types/trading";
+import type { Ticker, Strategy } from "@/types/trading";
 
 interface AccountFormProps {
-  initialData?: Partial<TradingAccount>;
+  initialData?: Partial<AccountFormData>;
   onSubmit: (data: AccountFormData) => Promise<void>;
   isSubmitting: boolean;
   mode: "create" | "edit";

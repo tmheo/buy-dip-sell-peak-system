@@ -6,17 +6,12 @@
 
 import type React from "react";
 import Link from "next/link";
-import type { TradingAccount, TierHolding } from "@/types/trading";
+import type { TierHolding, TradingAccountListItem } from "@/types/trading";
 import { formatDate } from "./format";
 
-interface AccountWithHoldings extends TradingAccount {
-  holdings: TierHolding[];
-  totalShares: number;
-}
-
 interface AccountListTableProps {
-  accounts: AccountWithHoldings[];
-  onDeleteClick: (account: AccountWithHoldings) => void;
+  accounts: TradingAccountListItem[];
+  onDeleteClick: (account: TradingAccountListItem) => void;
 }
 
 function formatCurrency(value: number): string {
@@ -92,7 +87,7 @@ export default function AccountListTable({
                   </div>
                 </div>
                 <div className="d-flex flex-wrap justify-content-between column-gap-3 mt-2 small text-secondary">
-                  <span className="text-nowrap">시드: {formatCurrency(account.seedCapital)}</span>
+                  <span className="text-nowrap">시드: {formatCurrency(account.seed.current)}</span>
                   <span className="text-nowrap">
                     보유:{" "}
                     <span className={heldTiers > 0 ? "text-success" : "text-secondary"}>
@@ -143,7 +138,7 @@ export default function AccountListTable({
                         <td className="text-center">
                           <span className="badge bg-info">{account.ticker}</span>
                         </td>
-                        <td className="text-end">{formatCurrency(account.seedCapital)}</td>
+                        <td className="text-end">{formatCurrency(account.seed.current)}</td>
                         <td className="text-center">
                           <span className="badge bg-secondary">{account.strategy}</span>
                         </td>

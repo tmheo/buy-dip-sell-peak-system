@@ -1,11 +1,13 @@
 /**
- * 계좌 설정 카드의 편집 규칙 (#112)
+ * 계좌 설정 카드의 편집 규칙 (#112, ADR-0005)
  *
  * 종목은 계좌를 만들 때 정하므로 언제나 읽기 전용이다. 이 모듈은 그 밖에 계좌 상태나
  * 고른 값에 따라 달라지는 규칙만 담는다.
  */
 
-import type { Strategy, TradingAccount } from "@/types/trading";
+import type { SeedStatus, Strategy, TradingAccount } from "@/types/trading";
+
+import { formatMonthDayWithWeekday, formatSeedAmount } from "./format";
 
 const STRATEGY_CHANGE_WARNING =
   "이미 이 전략으로 1번 티어 매수 주문을 냈다면 바꾸지 마세요. 바꾼 전략으로 체결이 기록되어 증권사 잔고와 어긋납니다.";
@@ -27,4 +29,28 @@ export function canEditTradingStartDate(
  */
 export function strategyChangeWarning(current: Strategy, selected: Strategy): string | null {
   return current === selected ? null : STRATEGY_CHANGE_WARNING;
+}
+
+/**
+ * 적용 전 시드 변경을 보일 문장, 예: "$10,000 → $3,000, 11월 11일(수) 주문표부터".
+ * 적용 전 변경이 없으면 null.
+ * 바꾼 시드는 다음 거래일 주문표부터 쓰이므로, 그 전까지는 지금 시드로 주문표가 만들어진다.
+ */
+export function pendingSeedChangeText(seed: SeedStatus): string | null {
+  if (!seed.pending) return null;
+  const { seedCapital, effectiveDate } = seed.pending;
+  return `${formatSeedAmount(seed.current)} → ${formatSeedAmount(seedCapital)}, ${formatMonthDayWithWeekday(effectiveDate)} 주문표부터`;
+}
+
+/** 시드 칸의 시작 값 - 적용 전 변경이 있으면 그 값이다(다시 바꾸면 그 변경을 덮어쓴다). */
+export function seedInputValue(seed: SeedStatus): number {
+  return seed.pending?.seedCapital ?? seed.current;
+}
+
+/**
+ * 저장할 때 보낼 시드. 시드 칸이 시작 값 그대로이면 null(보내지 않는다).
+ * 적용 전 변경이 있을 때 지금 시드를 보내면 서버가 그 변경을 지운다(되돌리기).
+ */
+export function seedChangeToSend(seed: SeedStatus, entered: number): number | null {
+  return entered === seedInputValue(seed) ? null : entered;
 }
