@@ -12,6 +12,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE } from "@/lib/validations/seed-capital-bounds";
 import type { TradingAccountDetail, Strategy } from "@/types/trading";
 import {
   canEditTradingStartDate,
@@ -142,8 +143,8 @@ export default function AccountSettingsCard({
   }
 
   async function handleSave(): Promise<void> {
-    if (!formData.seedCapital || formData.seedCapital < 2000) {
-      setSaveError("시드 자금은 최소 $2,000 이상이어야 합니다.");
+    if (!formData.seedCapital || formData.seedCapital < MIN_SEED_CAPITAL) {
+      setSaveError(`${MIN_SEED_CAPITAL_MESSAGE}.`);
       return;
     }
     setSaveError(null);
@@ -209,7 +210,7 @@ export default function AccountSettingsCard({
                 name="seedCapital"
                 value={formData.seedCapital || ""}
                 onChange={handleChange}
-                min="2000"
+                min={MIN_SEED_CAPITAL}
                 step="1"
                 disabled={isSaving}
                 aria-describedby="settings-seed-hint"

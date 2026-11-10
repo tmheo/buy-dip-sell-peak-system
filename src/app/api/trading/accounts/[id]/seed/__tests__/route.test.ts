@@ -125,6 +125,12 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed", () => {
       "시드 금액은 최소 $2,000 이상이어야 합니다",
     ],
     ["10억보다 큰 시드", { seedCapital: 1_000_000_001 }, "시드 금액은 10억 이하여야 합니다"],
+    // 반올림해 받으면 지금 시드와 같은 값이 적용 전 변경으로 남는다
+    [
+      "센트보다 작은 단위가 있는 시드",
+      { seedCapital: 10_000.001 },
+      "시드 금액은 센트(소수 둘째 자리)까지만 입력할 수 있습니다",
+    ],
   ])("%s는 400을 돌려주고 시드를 바꾸지 않아야 한다", async (_label, body, message) => {
     mockLoggedIn(OWNER_ID);
     const id = await createAccount();
@@ -134,7 +140,10 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed", () => {
     expect(response.status).toBe(400);
     const json = await response.json();
     expect(json.details.fieldErrors.seedCapital).toEqual([message]);
-    expect(await seedOn(id, "2026-11-16")).toBe(10_000);
+    expect(await trading.getSeedStatus({ id, ticker: "SOXL" }, TODAY)).toMatchObject({
+      current: 10_000,
+      pending: null,
+    });
   });
 
   it("최소 금액 $2,000 그대로는 받아야 한다", async () => {

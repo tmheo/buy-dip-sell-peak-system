@@ -4,10 +4,29 @@
 
 import { z } from "zod";
 
-/** 시드 금액의 최소값 ($) - 화면의 입력 검사와 같다 */
-export const MIN_SEED_CAPITAL = 2000;
-/** 시드 금액의 최대값 ($) */
-const MAX_SEED_CAPITAL = 1_000_000_000;
+import {
+  MAX_SEED_CAPITAL,
+  MIN_SEED_CAPITAL,
+  MIN_SEED_CAPITAL_MESSAGE,
+} from "./seed-capital-bounds";
+
+/** 센트(소수 둘째 자리)까지만 있는 금액인가 - 저장 칸은 numeric(14,2)다 */
+function hasAtMostCents(value: number): boolean {
+  return Number(value.toFixed(2)) === value;
+}
+
+/**
+ * 시드 금액 검증 - 계좌 생성과 시드 변경이 같은 기준을 쓴다.
+ * 서버도 최소 금액을 검사한다 - 화면만 검사하면 다른 경로로 들어온 작은 시드가 그대로 저장된다.
+ * 센트보다 작은 단위는 반올림하지 않고 거절한다. 그대로 받으면 저장할 때 반올림되어,
+ * 지금 시드 10000에 10000.001을 보낸 요청이 변경으로 세어지고 지금 시드와 같은 적용 전
+ * 변경이 남는다.
+ */
+export const SeedCapitalAmountSchema = z
+  .number({ error: "시드 금액은 숫자여야 합니다" })
+  .min(MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE)
+  .max(MAX_SEED_CAPITAL, "시드 금액은 10억 이하여야 합니다")
+  .refine(hasAtMostCents, "시드 금액은 센트(소수 둘째 자리)까지만 입력할 수 있습니다");
 
 /**
  * 트레이딩 계좌 생성 스키마
@@ -17,10 +36,7 @@ export const CreateTradingAccountSchema = z.object({
   ticker: z.enum(["SOXL", "TQQQ"], {
     message: "티커는 SOXL 또는 TQQQ만 가능합니다",
   }),
-  seedCapital: z
-    .number()
-    .positive("시드 자본은 양수여야 합니다")
-    .max(1000000000, "시드 자본은 10억 이하여야 합니다"),
+  seedCapital: SeedCapitalAmountSchema,
   strategy: z.enum(["Pro1", "Pro2", "Pro3"], {
     message: "전략은 Pro1, Pro2, Pro3 중 하나여야 합니다",
   }),
@@ -54,13 +70,9 @@ export const UpdateTradingAccountSchema = z.object({
 
 /**
  * 시드 변경 스키마 (PUT /api/trading/accounts/[id]/seed, ADR-0005)
- * 최소 금액은 화면과 같다 - 화면만 검사하면 다른 경로로 들어온 작은 시드가 그대로 저장된다.
  */
 export const ChangeSeedCapitalSchema = z.object({
-  seedCapital: z
-    .number({ error: "시드 금액은 숫자여야 합니다" })
-    .min(MIN_SEED_CAPITAL, "시드 금액은 최소 $2,000 이상이어야 합니다")
-    .max(MAX_SEED_CAPITAL, "시드 금액은 10억 이하여야 합니다"),
+  seedCapital: SeedCapitalAmountSchema,
 });
 
 export type CreateTradingAccountInput = z.infer<typeof CreateTradingAccountSchema>;
