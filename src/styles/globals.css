@@ -449,8 +449,9 @@ body {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
   }
-  .form-control-sm,
-  .form-select-sm {
+  /* 부트스트랩의 .form-control-sm min-height가 나중에 읽혀 이기지 않도록 두 클래스로 쓴다 */
+  .form-control.form-control-sm,
+  .form-select.form-select-sm {
     min-height: 44px;
   }
   .form-check-input {

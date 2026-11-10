@@ -82,7 +82,7 @@ export default function AccountForm({
     }
 
     if (!formData.cycleStartDate) {
-      newErrors.cycleStartDate = "시작일을 선택하세요.";
+      newErrors.cycleStartDate = "운용 시작일을 선택하세요.";
     }
 
     setErrors(newErrors);
@@ -138,6 +138,9 @@ export default function AccountForm({
             </option>
           ))}
         </select>
+        <div className="form-text text-secondary" style={{ wordBreak: "keep-all" }}>
+          계좌를 만든 뒤에는 바꿀 수 없습니다. 다른 종목은 계좌를 새로 만드세요.
+        </div>
       </div>
 
       <div className="mb-3">
@@ -165,7 +168,7 @@ export default function AccountForm({
 
       <div className="mb-3">
         <label htmlFor="cycleStartDate" className="form-label text-light">
-          시작일 <span className="text-danger">*</span>
+          운용 시작일 <span className="text-danger">*</span>
         </label>
         <input
           type="date"
@@ -179,6 +182,9 @@ export default function AccountForm({
           disabled={isSubmitting}
         />
         {errors.cycleStartDate && <div className="invalid-feedback">{errors.cycleStartDate}</div>}
+        <div className="form-text text-secondary" style={{ wordBreak: "keep-all" }}>
+          첫 사이클을 시작한 거래일입니다. 첫 일일 마감 전까지만 바꿀 수 있습니다.
+        </div>
       </div>
 
       <div className="mb-4">
@@ -201,8 +207,8 @@ export default function AccountForm({
         </select>
       </div>
 
-      <div className="alert alert-secondary" role="alert">
-        <small>* 설정은 계좌 생성 후에도 변경할 수 있습니다.</small>
+      <div className="alert alert-secondary" role="alert" style={{ wordBreak: "keep-all" }}>
+        <small>* 종목을 뺀 설정은 계좌 생성 후에도 변경할 수 있습니다.</small>
       </div>
 
       <div className="d-grid gap-2">

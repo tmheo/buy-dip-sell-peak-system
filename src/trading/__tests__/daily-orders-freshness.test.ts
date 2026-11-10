@@ -203,9 +203,9 @@ describe("getFreshDailyOrders - 계좌 설정 변경", () => {
     expect(mockedGetPreviousTradingClose).toHaveBeenCalledWith("TQQQ", DATE);
   });
 
-  it("사이클 시작일 변경처럼 주문 내용이 그대로인 설정 변경은 교체하지 않는다", async () => {
+  it("운용 시작일 변경처럼 주문 내용이 그대로인 설정 변경은 교체하지 않는다", async () => {
     // 수정 시각 비교는 없어졌다 - 설정이 바뀌어도 다시 만든 주문이 같으면 신선하다.
-    // 사이클 시작일은 주문 계산의 입력이 아니다. 사이클 안 실현손익(ADR-0003)도
+    // 운용 시작일은 주문 계산의 입력이 아니다. 사이클 안 실현손익(ADR-0003)도
     // 시작일이 아니라 수익 기록의 사이클 번호로 묶는다 (#97).
     const existing = storedOrders(FRESH_ROWS);
     mockedGetDailyOrders.mockResolvedValue(existing);
