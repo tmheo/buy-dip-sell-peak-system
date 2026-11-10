@@ -390,7 +390,7 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
 
       await expect(
         tradingModule.updateTradingAccount(created.id, TEST_USER_ID, { name: "새 이름" })
-      ).rejects.toThrow("Cannot update account while cycle is in progress");
+      ).rejects.toBeInstanceOf(tradingModule.CycleInProgressError);
     });
 
     it("빈 업데이트 요청 시 기존 계좌를 그대로 반환해야 한다", async () => {

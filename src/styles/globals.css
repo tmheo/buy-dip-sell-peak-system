@@ -204,6 +204,12 @@ body {
   }
 }
 
+/* 한국어 문장이 줄바꿈될 때 낱말 중간에서 끊지 않는다.
+   부트스트랩 유틸리티처럼 !important를 붙여 다른 규칙보다 앞선다. */
+.text-keep-all {
+  word-break: keep-all !important;
+}
+
 /* Loading Spinner */
 .loading-spinner {
   display: none;

@@ -12,24 +12,13 @@ import type React from "react";
 import type { TierHolding, Strategy } from "@/types/trading";
 import type { CashBreakdown } from "@/strategy";
 import { calculateTradingDays, getTodayTradingDate } from "@/lib/date";
-import { formatCurrency, getTierLabel } from "./format";
+import { formatCurrency, formatDate, getTierLabel } from "./format";
 import { buildTierRows, reductionNotice, type TierRow } from "./tier-rows";
 
 interface TierHoldingsTableProps {
   holdings: TierHolding[];
   strategy: Strategy;
   cash: CashBreakdown;
-}
-
-function formatDate(date: string | null): string {
-  if (!date) return "-";
-  const [year, month, day] = date.split("-");
-  const localDate = new Date(Number(year), Number(month) - 1, Number(day));
-  return localDate.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 function calculateHoldingDays(buyDate: string | null): string {
@@ -191,9 +180,7 @@ export default function TierHoldingsTable({
       </div>
       {notice !== null && (
         <div className="card-footer border-secondary">
-          <small className="text-secondary" style={{ wordBreak: "keep-all" }}>
-            * {notice}
-          </small>
+          <small className="text-secondary text-keep-all">* {notice}</small>
         </div>
       )}
     </div>

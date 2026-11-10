@@ -18,6 +18,7 @@ import {
   getTradingAccountWithHoldings,
   getLatestClose,
   updateTradingAccount,
+  CycleInProgressError,
   TradingStartDateLockedError,
   deleteTradingAccount,
   markAccountViewed,
@@ -109,14 +110,8 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
 
     return NextResponse.json({ account });
   } catch (error) {
-    if (error instanceof TradingStartDateLockedError) {
+    if (error instanceof CycleInProgressError || error instanceof TradingStartDateLockedError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    if (error instanceof Error && error.message.includes("cycle is in progress")) {
-      return NextResponse.json(
-        { error: "사이클 진행 중에는 계좌 설정을 수정할 수 없습니다" },
-        { status: 400 }
-      );
     }
 
     console.error("Failed to update trading account:", error);

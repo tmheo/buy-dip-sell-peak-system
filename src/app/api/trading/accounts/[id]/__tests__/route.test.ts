@@ -90,7 +90,7 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
   });
 
   afterAll(async () => {
-    // 계좌·홀딩·수익 기록 CASCADE 삭제
+    // 계좌·티어 보유·수익 기록 CASCADE 삭제
     await db.delete(users).where(eq(users.id, OWNER_ID));
     await db.delete(users).where(eq(users.id, OTHER_USER_ID));
   });
@@ -313,7 +313,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
   });
 
   afterAll(async () => {
-    // 계좌·홀딩 CASCADE 삭제
+    // 계좌·티어 보유 CASCADE 삭제
     await db.delete(users).where(eq(users.id, PUT_OWNER_ID));
   });
 
@@ -326,6 +326,20 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
     expect(response.status).toBe(400);
     const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
     expect(after!.ticker).toBe("SOXL");
+    expect(after!.strategy).toBe("Pro1");
+  });
+
+  it("보유 티어가 있는 동안에는 400과 한국어 오류를 돌려주고 계좌를 바꾸지 않아야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+    await trading.updateTierHolding(id, 1, { buyPrice: 100, shares: 10, buyDate: "2025-01-02" });
+
+    const response = await put(id, { strategy: "Pro2" });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("사이클 진행 중에는 계좌 설정을 수정할 수 없습니다");
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
     expect(after!.strategy).toBe("Pro1");
   });
 

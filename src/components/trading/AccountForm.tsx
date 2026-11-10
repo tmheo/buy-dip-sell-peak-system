@@ -138,7 +138,7 @@ export default function AccountForm({
             </option>
           ))}
         </select>
-        <div className="form-text text-secondary" style={{ wordBreak: "keep-all" }}>
+        <div className="form-text text-secondary text-keep-all">
           계좌를 만든 뒤에는 바꿀 수 없습니다. 다른 종목은 계좌를 새로 만드세요.
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function AccountForm({
           disabled={isSubmitting}
         />
         {errors.cycleStartDate && <div className="invalid-feedback">{errors.cycleStartDate}</div>}
-        <div className="form-text text-secondary" style={{ wordBreak: "keep-all" }}>
+        <div className="form-text text-secondary text-keep-all">
           첫 사이클을 시작한 거래일입니다. 첫 일일 마감 전까지만 바꿀 수 있습니다.
         </div>
       </div>
@@ -207,7 +207,7 @@ export default function AccountForm({
         </select>
       </div>
 
-      <div className="alert alert-secondary" role="alert" style={{ wordBreak: "keep-all" }}>
+      <div className="alert alert-secondary text-keep-all" role="alert">
         <small>* 종목을 뺀 설정은 계좌 생성 후에도 변경할 수 있습니다.</small>
       </div>
 

@@ -7,6 +7,7 @@
 import type React from "react";
 import Link from "next/link";
 import type { TradingAccount, TierHolding } from "@/types/trading";
+import { formatDate } from "./format";
 
 interface AccountWithHoldings extends TradingAccount {
   holdings: TierHolding[];
@@ -25,16 +26,6 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function formatDate(date: string): string {
-  const [year, month, day] = date.split("-");
-  const localDate = new Date(Number(year), Number(month) - 1, Number(day));
-  return localDate.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
 }
 
 function countHeldTiers(holdings: TierHolding[]): number {
