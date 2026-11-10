@@ -11,16 +11,18 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-const seedFormatter = new Intl.NumberFormat("en-US", {
+const wholeDollarFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 });
 
-/** 시드 금액 - 센트가 없으면 달러까지만, 예: "$10,000", "$65,303.83" */
+/** 시드 금액 - 센트가 없으면 달러까지만, 있으면 센트까지, 예: "$10,000", "$3,000.50" */
 export function formatSeedAmount(value: number): string {
-  return seedFormatter.format(value);
+  return Number.isInteger(value)
+    ? wholeDollarFormatter.format(value)
+    : currencyFormatter.format(value);
 }
 
 /** 달러 금액 (소수 둘째 자리). 값이 없으면 "-" */

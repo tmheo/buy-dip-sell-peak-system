@@ -63,4 +63,8 @@ describe("formatSeedAmount", () => {
   it("센트가 있으면 센트까지 보여야 한다", () => {
     expect(formatSeedAmount(65_303.83)).toBe("$65,303.83");
   });
+
+  it("센트가 10의 배수여도 소수 둘째 자리까지 보여야 한다", () => {
+    expect(formatSeedAmount(3_000.5)).toBe("$3,000.50");
+  });
 });
