@@ -19,6 +19,8 @@
 -- (scripts/seed-capital-history-deploy.sh verify)가 잡는다.
 --
 -- CI는 drizzle 스키마로 테이블을 먼저 만든 뒤 이 파일을 다시 적용하므로 멱등하게 쓴다.
+-- 마이그레이션 B(#120)가 seed_capital 칸을 지운 뒤로는 drizzle 스키마에도 칸이 없다.
+-- 칸이 없으면 첫 줄 채우기와 NOT NULL 풀기를 건너뛰고 줄이 없는 계좌 검사만 한다.
 -- 한 트랜잭션으로 적용한다(psql -1).
 
 CREATE TABLE IF NOT EXISTS public.seed_capital_history (
@@ -34,14 +36,29 @@ CREATE TABLE IF NOT EXISTS public.seed_capital_history (
 
 ALTER TABLE public.seed_capital_history ENABLE ROW LEVEL SECURITY;
 
--- 이미 이력이 있는 계좌는 건드리지 않는다 - 다시 적용해도 새 코드가 쓴 줄이 그대로 남는다
-INSERT INTO public.seed_capital_history (account_id, effective_date, seed_capital)
-SELECT a.id, coalesce(a.created_at::date, current_date), a.seed_capital
-FROM public.trading_accounts a
-WHERE a.seed_capital IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM public.seed_capital_history h WHERE h.account_id = a.id
-  );
+-- 이미 이력이 있는 계좌는 건드리지 않는다 - 다시 적용해도 새 코드가 쓴 줄이 그대로 남는다.
+-- plpgsql은 문장을 실행할 때 해석하므로, 칸이 없어 건너뛴 문장은 칸을 찾지 않는다.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_attribute
+    WHERE attrelid = 'public.trading_accounts'::regclass
+      AND attname = 'seed_capital'
+      AND NOT attisdropped
+  ) THEN
+    INSERT INTO public.seed_capital_history (account_id, effective_date, seed_capital)
+    SELECT a.id, coalesce(a.created_at::date, current_date), a.seed_capital
+    FROM public.trading_accounts a
+    WHERE a.seed_capital IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.seed_capital_history h WHERE h.account_id = a.id
+      );
+
+    ALTER TABLE public.trading_accounts
+      ALTER COLUMN seed_capital DROP NOT NULL;
+  END IF;
+END
+$$;
 
 DO $$
 DECLARE
@@ -59,6 +76,3 @@ BEGIN
   END IF;
 END
 $$;
-
-ALTER TABLE public.trading_accounts
-  ALTER COLUMN seed_capital DROP NOT NULL;

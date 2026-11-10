@@ -42,9 +42,6 @@ export const tradingAccounts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text().notNull(),
     ticker: text().notNull().$type<AllowedTicker>(),
-    // 더 읽지도 쓰지도 않는다 - 시드는 seed_capital_history가 소유한다 (ADR-0005).
-    // 되돌릴 일이 없다고 확인되면 칸을 지운다 (#120).
-    seedCapital: numeric("seed_capital", { precision: 14, scale: 2, mode: "number" }),
     strategy: text().notNull().$type<AllowedStrategy>(),
     // 운용 시작일(첫 사이클의 시작일). 사이클이 끝나도 바뀌지 않으며 첫 일일 마감 전에만 바꿀 수 있다.
     cycleStartDate: date("cycle_start_date").notNull(),

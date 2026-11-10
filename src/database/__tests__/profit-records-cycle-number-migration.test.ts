@@ -79,8 +79,8 @@ describe.skipIf(!hasDb)("profit_records.cycle_number 마이그레이션", () => 
         for (const a of fixture.accounts) {
           await tx`
             INSERT INTO pg_temp.trading_accounts
-              (id, user_id, name, ticker, seed_capital, strategy, cycle_start_date, cycle_number)
-            VALUES (${a.id}, 'migration-test', ${a.id}, 'SOXL', 10000, 'Pro1', '2025-01-02', ${a.cycleNumber})`;
+              (id, user_id, name, ticker, strategy, cycle_start_date, cycle_number)
+            VALUES (${a.id}, 'migration-test', ${a.id}, 'SOXL', 'Pro1', '2025-01-02', ${a.cycleNumber})`;
         }
         for (const r of fixture.records ?? []) {
           await tx`

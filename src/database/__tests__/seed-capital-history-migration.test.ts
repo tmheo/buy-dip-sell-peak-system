@@ -8,6 +8,7 @@
  * 실제 테이블은 건드리지 않는다. 한 트랜잭션 안에서 trading_accounts의 구조를 임시 테이블로
  * 복제하고 seed_capital을 마이그레이션 전처럼 NOT NULL로 되돌린 뒤, 마이그레이션의 `public.`을
  * `pg_temp.`로 바꿔 그 복제본에 적용한다. 트랜잭션은 매번 되돌린다.
+ * 실제 테이블의 seed_capital 칸은 마이그레이션 B(#120)가 지웠으므로 복제본에 되살린다.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -27,11 +28,14 @@ interface Fixture {
   accounts: Array<{ id: string; seedCapital: number | null; createdAt: string }>;
   /** 마이그레이션 전에 이미 있던 이력 (다시 적용하는 경우) */
   history?: Array<{ account: string; effectiveDate: string; seedCapital: number }>;
+  /** 마이그레이션 B가 seed_capital 칸을 지운 뒤에 다시 적용한다 (CI처럼) */
+  afterSeedCapitalDropped?: boolean;
 }
 
 interface Migrated {
   history: Array<{ account: string; effectiveDate: string; seedCapital: number }>;
-  seedCapitalNullable: string;
+  /** seed_capital 칸이 없으면 null */
+  seedCapitalNullable: string | null;
   rowSecurity: boolean;
 }
 
@@ -47,6 +51,14 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
   afterAll(async () => {
     await sql.end();
   });
+
+  async function insertHistory(tx: postgres.Sql, history: NonNullable<Fixture["history"]>) {
+    for (const h of history) {
+      await tx`
+        INSERT INTO pg_temp.seed_capital_history (account_id, effective_date, seed_capital)
+        VALUES (${h.account}, ${h.effectiveDate}, ${h.seedCapital})`;
+    }
+  }
 
   /**
    * 마이그레이션 전 상태의 임시 복제본에 테스트용 계좌를 넣고 마이그레이션을 times번 적용한다.
@@ -65,8 +77,11 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
         await tx.unsafe(
           "CREATE TEMP TABLE trading_accounts (LIKE public.trading_accounts INCLUDING DEFAULTS INCLUDING INDEXES)"
         );
-        // seed_capital이 없는 테스트용 계좌를 넣을 수 있게 열어 두고, 그런 계좌가 없으면
-        // 마이그레이션 전처럼 NOT NULL로 되돌린다
+        // 마이그레이션 B가 지운 칸을 되살린다. seed_capital이 없는 테스트용 계좌를 넣을 수 있게
+        // 열어 두고, 그런 계좌가 없으면 마이그레이션 전처럼 NOT NULL로 되돌린다
+        await tx.unsafe(
+          "ALTER TABLE pg_temp.trading_accounts ADD COLUMN IF NOT EXISTS seed_capital numeric(14, 2)"
+        );
         await tx.unsafe(
           "ALTER TABLE pg_temp.trading_accounts ALTER COLUMN seed_capital DROP NOT NULL"
         );
@@ -83,16 +98,19 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
             "ALTER TABLE pg_temp.trading_accounts ALTER COLUMN seed_capital SET NOT NULL"
           );
         }
+        if (fixture.afterSeedCapitalDropped) {
+          await tx.unsafe("ALTER TABLE pg_temp.trading_accounts DROP COLUMN seed_capital");
+          await tx.unsafe(
+            "CREATE TEMP TABLE seed_capital_history (LIKE public.seed_capital_history INCLUDING DEFAULTS INCLUDING INDEXES)"
+          );
+          await insertHistory(tx, fixture.history ?? []);
+        }
 
         try {
           for (let i = 0; i < times; i++) {
             await tx.unsafe(migrationSql);
-            if (i === 0) {
-              for (const h of fixture.history ?? []) {
-                await tx`
-                  INSERT INTO pg_temp.seed_capital_history (account_id, effective_date, seed_capital)
-                  VALUES (${h.account}, ${h.effectiveDate}, ${h.seedCapital})`;
-              }
+            if (i === 0 && !fixture.afterSeedCapitalDropped) {
+              await insertHistory(tx, fixture.history ?? []);
             }
           }
         } catch (error) {
@@ -117,7 +135,7 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
             effectiveDate: h.effectiveDate,
             seedCapital: Number(h.seed),
           })),
-          seedCapitalNullable: column.is_nullable,
+          seedCapitalNullable: column?.is_nullable ?? null,
           rowSecurity: security.relrowsecurity,
         };
         throw new Rollback();
@@ -165,6 +183,21 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
         { account: "A", effectiveDate: "2026-07-01", seedCapital: 10_000 },
         { account: "A", effectiveDate: "2026-11-11", seedCapital: 3_000 },
       ],
+    });
+  });
+
+  it("seed_capital 칸을 지운 뒤에 다시 적용해도 이력을 그대로 두고 실패하지 않는다", async () => {
+    const result = await migrate({
+      accounts: [{ id: "A", seedCapital: 10_000, createdAt: "2026-07-01 09:00:00" }],
+      history: [{ account: "A", effectiveDate: "2026-07-01", seedCapital: 10_000 }],
+      afterSeedCapitalDropped: true,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      history: [{ account: "A", effectiveDate: "2026-07-01", seedCapital: 10_000 }],
+      seedCapitalNullable: null,
+      rowSecurity: true,
     });
   });
 
