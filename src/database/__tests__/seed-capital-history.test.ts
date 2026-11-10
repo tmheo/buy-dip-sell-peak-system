@@ -120,7 +120,8 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
     expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(10_000);
   });
 
-  it("보유 티어가 있으면 시드를 바꾸지 않는다 - 사이클 중 변경(ADR-0004)은 #117에서 연다", async () => {
+  it("보유 티어가 있어도 시드를 바꾼다 - 사이클 중 변경 (ADR-0004, #117)", async () => {
+    // 사이클을 끝낼 수 있는 감액인지 묻는 일은 호출 경로(시드 변경 API)가 한다
     const account = await trading.createTradingAccount(TEST_USER_ID, REQUEST, "2009-06-01");
     await trading.updateTierHolding(account.id, 1, {
       buyPrice: 100,
@@ -128,10 +129,10 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       buyDate: "2009-06-01",
     });
 
-    await expect(
-      trading.changeSeedCapital(account.id, TEST_USER_ID, 3_000, "2009-06-02")
-    ).rejects.toBeInstanceOf(trading.CycleInProgressError);
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(10_000);
+    const changed = await trading.changeSeedCapital(account.id, TEST_USER_ID, 3_000, "2009-06-02");
+
+    expect(changed?.pending).toEqual({ seedCapital: 3_000, effectiveDate: "2009-06-03" });
+    expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(3_000);
   });
 
   it("다른 사용자의 계좌는 바꾸지 않는다", async () => {

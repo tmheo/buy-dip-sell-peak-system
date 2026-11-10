@@ -1,5 +1,5 @@
 /**
- * 시드 변경 API (ADR-0005, #116)
+ * 시드 변경 API (ADR-0004, ADR-0005, ADR-0006, #116, #117)
  * PUT /api/trading/accounts/[id]/seed - 시드를 바꾼다. 새 시드는 다음 거래일 주문표부터 쓰인다.
  */
 
@@ -12,17 +12,27 @@ import {
   serverErrorResponse,
   type RouteParams,
 } from "@/lib/api-utils";
-import { changeSeedCapital, CycleInProgressError } from "@/database/trading";
 import { getTodayTradingDate } from "@/lib/date";
 import { ChangeSeedCapitalSchema } from "@/lib/validations/trading";
+import { changeSeed } from "@/trading";
+
+/** 확인이 필요한 감액의 409 문구 */
+const CONFIRMATION_MESSAGES = {
+  ends: "이 감액은 적용일에 보유 티어를 모두 팔아 사이클을 끝냅니다. 확인한 뒤 다시 보내 주세요",
+  depends: "오늘 매수가 체결되면 이 감액은 적용일에 사이클을 끝냅니다. 확인한 뒤 다시 보내 주세요",
+} as const;
 
 /**
  * PUT /api/trading/accounts/[id]/seed
- * 본문 { seedCapital }. 응답은 바꾼 뒤의 시드 상태 { seed }.
+ * 본문 { seedCapital, confirmCycleEnd? }. 응답은 바꾼 뒤의 시드 상태 { seed }.
  *
  * 바꾼 날은 서버의 UTC 날짜이고, 적용일은 그다음 거래일이다 - 바꾼 날의 주문표는 사용자가
  * 이미 증권사에 냈을 수 있어 옛 시드로 체결한다. 지금 시드를 보내면 적용 전 변경을 되돌린다.
- * 사이클 중 변경(ADR-0004)은 #117에서 연다. 그때까지는 보유 티어가 있으면 400이다.
+ *
+ * 사이클 중에도 받는다 (ADR-0004). 사이클 중 감액은 서버가 감액 경계를 새로 계산해 분류하고,
+ * 사이클을 끝내거나(ends) 오늘 체결에 따라 끝낼 수 있는(depends) 감액인데 confirmCycleEnd가
+ * true가 아니면 409 { error, classification, seedCutLimits }로 거절한다 - 오래 열려 있던 화면이
+ * 사용자에게 지금의 경계로 다시 묻게 하려는 것이다.
  */
 export async function PUT(request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -43,22 +53,27 @@ export async function PUT(request: Request, { params }: RouteParams): Promise<Ne
       return validationErrorResponse(parsed.error.flatten());
     }
 
-    const seed = await changeSeedCapital(
+    const outcome = await changeSeed(
       id,
       userId,
       parsed.data.seedCapital,
-      getTodayTradingDate()
+      getTodayTradingDate(),
+      parsed.data.confirmCycleEnd === true
     );
-    if (!seed) {
+    if (!outcome) {
       return notFoundResponse("Account");
     }
 
-    return NextResponse.json({ seed });
-  } catch (error) {
-    if (error instanceof CycleInProgressError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (outcome.status === "needsConfirmation") {
+      const { classification, seedCutLimits } = outcome;
+      return NextResponse.json(
+        { error: CONFIRMATION_MESSAGES[classification], classification, seedCutLimits },
+        { status: 409 }
+      );
     }
 
+    return NextResponse.json({ seed: outcome.seed });
+  } catch (error) {
     console.error("Failed to change seed capital:", error);
     return serverErrorResponse();
   }

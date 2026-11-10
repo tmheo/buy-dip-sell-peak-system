@@ -16,9 +16,7 @@ import type { SeedHistoryEntry, SeedStatus, TradingAccount } from "@/types/tradi
 import { db, type DbExecutor } from "../db-drizzle";
 import { seedCapitalHistory, tradingAccounts } from "../schema/index";
 
-import { CycleInProgressError } from "./errors";
 import { getPreviousTradingClose } from "./orders";
-import { getTotalShares } from "./tier-holdings";
 
 /**
  * 어느 날의 시드 - 적용일이 그날 이하인 가장 최근 줄, 없으면 첫 줄.
@@ -213,8 +211,8 @@ export async function getSeedStatus(
  * 같은 계좌의 동시 변경은 계좌 행 잠금으로 차례를 세운다 - 나중 변경은 먼저 커밋된 변경을
  * 보고 그 위에 덮어쓴다. (계좌, 적용일) 유일 제약은 이 잠금을 거치지 않는 쓰기까지 막는다.
  *
- * 사이클 중 변경(ADR-0004)은 #117에서 연다. 그때까지는 보유 티어가 있으면
- * CycleInProgressError를 던진다.
+ * 사이클 중에도 바꿀 수 있다(ADR-0004). 사이클을 끝낼 수 있는 감액인지 묻는 일은 호출 경로가
+ * 한다 - 이 함수는 이력만 쓴다.
  *
  * @param seedCapital - 새 시드 (검증은 호출 경로가 마쳤다)
  * @param today - 바꾼 날 (서버의 UTC 날짜, YYYY-MM-DD)
@@ -236,10 +234,6 @@ export async function changeSeedCapital(
       .for("update");
     if (!account) {
       return null;
-    }
-
-    if ((await getTotalShares(accountId, tx)) > 0) {
-      throw new CycleInProgressError();
     }
 
     const history = changeSeedHistory(await getSeedHistory(accountId, tx), seedCapital, today);

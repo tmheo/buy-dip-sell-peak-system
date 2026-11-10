@@ -13,6 +13,10 @@ export type { FreshDailyOrders } from "./orders";
 // 사이클 상태 조립 - 화면의 예수금도 주문표와 같은 상태에서 읽는다 (#97)
 export { loadCycleState } from "./orders";
 
+// 시드 변경과 감액 경계 - 계좌 상세 화면과 시드 변경 API가 같은 경계를 쓴다 (ADR-0006)
+export { changeSeed, loadSeedCutLimits } from "./seed-change";
+export type { SeedChangeOutcome } from "./seed-change";
+
 // 체결·마감 처리
 export {
   processOrderExecution,
