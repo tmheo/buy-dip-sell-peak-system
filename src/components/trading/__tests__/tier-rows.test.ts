@@ -1,8 +1,11 @@
 /**
- * 보유 현황 티어 줄 테스트 (#98)
+ * 보유 현황 티어 줄 테스트 (#98, #118)
  *
  * 티어별 할당 시드와 축소 여부는 계좌 상세 응답 cashBreakdown의 tiers가 정한다 - 화면은
  * 그 값을 티어 줄에 옮기기만 하고, 예비 티어를 살 차례인지 같은 규칙을 다시 따지지 않는다.
+ * 보유 중인 기본 티어의 할당 시드는 비워 둔다 - 산 금액은 매수시드 열에 있고, 사이클 중 시드를
+ * 바꾸면 지금 시드 × 비율은 산 금액과 다르다 (#118).
+ * 티어 줄은 무엇을 보일지(배지, 매도목표)까지 정한다 - 표와 카드는 그대로 그리기만 한다.
  *
  * 기준 시나리오 (Pro2, 시드 $10,000, 비율 10/15/20/25/20/10%):
  * 티어 1-5 보유, 이번 사이클 순실현손실 $400 → 예수금 $600, 티어 6은 $1,000 대신 $600
@@ -20,7 +23,7 @@ function holding(tier: number, shares: number): TierHolding {
     buyPrice: shares > 0 ? 100 : null,
     shares,
     buyDate: shares > 0 ? "2026-04-01" : null,
-    sellTargetPrice: null,
+    sellTargetPrice: shares > 0 ? 101.5 : null,
     createdAt: "",
     updatedAt: "",
   };
@@ -72,18 +75,76 @@ describe("buildTierRows", () => {
       allocatedSeed: 600,
       reducedFrom: 1_000,
       hasShares: false,
+      badge: "reduced",
     });
   });
 
   it("비율대로 살 수 있는 티어는 축소 표시가 없다", () => {
+    // 티어 1-4 보유: 아직 안 산 티어 5는 비율대로 $2,000을 산다
+    const rows = buildTierRows(TIERS_1_TO_5.slice(0, 4), "Pro2", reducedCash());
+
+    expect(rows.find((row) => row.tier === 5)).toMatchObject({
+      allocatedSeed: 2_000,
+      reducedFrom: null,
+      hasShares: false,
+      ratioPercent: 20,
+      badge: null,
+    });
+  });
+
+  it("보유 중인 기본 티어의 할당 시드는 비워 둔다 - 산 금액은 매수시드 열에 있다 (#118)", () => {
     const rows = buildTierRows([...TIERS_1_TO_5, holding(6, 0)], "Pro2", reducedCash());
 
+    expect(rows.slice(0, 5).map((row) => row.allocatedSeed)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
     expect(rows.find((row) => row.tier === 4)).toMatchObject({
-      allocatedSeed: 2_500,
       reducedFrom: null,
       hasShares: true,
       ratioPercent: 25,
     });
+  });
+
+  it("시드 감액으로 사이클을 끝내는 날에는 보유 티어에 오늘 모두 매도와 MOC를 보이고 안 산 티어의 금액은 비운다 (ADR-0006)", () => {
+    // 예수금이 0이라 안 산 티어는 모두 축소로 계산되지만, 이날은 아무것도 사지 않는다
+    const endsCycleCash = reducedCash({
+      availableCash: 0,
+      accountCash: -7_000,
+      cycleCapital: 2_000,
+      netRealizedLoss: 0,
+      isCashReduced: false,
+      tiers: tiers({ 6: { amount: 0, isReduced: true }, 7: { amount: 0 } }),
+      endsCycleBySeedCut: true,
+      unwithdrawnCut: 8_000,
+    });
+
+    const rows = buildTierRows([...TIERS_1_TO_5, holding(6, 0)], "Pro2", endsCycleCash);
+
+    expect(rows.map((row) => [row.badge, row.sellTarget])).toEqual([
+      ["sellAllToday", "MOC"],
+      ["sellAllToday", "MOC"],
+      ["sellAllToday", "MOC"],
+      ["sellAllToday", "MOC"],
+      ["sellAllToday", "MOC"],
+      [null, null],
+      [null, null],
+    ]);
+    expect(rows.find((row) => row.tier === 6)).toMatchObject({
+      allocatedSeed: null,
+      reducedFrom: null,
+    });
+    expect(rows.find((row) => row.tier === 7)?.allocatedSeed).toBeNull();
+  });
+
+  it("시드 감액으로 사이클을 끝내는 날이 아니면 보유 티어의 매도목표는 지정가이고 배지가 없다", () => {
+    const rows = buildTierRows(TIERS_1_TO_5, "Pro2", reducedCash());
+
+    expect(rows.find((row) => row.tier === 1)).toMatchObject({ badge: null, sellTarget: 101.5 });
+    expect(rows.find((row) => row.tier === 6)?.sellTarget).toBeNull();
   });
 
   it("예비 티어의 할당 시드는 응답이 정한 금액을 그대로 쓰고 비율은 0이다", () => {
@@ -158,6 +219,12 @@ describe("reductionNotice - 표 아래 축소 안내", () => {
     });
 
     expect(reductionNotice(enough)).toBeNull();
+  });
+
+  it("시드 감액으로 사이클을 끝내는 날에는 아무것도 사지 않으므로 안내하지 않는다 (ADR-0006)", () => {
+    const endsCycleCash = reducedCash({ availableCash: 0, endsCycleBySeedCut: true });
+
+    expect(reductionNotice(endsCycleCash)).toBeNull();
   });
 
   it("예수금이 줄지 않았으면 안내하지 않는다", () => {

@@ -2,7 +2,8 @@
  * 계좌 설정 카드의 편집 규칙 (#112, ADR-0005)
  *
  * 종목은 계좌를 만들 때 정하므로 언제나 읽기 전용이다. 이 모듈은 그 밖에 계좌 상태나
- * 고른 값에 따라 달라지는 규칙만 담는다.
+ * 고른 값에 따라 달라지는 규칙만 담는다. 새 시드가 쓰이기 시작한 뒤의 안내는
+ * applied-seed-notices.ts가 맡는다.
  */
 
 import type { SeedStatus, Strategy, TradingAccount } from "@/types/trading";

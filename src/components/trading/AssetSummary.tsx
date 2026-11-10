@@ -4,6 +4,7 @@
  * 자산 현황 섹션 컴포넌트
  *
  * 총자산은 계좌 현금 + 평가금이고, 평가금은 저장된 가장 최근 종가 기준이다 (#98).
+ * 시드 감액으로 사이클을 끝내는 날에는 아직 출금하지 않은 감액분을 더하고 그렇다고 적는다 (ADR-0006).
  * 예수금이 이번 사이클 순실현손실로 줄었을 때만 예수금 칸에 계산식을 펼친다 (#98, ADR-0003,
  * 결정은 #93). 계산식의 항목은 모두 계좌 상세 응답(cashBreakdown)의 값이다.
  */
@@ -46,6 +47,10 @@ function FormulaRow({
   );
 }
 
+/**
+ * 자산 현황 카드. 총자산·수량·평가금·예수금·투자비중을 보인다.
+ * 값은 calculateAssetValues와 cashBreakdown에서 받아 그대로 그린다.
+ */
 export default function AssetSummary({
   ticker,
   totalShares,
@@ -69,6 +74,11 @@ export default function AssetSummary({
             <div className="p-3 bg-secondary bg-opacity-25 rounded h-100">
               <div className="text-secondary small mb-1">총자산</div>
               <div className="h4 mb-0 text-light">{formatCurrency(totalAssets)}</div>
+              {cash.unwithdrawnCut > 0 && totalAssets !== null && (
+                <div className="text-secondary small mt-1">
+                  출금 전 금액 {formatCurrency(cash.unwithdrawnCut)} 포함
+                </div>
+              )}
             </div>
           </div>
           <div className="col-md-6 col-lg-4">

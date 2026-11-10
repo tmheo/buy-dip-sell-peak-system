@@ -1,6 +1,6 @@
 /**
  * 트레이딩 계좌 상세 API (PRD-TRADING-001)
- * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 시드 상태, 예수금 내역, 가장 최근 종가, 사이클 중 감액 경계 포함)
+ * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 시드 상태, 예수금 내역, 가장 최근 종가, 사이클 중 감액 경계, 시드 감액 정산 포함)
  * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만, 종목과 시드는 받지 않는다)
  * DELETE /api/trading/accounts/[id] - 계좌 삭제
  */
@@ -28,7 +28,7 @@ import {
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
 import { getTodayTradingDate } from "@/lib/date";
 import { cashBreakdown } from "@/strategy";
-import { loadCycleStateWithSeedCutLimits } from "@/trading";
+import { loadCycleStateWithSeedCutLimits, loadSeedCutSettlement } from "@/trading";
 
 /**
  * GET /api/trading/accounts/[id]
@@ -47,6 +47,11 @@ import { loadCycleStateWithSeedCutLimits } from "@/trading";
  * 사이클 중이면 오늘 시드를 줄일 때의 감액 경계(seedCutLimits: 직전 마감 예수금, 오늘 매수가
  * 체결된다고 쳤을 때의 예수금)를 함께 돌려준다 (ADR-0006). 사이클 사이에는 null이다.
  * 시드 변경 API가 같은 함수로 경계를 다시 계산해 확인이 필요한 감액인지 가린다.
+ *
+ * 지금 사이클이 시드 감액으로 끝난 사이클 바로 다음 사이클인 동안 그 시드 감액 정산
+ * (seedCutSettlement: 옛 시드, 끝난 사이클 실현손익, 사이클이 끝났을 때 증권사에 있어야 할 현금,
+ * 새 시드, 출금할 금액)을 함께 돌려준다 (#118). 아니면 null이다. 화면은 이 값을 다시 계산하지
+ * 않고 그대로 보인다(ADR-0003).
  */
 export async function GET(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -61,18 +66,19 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   const detail = await runInReadSnapshot(async (snapshot) => {
     const account = await getTradingAccountWithHoldings(id, userId, snapshot);
     if (!account) return null;
-    const [{ state, seedCutLimits }, latestClose, seed] = await Promise.all([
+    const [{ state, seedCutLimits }, latestClose, seed, seedCutSettlement] = await Promise.all([
       loadCycleStateWithSeedCutLimits(account, today, snapshot),
       getLatestClose(account.ticker, snapshot),
       getSeedStatus(account, today, snapshot),
+      loadSeedCutSettlement(account, snapshot),
     ]);
-    return { account: { ...account, seed }, state, latestClose, seedCutLimits };
+    return { account: { ...account, seed }, state, latestClose, seedCutLimits, seedCutSettlement };
   });
 
   if (!detail) {
     return notFoundResponse("Account");
   }
-  const { account, state, latestClose, seedCutLimits } = detail;
+  const { account, state, latestClose, seedCutLimits, seedCutSettlement } = detail;
 
   // 조회 시각 갱신(부가 동작): 실패해도 상세 조회 응답은 유지한다
   try {
@@ -87,6 +93,7 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
     cashBreakdown: cashBreakdown(state),
     latestClose,
     seedCutLimits,
+    seedCutSettlement,
   });
 }
 

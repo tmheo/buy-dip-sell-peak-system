@@ -15,8 +15,10 @@ import TierHoldingsTable from "@/components/trading/TierHoldingsTable";
 import DailyOrdersTable from "@/components/trading/DailyOrdersTable";
 import ProfitStatusTable from "@/components/trading/ProfitStatusTable";
 import { calculateAssetValues } from "@/components/trading/asset-values";
+import { formatSeedAmount } from "@/components/trading/format";
 import type { LatestClose } from "@/database/trading";
 import type { CashBreakdown, ReducedBuy, UnaffordableBuy } from "@/strategy";
+import type { SeedCutSettlement } from "@/trading";
 import type { TradingAccountDetail, DailyOrder } from "@/types/trading";
 
 interface TradingDetailClientProps {
@@ -26,11 +28,13 @@ interface TradingDetailClientProps {
 /**
  * 계좌 상세 응답
  * 예수금·계좌 현금·티어 금액(cashBreakdown)은 매매 규칙이 계산한 값을 그대로 쓴다 (ADR-0003).
+ * 앞 사이클이 시드 감액으로 끝났으면 그 시드 감액 정산(seedCutSettlement)이 함께 온다 (#118).
  */
 interface AccountResponse {
   account: TradingAccountDetail;
   cashBreakdown: CashBreakdown;
   latestClose: LatestClose | null;
+  seedCutSettlement: SeedCutSettlement | null;
 }
 
 interface OrdersResponse {
@@ -44,6 +48,7 @@ interface AccountDetail {
   account: TradingAccountDetail;
   cash: CashBreakdown;
   latestClose: LatestClose | null;
+  seedCutSettlement: SeedCutSettlement | null;
 }
 
 /**
@@ -116,6 +121,7 @@ export default function TradingDetailClient({
           account: accountData.account,
           cash: accountData.cashBreakdown,
           latestClose: accountData.latestClose,
+          seedCutSettlement: accountData.seedCutSettlement,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -203,7 +209,7 @@ export default function TradingDetailClient({
     );
   }
 
-  const { account, cash, latestClose } = detail;
+  const { account, cash, latestClose, seedCutSettlement } = detail;
   const assetValues = calculateAssetValues(account.totalShares, cash, latestClose);
 
   return (
@@ -216,7 +222,13 @@ export default function TradingDetailClient({
       </div>
 
       {/* Settings Section */}
-      <AccountSettingsCard account={account} onSave={handleSave} isSaving={isSaving} />
+      <AccountSettingsCard
+        account={account}
+        endsCycleBySeedCut={cash.endsCycleBySeedCut}
+        seedCutSettlement={seedCutSettlement}
+        onSave={handleSave}
+        isSaving={isSaving}
+      />
 
       {/* Asset Summary Section */}
       <AssetSummary
@@ -231,6 +243,13 @@ export default function TradingDetailClient({
       <TierHoldingsTable holdings={account.holdings} strategy={account.strategy} cash={cash} />
 
       {/* Daily Orders Section */}
+      {/* 시드 감액으로 사이클을 끝내는 날의 안내는 이 한 줄이 맡는다 (ADR-0006) - 여러 곳에 흩지 않는다 */}
+      {cash.endsCycleBySeedCut && (
+        <div className="alert alert-danger py-2 mb-2 small text-keep-all" role="status">
+          오늘은 시드를 {formatSeedAmount(account.seed.current)}로 줄여 사이클을 끝내는 날입니다.
+          보유 티어를 모두 MOC로 팔고, 매수 주문은 내지 않습니다.
+        </div>
+      )}
       {ordersError && (
         <div className="alert alert-warning mb-4" role="alert">
           {ordersError}

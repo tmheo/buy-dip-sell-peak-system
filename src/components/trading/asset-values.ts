@@ -2,6 +2,9 @@
  * 계좌 화면 자산 현황 값 (#98)
  *
  * 총자산 = 계좌 현금 + 평가금, 평가금 = 저장된 가장 최근 종가 × 보유 수량.
+ * 시드 감액으로 사이클을 끝내는 날에는 아직 출금하지 않은 감액분(cashBreakdown.unwithdrawnCut)을 현금에
+ * 더한다 (ADR-0006) - 그날 사이클 자본은 이미 새 시드라 계좌 현금은 음수로 계산되지만, 감액분은
+ * 팔기 전이라 증권사에 그대로 있다. 다른 날 감액분은 0이다.
  * 계좌 현금과 투자 중은 계좌 상세 응답(cashBreakdown)의 값을 그대로 쓴다 - 둘은 매매 규칙의
  * 파생값이라(ADR-0003) 화면이 다시 계산하지 않는다. 보유 수량은 계좌 상세 응답의 totalShares다.
  * 실시간 시세가 아니라 저장된 종가 기준이다.
@@ -13,11 +16,12 @@ import type { CashBreakdown } from "@/strategy";
 export interface AssetValues {
   // 평가금: 가장 최근 종가 × 보유 수량 (소수 둘째 자리 내림). 보유가 있는데 종가가 없으면 null
   stockValue: number | null;
-  // 총자산: 계좌 현금 + 평가금. 평가금을 모르면 null
+  // 총자산: 계좌 현금 + 아직 출금하지 않은 감액분 + 평가금. 평가금을 모르면 null
   totalAssets: number | null;
   // 평가손익률(%): (평가금 - 투자 중) ÷ 투자 중. 보유가 없으면 0, 평가금을 모르면 null
   profitRate: number | null;
-  // 투자비중(%, 0-100): 계좌 현금과 평가금이 총자산에서 차지하는 비율. 평가금을 모르면 null
+  // 투자비중(%, 0-100): 현금(계좌 현금 + 아직 출금하지 않은 감액분)과 평가금이 총자산에서
+  // 차지하는 비율. 평가금을 모르면 null
   cashRatio: number | null;
   stockRatio: number | null;
 }
@@ -56,13 +60,17 @@ export function calculateAssetValues(
     };
   }
 
-  const { investedAmount, accountCash } = cash;
-  const totalAssets = new Decimal(accountCash).add(stockValue).toNumber();
+  const { investedAmount } = cash;
+  const cashIncludingUnwithdrawnCut = new Decimal(cash.accountCash)
+    .add(cash.unwithdrawnCut)
+    .toNumber();
+  const totalAssets = new Decimal(cashIncludingUnwithdrawnCut).add(stockValue).toNumber();
   return {
     stockValue,
     totalAssets,
     profitRate: investedAmount > 0 ? ((stockValue - investedAmount) / investedAmount) * 100 : 0,
-    cashRatio: totalAssets > 0 ? clampPercent((accountCash / totalAssets) * 100) : 100,
+    cashRatio:
+      totalAssets > 0 ? clampPercent((cashIncludingUnwithdrawnCut / totalAssets) * 100) : 100,
     stockRatio: totalAssets > 0 ? clampPercent((stockValue / totalAssets) * 100) : 0,
   };
 }

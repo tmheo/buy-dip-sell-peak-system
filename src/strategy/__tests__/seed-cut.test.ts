@@ -169,7 +169,7 @@ describe("seedCutLimits - 오늘 시드를 줄일 때의 감액 경계", () => {
     expect(seedCutLimits(state, 100)).toEqual({ closedCash: 9_000, cashIfTodayBuyFills: 7_500.15 });
   });
 
-  it("오늘이 모두 파는 날이면 두 경계가 모두 0이어야 한다", () => {
+  it("오늘이 시드 감액으로 사이클을 끝내는 날이면 두 경계가 모두 0이어야 한다", () => {
     expect(seedCutLimits(effectiveDayState(8_500), 100)).toEqual({
       closedCash: 0,
       cashIfTodayBuyFills: 0,
@@ -224,8 +224,8 @@ describe("isCycleInProgress - 사이클 중인지", () => {
   });
 });
 
-describe("cashBreakdown - 시드 감액으로 모두 파는 날", () => {
-  it("모두 파는 날이면 그날의 감액분을 아직 출금하지 않은 돈으로 내야 한다", () => {
+describe("cashBreakdown - 시드 감액으로 사이클을 끝내는 날", () => {
+  it("시드 감액으로 사이클을 끝내는 날이면 그날의 감액분을 아직 출금하지 않은 돈으로 내야 한다", () => {
     // 이날 계좌 현금은 8,500 - 9,000 = -500으로 계산된다. 화면은 총자산을
     // 계좌 현금 + 감액분 + 평가금으로 보인다
     const breakdown = cashBreakdown(effectiveDayState(8_500));
@@ -236,14 +236,14 @@ describe("cashBreakdown - 시드 감액으로 모두 파는 날", () => {
     expect(breakdown.availableCash).toBe(0);
   });
 
-  it("예수금 이내 감액의 적용일은 모두 파는 날이 아니고 감액분도 0이어야 한다", () => {
+  it("예수금 이내 감액의 적용일은 시드 감액으로 사이클을 끝내는 날이 아니고 감액분도 0이어야 한다", () => {
     const breakdown = cashBreakdown(effectiveDayState(9_000));
 
     expect(breakdown.endsCycleBySeedCut).toBe(false);
     expect(breakdown.unwithdrawnCut).toBe(0);
   });
 
-  it("사이클 자본이 줄지 않은 날은 모두 파는 날이 아니어야 한다", () => {
+  it("사이클 자본이 줄지 않은 날은 시드 감액으로 사이클을 끝내는 날이 아니어야 한다", () => {
     const breakdown = cashBreakdown(createState({ holdings: TIERS_1_TO_5 }));
 
     expect(breakdown.endsCycleBySeedCut).toBe(false);

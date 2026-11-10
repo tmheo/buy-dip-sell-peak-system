@@ -73,6 +73,16 @@ export function formatPercent(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+/**
+ * 숫자 뒤에 붙일 주격 조사: 숫자를 한자어로 읽은 끝소리에 받침이 있으면 "이", 없으면 "가".
+ * 끝자리가 2(이), 4(사), 5(오), 9(구)이면 받침이 없다. 0으로 끝나면 십·백·천·만으로 읽어 받침이 있다.
+ * 예: 사이클 1이, 사이클 2가, 사이클 10이
+ */
+export function subjectParticleAfterNumber(value: number): "이" | "가" {
+  const lastDigit = Math.abs(Math.trunc(value)) % 10;
+  return [2, 4, 5, 9].includes(lastDigit) ? "가" : "이";
+}
+
 /** 티어 표시 이름: 예비 티어는 "예비", 기본 티어는 번호 */
 export function getTierLabel(tier: number): string {
   if (tier === RESERVE_TIER_NUMBER) return "예비";

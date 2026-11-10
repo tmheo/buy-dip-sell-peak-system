@@ -8,11 +8,19 @@
  *
  * 시드는 다른 칸과 따로 보낸다 - 바꾼 시드는 다음 거래일 주문표부터 쓰이므로(ADR-0005),
  * 적용 전 변경이 있으면 시드 칸에 그 변경과 적용일, 다시 바꾸기·되돌리기를 보인다.
+ *
+ * 새 시드가 쓰이기 시작한 뒤의 안내도 이 카드가 맡는다 (#118, ADR-0006).
+ * - 새 시드가 처음 쓰이는 날(사이클이 이어질 때): 감액이면 이제 출금, 증액이면 아직이면 입금
+ * - 시드 감액으로 사이클을 끝내는 날: 머리에 "사이클 종료 매도일" 배지 (안내 문장은 주문표 위 한 곳)
+ * - 시드 감액으로 끝난 다음 사이클 동안: 증권사 잔고를 새 시드에 맞추라는 안내와 시드 감액 정산의
+ *   계산 과정
+ * 안내 문장과 계산 과정의 줄은 applied-seed-notices.ts가 만든다.
  */
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE } from "@/lib/validations/seed-capital-bounds";
+import type { SeedCutSettlement } from "@/trading";
 import type { TradingAccountDetail, Strategy } from "@/types/trading";
 import {
   canEditTradingStartDate,
@@ -21,10 +29,20 @@ import {
   seedInputValue,
   strategyChangeWarning,
 } from "./account-settings";
+import {
+  appliedSeedNotice,
+  seedCutSettlementLines,
+  seedCutSettlementTitle,
+  type SettlementLine,
+} from "./applied-seed-notices";
 import { formatLongDate, formatSeedAmount } from "./format";
 
 interface AccountSettingsCardProps {
   account: TradingAccountDetail;
+  /** 오늘이 시드 감액으로 사이클을 끝내는 날인지 (cashBreakdown.endsCycleBySeedCut) */
+  endsCycleBySeedCut: boolean;
+  /** 앞 사이클이 시드 감액으로 끝났으면 그 시드 감액 정산 (계좌 상세 응답의 seedCutSettlement) */
+  seedCutSettlement: SeedCutSettlement | null;
   /** 바꾼 것만 보낸다. 저장에 성공하면 true */
   onSave: (changes: AccountSettingsChanges) => Promise<boolean>;
   isSaving: boolean;
@@ -96,8 +114,47 @@ function ReadOnlyField({
   );
 }
 
+const SETTLEMENT_TONE_CLASS: Record<SettlementLine["tone"], string> = {
+  default: "text-light",
+  profit: "text-success",
+  loss: "text-danger",
+  total: "text-light fw-bold",
+};
+
+/** 시드 감액 정산의 계산 과정. 마지막 줄(출금·입금할 금액) 위에 구분선을 둔다 */
+function SettlementBreakdown({
+  settlement,
+}: {
+  settlement: SeedCutSettlement;
+}): React.ReactElement {
+  const lines = seedCutSettlementLines(settlement);
+  return (
+    <div className="seed-settlement-breakdown mt-2">
+      {lines.map((line, index) => (
+        <div
+          key={line.label}
+          className={`d-flex justify-content-between gap-3 ${
+            index === lines.length - 1 ? "border-top border-secondary mt-1 pt-1" : ""
+          }`}
+        >
+          <span className="text-secondary text-keep-all">{line.label}</span>
+          <span className={`text-nowrap ${SETTLEMENT_TONE_CLASS[line.tone]}`}>{line.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 계좌 설정 카드. 읽기 모드에서는 설정과 새 시드가 쓰인 뒤의 안내를, 편집 모드에서는 입력 칸을 보인다.
+ *
+ * @param endsCycleBySeedCut - 오늘이 시드 감액으로 사이클을 끝내는 날인지 (cashBreakdown)
+ * @param seedCutSettlement - 앞 사이클의 시드 감액 정산. 앞 사이클이 시드 감액으로 끝나지 않았으면 null
+ */
 export default function AccountSettingsCard({
   account,
+  endsCycleBySeedCut,
+  seedCutSettlement,
   onSave,
   isSaving,
 }: AccountSettingsCardProps): React.ReactElement {
@@ -112,6 +169,7 @@ export default function AccountSettingsCard({
   const startDateEditable = canEditTradingStartDate(account);
   const strategyWarning = strategyChangeWarning(account.strategy, formData.strategy);
   const pendingSeedText = pendingSeedChangeText(account.seed);
+  const appliedNotice = appliedSeedNotice(account.seed, endsCycleBySeedCut);
 
   useEffect(() => {
     if (isEditing && focusSeed) {
@@ -174,18 +232,25 @@ export default function AccountSettingsCard({
 
   return (
     <div className="card bg-dark border-secondary mb-4">
-      <div className="card-header border-secondary d-flex justify-content-between align-items-center">
-        <h5 className="mb-0 text-light">{account.name}</h5>
+      {/* 계좌 이름이 길면 이름만 줄바꿈한다 - 버튼과 배지 글자가 꺾이지 않게 한다 */}
+      <div className="card-header border-secondary d-flex justify-content-between align-items-center gap-2">
+        <h5 className="mb-0 text-light text-keep-all">{account.name}</h5>
         {canEdit && !isEditing && (
           <button
             type="button"
-            className="btn btn-sm btn-outline-primary"
+            className="btn btn-sm btn-outline-primary text-nowrap flex-shrink-0"
             onClick={() => startEditing({ focusSeed: false })}
           >
             설정 변경
           </button>
         )}
-        {!canEdit && <span className="badge bg-warning text-dark">사이클 진행 중</span>}
+        {endsCycleBySeedCut ? (
+          <span className="badge bg-danger flex-shrink-0">사이클 종료 매도일</span>
+        ) : (
+          !canEdit && (
+            <span className="badge bg-warning text-dark flex-shrink-0">사이클 진행 중</span>
+          )
+        )}
       </div>
       <div className="card-body">
         {isEditing ? (
@@ -359,6 +424,19 @@ export default function AccountSettingsCard({
                 <span className="badge bg-primary">{account.cycleNumber}</span>
               </div>
             </div>
+          </div>
+        )}
+        {appliedNotice && (
+          <div className="alert alert-info py-2 mb-0 mt-3 small text-keep-all" role="status">
+            {appliedNotice}
+          </div>
+        )}
+        {seedCutSettlement && (
+          <div className="border border-warning rounded p-3 mt-3 small" role="status">
+            <div className="fw-bold text-warning text-keep-all">
+              {seedCutSettlementTitle(seedCutSettlement.endedCycleNumber)}
+            </div>
+            <SettlementBreakdown settlement={seedCutSettlement} />
           </div>
         )}
       </div>
