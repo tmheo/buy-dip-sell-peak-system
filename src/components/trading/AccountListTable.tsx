@@ -7,20 +7,11 @@
 import type React from "react";
 import Link from "next/link";
 import type { TierHolding, TradingAccountListItem } from "@/types/trading";
-import { formatDate } from "./format";
+import { formatDate, formatSeedAmount } from "./format";
 
 interface AccountListTableProps {
   accounts: TradingAccountListItem[];
   onDeleteClick: (account: TradingAccountListItem) => void;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function countHeldTiers(holdings: TierHolding[]): number {
@@ -87,7 +78,9 @@ export default function AccountListTable({
                   </div>
                 </div>
                 <div className="d-flex flex-wrap justify-content-between column-gap-3 mt-2 small text-secondary">
-                  <span className="text-nowrap">시드: {formatCurrency(account.seed.current)}</span>
+                  <span className="text-nowrap">
+                    시드: {formatSeedAmount(account.seed.current)}
+                  </span>
                   <span className="text-nowrap">
                     보유:{" "}
                     <span className={heldTiers > 0 ? "text-success" : "text-secondary"}>
@@ -138,7 +131,7 @@ export default function AccountListTable({
                         <td className="text-center">
                           <span className="badge bg-info">{account.ticker}</span>
                         </td>
-                        <td className="text-end">{formatCurrency(account.seed.current)}</td>
+                        <td className="text-end">{formatSeedAmount(account.seed.current)}</td>
                         <td className="text-center">
                           <span className="badge bg-secondary">{account.strategy}</span>
                         </td>
