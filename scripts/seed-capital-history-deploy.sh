@@ -12,9 +12,12 @@
 # verify는 3과 4 사이에 옛 코드가 만든 계좌나 바꾼 시드를 잡는다. 다음 중 하나라도 있으면
 # 실패로 끝나고 해당 계좌를 보인다. 사람이 고친 뒤 다시 verify한다.
 #   - 시드 이력 줄이 없는 계좌 (옛 코드가 만든 계좌)
-#   - 줄이 하나뿐인데 seed_capital과 값이 다른 계좌 (옛 코드가 바꾼 시드)
-# 새 코드는 seed_capital을 쓰지 않으므로, 새 코드가 만든 계좌(seed_capital이 비어 있음)는
-# 걸리지 않는다.
+#   - 첫 줄(적용일이 가장 이른 줄)이 seed_capital과 값이 다른 계좌 (옛 코드가 바꾼 시드)
+# 새 코드는 seed_capital도 첫 줄도 쓰지 않는다. 그래서 첫 줄은 apply 때의 seed_capital
+# 그대로이고, 둘이 다르면 그 뒤 옛 코드가 seed_capital을 바꾼 것이다. 줄 수는 보지 않는다 -
+# 옛 코드가 바꾼 뒤 verify 전에 사용자가 새 코드로 다시 바꾸면 줄이 둘이 되지만, 첫 줄은
+# 여전히 옛 코드가 바꾸기 전의 값이다.
+# 새 코드가 만든 계좌는 seed_capital이 비어 있어 걸리지 않는다.
 #
 # 접속 정보: 기본은 저장소 루트 .env.vercel의 SUPABASE_DIRECT_URL. DB_URL로 바꿀 수 있다.
 # 로컬에 psql이 없으므로 기본으로 Supabase 로컬 컨테이너 안의 psql을 쓴다. PSQL로 바꿀 수 있다.
@@ -48,17 +51,19 @@ run_psql() {
 # 배포 뒤 확인 쿼리. 문제 계좌가 있으면 그 목록을 보이고 예외로 끝난다.
 VERIFY_SQL=$(cat <<'SQL'
 CREATE TEMP VIEW seed_capital_history_problems AS
-SELECT a.id AS account_id, a.created_at, a.seed_capital, h.rows, h.first_seed,
-  CASE WHEN h.rows IS NULL THEN 'no history row'
-       ELSE 'single row differs from seed_capital' END AS problem
+SELECT a.id AS account_id, a.created_at, a.seed_capital,
+  f.effective_date AS first_effective_date, f.seed_capital AS first_seed, f.rows,
+  CASE WHEN f.account_id IS NULL THEN 'no history row'
+       ELSE 'first row differs from seed_capital' END AS problem
 FROM public.trading_accounts a
 LEFT JOIN (
-  SELECT account_id, count(*) AS rows, min(seed_capital) AS first_seed
+  SELECT DISTINCT ON (account_id) account_id, effective_date, seed_capital,
+    count(*) OVER (PARTITION BY account_id) AS rows
   FROM public.seed_capital_history
-  GROUP BY account_id
-) h ON h.account_id = a.id
-WHERE h.rows IS NULL
-   OR (h.rows = 1 AND a.seed_capital IS NOT NULL AND h.first_seed <> a.seed_capital);
+  ORDER BY account_id, effective_date
+) f ON f.account_id = a.id
+WHERE f.account_id IS NULL
+   OR (a.seed_capital IS NOT NULL AND f.seed_capital <> a.seed_capital);
 
 SELECT * FROM seed_capital_history_problems ORDER BY created_at;
 
