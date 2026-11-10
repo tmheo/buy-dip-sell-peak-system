@@ -32,7 +32,7 @@ interface AccountSettingsCardProps {
 
 // 종목은 바꿀 수 없으므로 보내지 않는다. 운용 시작일은 바꾸지 않았어도 함께 보낸다 -
 // 지금 값과 같은 날짜는 첫 일일 마감 뒤에도 받는다.
-export interface UpdateAccountData {
+export interface AccountSettingsUpdate {
   strategy: Strategy;
   cycleStartDate: string;
 }
@@ -42,11 +42,11 @@ export interface UpdateAccountData {
  * seedCapital은 새 시드(PUT /api/trading/accounts/[id]/seed)이고, 바꾸지 않았으면 null이다.
  */
 export interface AccountSettingsChanges {
-  settings: UpdateAccountData | null;
+  settings: AccountSettingsUpdate | null;
   seedCapital: number | null;
 }
 
-interface SettingsForm extends UpdateAccountData {
+interface SettingsForm extends AccountSettingsUpdate {
   seedCapital: number;
 }
 

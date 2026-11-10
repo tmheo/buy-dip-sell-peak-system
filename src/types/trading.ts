@@ -128,10 +128,12 @@ export interface TradingAccountWithHoldings extends TradingAccount {
 
 /**
  * 계좌 목록 응답의 계좌 - 목록의 시드 열은 오늘의 시드(seed.current)다 (ADR-0005)
+ * 목록은 사이클 진행 여부를 따로 붙이지 않는다.
  */
-export interface TradingAccountListItem extends TradingAccount {
-  holdings: TierHolding[];
-  totalShares: number;
+export interface TradingAccountListItem extends Omit<
+  TradingAccountWithHoldings,
+  "isCycleInProgress"
+> {
   seed: SeedStatus;
 }
 

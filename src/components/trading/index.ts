@@ -14,4 +14,4 @@ export { default as InvestmentRatioBar } from "./InvestmentRatioBar";
 
 // Type exports
 export type { AccountFormData } from "./AccountForm";
-export type { UpdateAccountData } from "./AccountSettingsCard";
+export type { AccountSettingsUpdate } from "./AccountSettingsCard";
