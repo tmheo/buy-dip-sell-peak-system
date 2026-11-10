@@ -10,7 +10,7 @@
  */
 export class CycleInProgressError extends Error {
   constructor() {
-    super("사이클 중에는 투자 전략·운용 시작일을 바꿀 수 없습니다");
+    super("사이클 중에는 계좌 이름·투자 전략·운용 시작일을 바꿀 수 없습니다");
     this.name = "CycleInProgressError";
   }
 }

@@ -455,9 +455,24 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     // 시드는 사이클 중에도 PUT .../seed로 바꿀 수 있으므로 문구는 막히는 것만 적는다 (ADR-0004)
-    expect(body.error).toBe("사이클 중에는 투자 전략·운용 시작일을 바꿀 수 없습니다");
+    expect(body.error).toBe("사이클 중에는 계좌 이름·투자 전략·운용 시작일을 바꿀 수 없습니다");
     const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
     expect(after!.strategy).toBe("Pro1");
+  });
+
+  it("보유 티어가 있는 동안 계좌 이름만 바꿔도 400을 돌려주고 문구가 계좌 이름이 막혔음을 알려야 한다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+    await trading.updateTierHolding(id, 1, { buyPrice: 100, shares: 10, buyDate: "2025-01-02" });
+    const before = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+
+    const response = await put(id, { name: "새 이름" });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("계좌 이름");
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+    expect(after!.name).toBe(before!.name);
   });
 
   it("첫 일일 마감 전에는 운용 시작일을 바꿀 수 있어야 한다", async () => {
