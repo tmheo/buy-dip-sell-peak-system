@@ -25,6 +25,7 @@ export interface TradingAccount {
   ticker: Ticker;
   seedCapital: number;
   strategy: Strategy;
+  // 운용 시작일(첫 사이클의 시작일). 사이클이 끝나도 바뀌지 않는다.
   cycleStartDate: string;
   cycleNumber: number;
   lastProcessedDate: string | null;
@@ -82,12 +83,13 @@ export interface CreateTradingAccountRequest {
 
 /**
  * 트레이딩 계좌 수정 요청
+ * 종목은 계좌를 만들 때 정하고 바꿀 수 없으므로 담지 않는다 (#112).
  */
 export interface UpdateTradingAccountRequest {
   name?: string;
-  ticker?: Ticker;
   seedCapital?: number;
   strategy?: Strategy;
+  // 운용 시작일(첫 사이클의 시작일). 첫 일일 마감 전에만 바꿀 수 있다.
   cycleStartDate?: string;
 }
 

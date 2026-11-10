@@ -15,7 +15,7 @@ import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { hasDb } from "@/test-utils/db";
 import { db } from "@/database/db-drizzle";
 import { users } from "@/database/schema/auth";
-import { dailyPrices } from "@/database/schema/index";
+import { dailyPrices, tradingAccounts } from "@/database/schema/index";
 import type { DailyOrder, Ticker } from "@/types/trading";
 
 const TEST_USER_ID = randomUUID();
@@ -100,7 +100,8 @@ describe.skipIf(!hasDb)("체결 처리의 입력 일관성", () => {
 
   describe("일일 마감 도중 종목이 바뀐 경우 (processHistoricalOrders)", () => {
     it("주문표를 만든 종목의 종가로 체결한다", async () => {
-      // 보유가 없을 때는 종목을 바꿀 수 있다 - 마감이 계좌를 읽은 뒤 바뀐 상황이다
+      // 마감이 계좌를 읽은 뒤 종목이 바뀐 상황이다. 계좌 설정 수정은 종목을 받지 않지만(#112)
+      // 체결이 주문표의 종목을 따르는 방어는 남겨 둔다 - 행을 직접 바꿔 흉내 낸다
       const staleAccount = await tradingModule.createTradingAccount(TEST_USER_ID, {
         name: "종목 교체 테스트 계좌",
         ticker: "TQQQ",
@@ -108,7 +109,10 @@ describe.skipIf(!hasDb)("체결 처리의 입력 일관성", () => {
         strategy: "Pro1",
         cycleStartDate: "2009-10-02",
       });
-      await tradingModule.updateTradingAccount(staleAccount.id, TEST_USER_ID, { ticker: "SOXL" });
+      await db
+        .update(tradingAccounts)
+        .set({ ticker: "SOXL" })
+        .where(eq(tradingAccounts.id, staleAccount.id));
 
       await trading.processHistoricalOrders(staleAccount, "2009-10-05");
 

@@ -114,8 +114,8 @@ export async function createProfitRecord(
  * 계좌의 지금 사이클 번호를 넘기면 이번 사이클 실현손익이 된다 (ADR-0003).
  * 매도 기록이 없으면 0이다.
  *
- * 사이클 시작일 이후 매도로 구분하지 않는다 - 사이클이 완료돼도 cycle_start_date는
- * 바뀌지 않아 앞선 사이클의 손익이 섞인다 (#97).
+ * 운용 시작일(cycle_start_date) 이후 매도로 구분하지 않는다 - 이 값은 첫 사이클의 시작일이라
+ * 사이클이 완료돼도 바뀌지 않아 앞선 사이클의 손익이 섞인다 (#97).
  */
 export async function getCycleRealizedPnl(
   accountId: string,

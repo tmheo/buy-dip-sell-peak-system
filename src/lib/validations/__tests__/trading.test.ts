@@ -445,16 +445,6 @@ describe("UpdateTradingAccountSchema", () => {
       }
     });
 
-    it("ticker만 수정할 수 있어야 한다", () => {
-      const input = {
-        ticker: "TQQQ",
-      };
-
-      const result = UpdateTradingAccountSchema.safeParse(input);
-
-      expect(result.success).toBe(true);
-    });
-
     it("seedCapital만 수정할 수 있어야 한다", () => {
       const input = {
         seedCapital: 20000,
@@ -525,13 +515,15 @@ describe("UpdateTradingAccountSchema", () => {
     });
   });
 
-  describe("ticker 필드 검증", () => {
-    it("유효하지 않은 티커는 거부되어야 한다", () => {
-      const input = {
-        ticker: "SPY",
-      };
+  describe("ticker 필드 검증 (종목 고정, #112)", () => {
+    it("종목은 계좌를 만든 뒤 바꿀 수 없으므로 ticker가 있으면 거부되어야 한다", () => {
+      const result = UpdateTradingAccountSchema.safeParse({ ticker: "TQQQ" });
 
-      const result = UpdateTradingAccountSchema.safeParse(input);
+      expect(result.success).toBe(false);
+    });
+
+    it("지금 종목과 같은 값이어도 조용히 무시하지 않고 거부되어야 한다", () => {
+      const result = UpdateTradingAccountSchema.safeParse({ ticker: "SOXL", strategy: "Pro2" });
 
       expect(result.success).toBe(false);
     });

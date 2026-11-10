@@ -2,7 +2,7 @@
  * 트레이딩 계좌 CRUD 함수 (PRD-TRADING-001)
  */
 
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc, gte, isNull, or } from "drizzle-orm";
 
 import { db, type DbExecutor } from "../db-drizzle";
 import { tradingAccounts, tierHoldings } from "../schema/index";
@@ -159,7 +159,23 @@ export async function getTradingAccountWithHoldings(
 }
 
 /**
+ * 첫 일일 마감 뒤에 운용 시작일을 다른 날짜로 바꾸려 할 때 던진다 (#112).
+ * 일일 마감은 lastProcessedDate가 없을 때만 운용 시작일부터 처리하므로, 그 뒤에 바꾸면
+ * 처리할 거래일은 그대로이고 화면 표시만 달라진다.
+ */
+export class TradingStartDateLockedError extends Error {
+  constructor() {
+    super("첫 일일 마감 뒤에는 운용 시작일을 바꿀 수 없습니다");
+    this.name = "TradingStartDateLockedError";
+  }
+}
+
+/**
  * 계좌 수정 (사이클 미진행 시만)
+ *
+ * 운용 시작일(cycleStartDate)은 첫 일일 마감 전에만 바꿀 수 있다. 지금과 같은 날짜는
+ * 바꾸는 것이 아니므로 받는다(설정 카드는 바꾸지 않은 칸도 함께 보낸다).
+ * 이 조건은 UPDATE의 WHERE에 넣어 확인과 저장 사이에 마감이 끝나도 어긋나지 않게 한다.
  */
 export async function updateTradingAccount(
   id: string,
@@ -178,7 +194,6 @@ export async function updateTradingAccount(
   // 업데이트할 필드가 있는지 확인
   const hasUpdates =
     data.name !== undefined ||
-    data.ticker !== undefined ||
     data.seedCapital !== undefined ||
     data.strategy !== undefined ||
     data.cycleStartDate !== undefined;
@@ -193,15 +208,29 @@ export async function updateTradingAccount(
   };
 
   if (data.name !== undefined) updateData.name = data.name;
-  if (data.ticker !== undefined) updateData.ticker = data.ticker;
   if (data.seedCapital !== undefined) updateData.seedCapital = data.seedCapital;
   if (data.strategy !== undefined) updateData.strategy = data.strategy;
   if (data.cycleStartDate !== undefined) updateData.cycleStartDate = data.cycleStartDate;
 
-  await db
+  const startDateUnlocked =
+    data.cycleStartDate === undefined
+      ? undefined
+      : or(
+          isNull(tradingAccounts.lastProcessedDate),
+          eq(tradingAccounts.cycleStartDate, data.cycleStartDate)
+        );
+
+  const updated = await db
     .update(tradingAccounts)
     .set(updateData as typeof tradingAccounts.$inferInsert)
-    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)));
+    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId), startDateUnlocked))
+    .returning({ id: tradingAccounts.id });
+
+  if (updated.length === 0) {
+    // 계좌는 위에서 찾았으므로 남은 이유는 운용 시작일 잠금이다
+    if (data.cycleStartDate !== undefined) throw new TradingStartDateLockedError();
+    return null;
+  }
 
   return await getTradingAccountById(id, userId);
 }
