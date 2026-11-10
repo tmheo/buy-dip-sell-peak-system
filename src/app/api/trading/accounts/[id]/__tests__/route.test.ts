@@ -249,6 +249,39 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     }
   });
 
+  it("계좌에 오늘의 시드와 적용 전 변경을 붙여 돌려줘야 한다 (ADR-0005)", async () => {
+    // 오늘은 서버의 UTC 날짜다 - 금요일로 정해 적용일이 월요일이 되게 한다
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-13T12:00:00Z"));
+    try {
+      const trading = await import("@/database/trading");
+      const account = await trading.createTradingAccount(OWNER_ID, {
+        name: "시드 응답 테스트 계좌",
+        ticker: "SOXL",
+        seedCapital: 10_000,
+        strategy: "Pro2",
+        cycleStartDate: "2026-11-02",
+      });
+      await trading.changeSeedCapital(account.id, OWNER_ID, 3_000, "2026-11-13");
+      mockLoggedIn(OWNER_ID);
+
+      const response = await get(account.id);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.account).not.toHaveProperty("seedCapital");
+      expect(body.account.seed).toEqual({
+        current: 10_000,
+        pending: { seedCapital: 3_000, effectiveDate: "2026-11-16" },
+        appliedToday: null,
+      });
+      // 예수금은 오늘의 시드로 계산한다
+      expect(body.cashBreakdown.cycleCapital).toBe(10_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("다른 사용자의 계좌는 404를 돌려줘야 한다", async () => {
     mockLoggedIn(OTHER_USER_ID);
 
@@ -329,6 +362,18 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
     expect(after!.strategy).toBe("Pro1");
   });
 
+  it("시드가 든 요청은 400을 돌려주고 시드를 바꾸지 않아야 한다 - 시드는 적용일이 붙은 이력으로 따로 바꾼다", async () => {
+    mockLoggedIn(PUT_OWNER_ID);
+    const id = await createAccount({ closed: false });
+
+    const response = await put(id, { seedCapital: 3_000, strategy: "Pro2" });
+
+    expect(response.status).toBe(400);
+    const after = await trading.getTradingAccountById(id, PUT_OWNER_ID);
+    expect(after!.strategy).toBe("Pro1");
+    expect((await trading.getSeedStatus(after!, "2099-01-01")).current).toBe(10_000);
+  });
+
   it("보유 티어가 있는 동안에는 400과 한국어 오류를 돌려주고 계좌를 바꾸지 않아야 한다", async () => {
     mockLoggedIn(PUT_OWNER_ID);
     const id = await createAccount({ closed: false });
@@ -372,11 +417,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]", () => {
     mockLoggedIn(PUT_OWNER_ID);
     const id = await createAccount({ closed: true });
 
-    const response = await put(id, {
-      seedCapital: 10_000,
-      strategy: "Pro2",
-      cycleStartDate: "2025-01-02",
-    });
+    const response = await put(id, { strategy: "Pro2", cycleStartDate: "2025-01-02" });
 
     expect(response.status).toBe(200);
     const body = await response.json();

@@ -21,7 +21,13 @@ export type {
 } from "./auth";
 
 // 트레이딩 스키마
-export { tradingAccounts, tierHoldings, dailyOrders, profitRecords } from "./trading";
+export {
+  tradingAccounts,
+  tierHoldings,
+  dailyOrders,
+  profitRecords,
+  seedCapitalHistory,
+} from "./trading";
 export type {
   TradingAccount,
   NewTradingAccount,
@@ -31,6 +37,7 @@ export type {
   NewDailyOrder,
   ProfitRecord,
   NewProfitRecord,
+  SeedCapitalHistoryRow,
 } from "./trading";
 
 // 캐시 스키마

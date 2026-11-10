@@ -6,10 +6,11 @@
 
 import type React from "react";
 import { useState } from "react";
-import type { Ticker, Strategy, TradingAccount } from "@/types/trading";
+import { MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE } from "@/lib/validations/seed-capital-bounds";
+import type { Ticker, Strategy } from "@/types/trading";
 
 interface AccountFormProps {
-  initialData?: Partial<TradingAccount>;
+  initialData?: Partial<AccountFormData>;
   onSubmit: (data: AccountFormData) => Promise<void>;
   isSubmitting: boolean;
   mode: "create" | "edit";
@@ -77,8 +78,8 @@ export default function AccountForm({
       newErrors.name = "계좌 이름을 입력하세요.";
     }
 
-    if (formData.seedCapital < 2000) {
-      newErrors.seedCapital = "시드 자금은 최소 $2,000 이상이어야 합니다.";
+    if (formData.seedCapital < MIN_SEED_CAPITAL) {
+      newErrors.seedCapital = `${MIN_SEED_CAPITAL_MESSAGE}.`;
     }
 
     if (!formData.cycleStartDate) {
@@ -158,7 +159,7 @@ export default function AccountForm({
             name="seedCapital"
             value={formData.seedCapital || ""}
             onChange={handleChange}
-            min="2000"
+            min={MIN_SEED_CAPITAL}
             step="1"
             disabled={isSubmitting}
           />

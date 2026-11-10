@@ -14,6 +14,7 @@ import {
   getCycleRealizedPnl,
   getDailyOrders,
   getPreviousTradingClose,
+  getSeedCapitalOn,
   getTierHoldings,
   listTradingDatesBetween,
   replaceDailyOrders,
@@ -76,7 +77,11 @@ async function toStrategyHoldings(
  * 보유 티어와 이번 사이클 실현손익은 한 시점에서 읽는다. 따로 읽으면 그 사이에 커밋된
  * 매도가 보유에는 빠지고 실현손익에는 들어가, 판 티어의 손실이 예수금에서 두 번 빠진다.
  *
- * @param account - 계좌 (종목·시드 금액·전략·사이클 번호)
+ * 사이클 자본은 그날의 시드다 - 시드 이력에서 적용일이 그날 이하인 시드를 같은 시점에서
+ * 읽는다 (ADR-0005). 지금의 시드를 쓰면 바꾼 날 이미 낸 주문표가 새 시드로 다시 만들어지고,
+ * 밀린 지난 날짜도 새 시드로 다시 계산된다.
+ *
+ * @param account - 계좌 (종목·전략·사이클 번호)
  * @param date - 기준일 (주문표 날짜 또는 체결 처리일)
  * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등). 없으면 이 함수의
  *   읽기만 묶는 읽기 시점을 새로 연다.
@@ -90,14 +95,15 @@ export async function loadCycleState(
     return runInReadSnapshot((snapshot) => loadCycleState(account, date, snapshot));
   }
 
-  const [holdings, realizedPnl] = await Promise.all([
+  const [holdings, realizedPnl, seedCapital] = await Promise.all([
     getTierHoldings(account.id, executor),
     // 이번 사이클 실현손익: 계좌의 지금 사이클 번호로 묶인 수익 기록의 손익 합 (ADR-0003)
     getCycleRealizedPnl(account.id, account.cycleNumber, executor),
+    getSeedCapitalOn(account.id, date, executor),
   ]);
   return {
     strategy: getStrategyParams(account.strategy),
-    cycleCapital: account.seedCapital, // 실계좌의 사이클 자본 = 사용자 설정 시드 금액 (#43)
+    cycleCapital: seedCapital, // 실계좌의 사이클 자본 = 그날의 시드 금액 (#43, ADR-0005)
     holdings: await toStrategyHoldings(account.ticker, holdings, date, executor),
     cycleNumber: account.cycleNumber,
     realizedPnl,

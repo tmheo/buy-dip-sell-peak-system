@@ -65,6 +65,23 @@ export function getPreviousTradingDate(date: string): string {
 }
 
 /**
+ * 다음 평일 (주말만 건너뛴다 - 휴장일은 알 수 없다)
+ * UTC 기준으로 계산하여 타임존 문제 방지
+ *
+ * @param date - 기준 날짜 (YYYY-MM-DD)
+ * @returns 기준 날짜 뒤의 첫 평일 (YYYY-MM-DD)
+ */
+export function getNextWeekday(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  do {
+    dt.setUTCDate(dt.getUTCDate() + 1);
+  } while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6);
+
+  return formatUtcDate(dt);
+}
+
+/**
  * 두 날짜 사이의 거래일 수 계산 (주말 제외)
  * 시작일부터 종료일까지의 거래일 수 (시작일 포함)
  * UTC 기준으로 계산하여 타임존 문제 방지

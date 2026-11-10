@@ -21,6 +21,7 @@ vi.mock("@/database/trading", () => ({
   getCycleRealizedPnl: vi.fn(),
   getDailyOrders: vi.fn(),
   getPreviousTradingClose: vi.fn(),
+  getSeedCapitalOn: vi.fn(),
   getTierHoldings: vi.fn(),
   getTradingAccountByIdWithoutOwnerCheck: vi.fn(),
   hasExecutedOrdersAfter: vi.fn(),
@@ -40,6 +41,7 @@ import {
   getCycleRealizedPnl,
   getDailyOrders,
   getPreviousTradingClose,
+  getSeedCapitalOn,
   getTierHoldings,
   getTradingAccountByIdWithoutOwnerCheck,
   hasExecutedOrdersAfter,
@@ -58,7 +60,6 @@ const ACCOUNT: TradingAccount = {
   userId: "user-1",
   name: "테스트 계좌",
   ticker: "SOXL",
-  seedCapital: 100,
   strategy: "Pro1",
   cycleStartDate: "2026-07-01",
   cycleNumber: 1,
@@ -88,6 +89,7 @@ beforeEach(() => {
   vi.mocked(getTradingAccountByIdWithoutOwnerCheck).mockResolvedValue(ACCOUNT);
   vi.mocked(getClosingPrice).mockResolvedValue(49);
   vi.mocked(getCycleRealizedPnl).mockResolvedValue(0);
+  vi.mocked(getSeedCapitalOn).mockResolvedValue(100);
   vi.mocked(getDailyOrders).mockResolvedValue([STALE_ORDER]);
   vi.mocked(getPreviousTradingClose).mockResolvedValue({ date: "2026-07-14", adjClose: 50 });
   vi.mocked(hasExecutedOrdersAfter).mockResolvedValue(false);

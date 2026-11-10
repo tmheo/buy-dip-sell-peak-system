@@ -11,6 +11,20 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
+const wholeDollarFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+/** 시드 금액 - 센트가 없으면 달러까지만, 있으면 센트까지, 예: "$10,000", "$3,000.50" */
+export function formatSeedAmount(value: number): string {
+  return Number.isInteger(value)
+    ? wholeDollarFormatter.format(value)
+    : currencyFormatter.format(value);
+}
+
 /** 달러 금액 (소수 둘째 자리). 값이 없으면 "-" */
 export function formatCurrency(value: number | null): string {
   if (value === null) return "-";
@@ -43,6 +57,14 @@ export function formatLongDate(date: string): string {
     month: "long",
     day: "numeric",
   });
+}
+
+/** 월·일과 요일, 예: "11월 11일(수)" */
+export function formatMonthDayWithWeekday(date: string): string {
+  const parsed = parseStoredDate(date);
+  const monthDay = parsed.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+  const weekday = parsed.toLocaleDateString("ko-KR", { weekday: "short" });
+  return `${monthDay}(${weekday})`;
 }
 
 /** 부호를 붙인 백분율 (소수 둘째 자리), 예: "+1.50%" */

@@ -34,12 +34,23 @@ export {
   getTradingAccountByIdWithoutOwnerCheck,
   getTradingAccountWithHoldings,
   updateTradingAccount,
-  CycleInProgressError,
-  TradingStartDateLockedError,
   deleteTradingAccount,
   completeCycleAndIncrement,
   updateAccountLastProcessedDate,
 } from "./accounts";
+
+// 업무 오류
+export { CycleInProgressError, TradingStartDateLockedError } from "./errors";
+
+// 시드 이력 (ADR-0005)
+export {
+  changeSeedCapital,
+  changeSeedHistory,
+  getSeedCapitalOn,
+  getSeedStatus,
+  seedCapitalOn,
+  seedStatus,
+} from "./seed-capital";
 
 // DailyOrder CRUD
 export {

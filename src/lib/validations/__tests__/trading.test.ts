@@ -9,13 +9,17 @@
  * - 유효한 입력 통과
  * - 잘못된 ticker 거부
  * - 잘못된 strategy 거부
- * - seedCapital 최소값/최대값 검증
+ * - seedCapital 최소값/최대값/센트 단위 검증 (계좌 생성과 시드 변경이 같은 기준을 쓴다)
  * - 필수 필드 누락 검증
  * - 날짜 형식 검증
  */
 
 import { describe, it, expect } from "vitest";
-import { CreateTradingAccountSchema, UpdateTradingAccountSchema } from "../trading";
+import {
+  ChangeSeedCapitalSchema,
+  CreateTradingAccountSchema,
+  UpdateTradingAccountSchema,
+} from "../trading";
 
 describe("CreateTradingAccountSchema", () => {
   describe("유효한 입력", () => {
@@ -86,11 +90,11 @@ describe("CreateTradingAccountSchema", () => {
       });
     });
 
-    it("최소 시드 자본(양수)이 허용되어야 한다", () => {
+    it("최소 시드 자본($2,000)이 허용되어야 한다", () => {
       const input = {
         name: "최소 자본 계좌",
         ticker: "SOXL",
-        seedCapital: 0.01,
+        seedCapital: 2000,
         strategy: "Pro1",
         cycleStartDate: "2025-01-02",
       };
@@ -220,8 +224,8 @@ describe("CreateTradingAccountSchema", () => {
   });
 
   describe("seedCapital 필드 검증", () => {
-    it("0 이하의 시드 자본은 거부되어야 한다", () => {
-      const invalidCapitals = [0, -1, -1000];
+    it("최소 $2,000보다 작은 시드 자본은 거부되어야 한다 - 화면만 검사하면 다른 경로로 들어온 작은 시드가 저장된다", () => {
+      const invalidCapitals = [1999.99, 0.01, 0, -1, -1000];
 
       invalidCapitals.forEach((seedCapital) => {
         const input = {
@@ -238,7 +242,9 @@ describe("CreateTradingAccountSchema", () => {
         if (!result.success) {
           const errors = result.error.flatten();
           expect(errors.fieldErrors.seedCapital).toBeDefined();
-          expect(errors.fieldErrors.seedCapital![0]).toContain("양수");
+          expect(errors.fieldErrors.seedCapital).toEqual([
+            "시드 금액은 최소 $2,000 이상이어야 합니다",
+          ]);
         }
       });
     });
@@ -259,6 +265,25 @@ describe("CreateTradingAccountSchema", () => {
         const errors = result.error.flatten();
         expect(errors.fieldErrors.seedCapital).toBeDefined();
         expect(errors.fieldErrors.seedCapital![0]).toContain("10억");
+      }
+    });
+
+    it("센트보다 작은 단위가 있는 시드 자본은 반올림하지 않고 거부되어야 한다", () => {
+      const input = {
+        name: "테스트 계좌",
+        ticker: "SOXL",
+        seedCapital: 10000.001,
+        strategy: "Pro1",
+        cycleStartDate: "2025-01-02",
+      };
+
+      const result = CreateTradingAccountSchema.safeParse(input);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.flatten().fieldErrors.seedCapital).toEqual([
+          "시드 금액은 센트(소수 둘째 자리)까지만 입력할 수 있습니다",
+        ]);
       }
     });
 
@@ -445,16 +470,6 @@ describe("UpdateTradingAccountSchema", () => {
       }
     });
 
-    it("seedCapital만 수정할 수 있어야 한다", () => {
-      const input = {
-        seedCapital: 20000,
-      };
-
-      const result = UpdateTradingAccountSchema.safeParse(input);
-
-      expect(result.success).toBe(true);
-    });
-
     it("strategy만 수정할 수 있어야 한다", () => {
       const input = {
         strategy: "Pro3",
@@ -478,7 +493,6 @@ describe("UpdateTradingAccountSchema", () => {
     it("여러 필드를 동시에 수정할 수 있어야 한다", () => {
       const input = {
         name: "수정된 계좌",
-        seedCapital: 15000,
         strategy: "Pro2",
       };
 
@@ -487,7 +501,6 @@ describe("UpdateTradingAccountSchema", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.name).toBe("수정된 계좌");
-        expect(result.data.seedCapital).toBe(15000);
         expect(result.data.strategy).toBe("Pro2");
       }
     });
@@ -529,25 +542,16 @@ describe("UpdateTradingAccountSchema", () => {
     });
   });
 
-  describe("seedCapital 필드 검증", () => {
-    it("0 이하의 시드 자본은 거부되어야 한다", () => {
-      const input = {
-        seedCapital: 0,
-      };
-
-      const result = UpdateTradingAccountSchema.safeParse(input);
+  describe("seedCapital 필드 검증 (시드 이력, ADR-0005)", () => {
+    it("시드는 적용일이 붙은 이력으로 따로 바꾸므로 seedCapital이 있으면 거부되어야 한다", () => {
+      const result = UpdateTradingAccountSchema.safeParse({ seedCapital: 20000, strategy: "Pro2" });
 
       expect(result.success).toBe(false);
-    });
-
-    it("10억 초과 시드 자본은 거부되어야 한다", () => {
-      const input = {
-        seedCapital: 1000000001,
-      };
-
-      const result = UpdateTradingAccountSchema.safeParse(input);
-
-      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.flatten().fieldErrors.seedCapital).toEqual([
+          "시드는 PUT /api/trading/accounts/[id]/seed로 바꿉니다",
+        ]);
+      }
     });
   });
 
@@ -580,7 +584,7 @@ describe("UpdateTradingAccountSchema", () => {
       const input = {
         name: "유효한 이름",
         ticker: "INVALID",
-        seedCapital: 10000,
+        strategy: "Pro1",
       };
 
       const result = UpdateTradingAccountSchema.safeParse(input);
@@ -590,7 +594,7 @@ describe("UpdateTradingAccountSchema", () => {
         const errors = result.error.flatten();
         expect(errors.fieldErrors.ticker).toBeDefined();
         expect(errors.fieldErrors.name).toBeUndefined();
-        expect(errors.fieldErrors.seedCapital).toBeUndefined();
+        expect(errors.fieldErrors.strategy).toBeUndefined();
       }
     });
 
@@ -608,5 +612,33 @@ describe("UpdateTradingAccountSchema", () => {
         expect((result.data as Record<string, unknown>).unknownField).toBeUndefined();
       }
     });
+  });
+});
+
+describe("ChangeSeedCapitalSchema (ADR-0005)", () => {
+  it("최소 $2,000부터 10억까지, 센트 단위까지의 시드를 받아야 한다", () => {
+    for (const seedCapital of [2000, 2_000.3, 65_303.83, 999_999_999.99, 1_000_000_000]) {
+      expect(ChangeSeedCapitalSchema.safeParse({ seedCapital }).success).toBe(true);
+    }
+  });
+
+  it.each([
+    [1999.99, "시드 금액은 최소 $2,000 이상이어야 합니다"],
+    [1_000_000_000.01, "시드 금액은 10억 이하여야 합니다"],
+    // 반올림해 받으면 지금 시드 10000과 같은 값이 적용 전 변경으로 남는다
+    [10_000.001, "시드 금액은 센트(소수 둘째 자리)까지만 입력할 수 있습니다"],
+    [3_000.555, "시드 금액은 센트(소수 둘째 자리)까지만 입력할 수 있습니다"],
+  ])("%s는 거부되어야 한다", (seedCapital, message) => {
+    const result = ChangeSeedCapitalSchema.safeParse({ seedCapital });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.seedCapital).toEqual([message]);
+    }
+  });
+
+  it("숫자가 아니거나 없으면 거부되어야 한다", () => {
+    expect(ChangeSeedCapitalSchema.safeParse({ seedCapital: "3000" }).success).toBe(false);
+    expect(ChangeSeedCapitalSchema.safeParse({}).success).toBe(false);
   });
 });

@@ -9,22 +9,17 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AccountListTable from "@/components/trading/AccountListTable";
 import DeleteAccountModal from "@/components/trading/DeleteAccountModal";
-import type { TradingAccount, TierHolding } from "@/types/trading";
-
-interface AccountWithHoldings extends TradingAccount {
-  holdings: TierHolding[];
-  totalShares: number;
-}
+import type { TradingAccountListItem } from "@/types/trading";
 
 interface AccountsResponse {
-  accounts: AccountWithHoldings[];
+  accounts: TradingAccountListItem[];
 }
 
 export default function TradingListClient(): React.ReactElement {
-  const [accounts, setAccounts] = useState<AccountWithHoldings[]>([]);
+  const [accounts, setAccounts] = useState<TradingAccountListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAccount, setSelectedAccount] = useState<AccountWithHoldings | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<TradingAccountListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchAccounts = useCallback(async (): Promise<void> => {
@@ -51,7 +46,7 @@ export default function TradingListClient(): React.ReactElement {
     fetchAccounts();
   }, [fetchAccounts]);
 
-  function handleDeleteClick(account: AccountWithHoldings): void {
+  function handleDeleteClick(account: TradingAccountListItem): void {
     setSelectedAccount(account);
   }
 

@@ -1,7 +1,7 @@
 /**
  * 트레이딩 계좌 상세 API (PRD-TRADING-001)
- * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 예수금 내역, 가장 최근 종가 포함)
- * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만, 종목은 받지 않는다)
+ * GET /api/trading/accounts/[id] - 특정 계좌 상세 (holdings, 시드 상태, 예수금 내역, 가장 최근 종가 포함)
+ * PUT /api/trading/accounts/[id] - 계좌 설정 수정 (사이클 미진행 시만, 종목과 시드는 받지 않는다)
  * DELETE /api/trading/accounts/[id] - 계좌 삭제
  */
 
@@ -17,6 +17,7 @@ import {
 import {
   getTradingAccountWithHoldings,
   getLatestClose,
+  getSeedStatus,
   updateTradingAccount,
   CycleInProgressError,
   TradingStartDateLockedError,
@@ -39,6 +40,9 @@ import { loadCycleState } from "@/trading";
  *
  * 평가금(가장 최근 종가 × 보유 수량)에 쓸 저장된 가장 최근 종가와 그 날짜(latestClose)도
  * 함께 돌려준다 (#98). 실시간 시세가 아니다. 가격 행이 없으면 null이다.
+ *
+ * 계좌에는 시드 상태(account.seed: 오늘의 시드, 적용 전 변경, 오늘 처음 적용된 시드)를 붙인다
+ * (ADR-0005). 예수금 내역과 같은 시점에서 읽는다.
  */
 export async function GET(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -49,14 +53,16 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   const { id } = await params;
   // 보유 티어와 예수금 내역은 한 시점에서 읽는다 - 따로 읽으면 그 사이에 커밋된 매도가
   // 보유 티어에는 빠지고 예수금 내역에는 들어간다
+  const today = getTodayTradingDate();
   const detail = await runInReadSnapshot(async (snapshot) => {
     const account = await getTradingAccountWithHoldings(id, userId, snapshot);
     if (!account) return null;
-    const [state, latestClose] = await Promise.all([
-      loadCycleState(account, getTodayTradingDate(), snapshot),
+    const [state, latestClose, seed] = await Promise.all([
+      loadCycleState(account, today, snapshot),
       getLatestClose(account.ticker, snapshot),
+      getSeedStatus(account, today, snapshot),
     ]);
-    return { account, state, latestClose };
+    return { account: { ...account, seed }, state, latestClose };
   });
 
   if (!detail) {
@@ -80,6 +86,7 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
  * 계좌 설정 수정 (사이클 미진행 시만)
  *
  * 종목(ticker)이 들어 있으면 검증 오류로 거절한다 - 종목은 계좌를 만들 때 정한다.
+ * 시드(seedCapital)도 거절한다 - 시드는 PUT /api/trading/accounts/[id]/seed로 바꾼다 (ADR-0005).
  * 운용 시작일은 첫 일일 마감 전에만 다른 날짜로 바꿀 수 있다 (#112).
  */
 export async function PUT(request: Request, { params }: RouteParams): Promise<NextResponse> {

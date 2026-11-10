@@ -5,34 +5,57 @@
  *
  * 종목은 계좌를 만들 때 정하므로 편집 모드에서도 읽기 전용이고, 운용 시작일은 첫 일일
  * 마감 뒤에 읽기 전용이 된다 (#112).
+ *
+ * 시드는 다른 칸과 따로 보낸다 - 바꾼 시드는 다음 거래일 주문표부터 쓰이므로(ADR-0005),
+ * 적용 전 변경이 있으면 시드 칸에 그 변경과 적용일, 다시 바꾸기·되돌리기를 보인다.
  */
 
 import type React from "react";
-import { useState } from "react";
-import type { TradingAccountWithHoldings, Strategy } from "@/types/trading";
-import { canEditTradingStartDate, strategyChangeWarning } from "./account-settings";
-import { formatLongDate } from "./format";
+import { useEffect, useRef, useState } from "react";
+import { MIN_SEED_CAPITAL, MIN_SEED_CAPITAL_MESSAGE } from "@/lib/validations/seed-capital-bounds";
+import type { TradingAccountDetail, Strategy } from "@/types/trading";
+import {
+  canEditTradingStartDate,
+  pendingSeedChangeText,
+  seedChangeToSend,
+  seedInputValue,
+  strategyChangeWarning,
+} from "./account-settings";
+import { formatLongDate, formatSeedAmount } from "./format";
 
 interface AccountSettingsCardProps {
-  account: TradingAccountWithHoldings;
-  onSave: (data: UpdateAccountData) => Promise<void>;
+  account: TradingAccountDetail;
+  /** 바꾼 것만 보낸다. 저장에 성공하면 true */
+  onSave: (changes: AccountSettingsChanges) => Promise<boolean>;
   isSaving: boolean;
 }
 
 // 종목은 바꿀 수 없으므로 보내지 않는다. 운용 시작일은 바꾸지 않았어도 함께 보낸다 -
 // 지금 값과 같은 날짜는 첫 일일 마감 뒤에도 받는다.
-export interface UpdateAccountData {
-  seedCapital: number;
+export interface AccountSettingsUpdate {
   strategy: Strategy;
   cycleStartDate: string;
 }
 
+/**
+ * 저장할 변경. settings는 전략·운용 시작일(PUT /api/trading/accounts/[id]),
+ * seedCapital은 새 시드(PUT /api/trading/accounts/[id]/seed)이고, 바꾸지 않았으면 null이다.
+ */
+export interface AccountSettingsChanges {
+  settings: AccountSettingsUpdate | null;
+  seedCapital: number | null;
+}
+
+interface SettingsForm extends AccountSettingsUpdate {
+  seedCapital: number;
+}
+
 const STRATEGY_OPTIONS: Strategy[] = ["Pro1", "Pro2", "Pro3"];
 
-/** 편집을 시작하거나 취소할 때의 입력값 - 저장된 계좌 설정 그대로 */
-function savedSettings(account: TradingAccountWithHoldings): UpdateAccountData {
+/** 편집을 시작하거나 취소할 때의 입력값 - 저장된 계좌 설정, 시드는 바꿀 시드 */
+function savedSettings(account: TradingAccountDetail): SettingsForm {
   return {
-    seedCapital: account.seedCapital,
+    seedCapital: seedInputValue(account.seed),
     strategy: account.strategy,
     cycleStartDate: account.cycleStartDate,
   };
@@ -80,11 +103,30 @@ export default function AccountSettingsCard({
 }: AccountSettingsCardProps): React.ReactElement {
   const [isEditing, setIsEditing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<UpdateAccountData>(() => savedSettings(account));
+  const [formData, setFormData] = useState<SettingsForm>(() => savedSettings(account));
+  // "다시 바꾸기"로 편집을 열면 시드 칸에 바로 입력할 수 있게 한다
+  const [focusSeed, setFocusSeed] = useState(false);
+  const seedInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = !account.isCycleInProgress;
   const startDateEditable = canEditTradingStartDate(account);
   const strategyWarning = strategyChangeWarning(account.strategy, formData.strategy);
+  const pendingSeedText = pendingSeedChangeText(account.seed);
+
+  useEffect(() => {
+    if (isEditing && focusSeed) {
+      seedInputRef.current?.focus();
+      seedInputRef.current?.select();
+      setFocusSeed(false);
+    }
+  }, [isEditing, focusSeed]);
+
+  function startEditing(options: { focusSeed: boolean }): void {
+    setFormData(savedSettings(account));
+    setSaveError(null);
+    setFocusSeed(options.focusSeed);
+    setIsEditing(true);
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void {
     const { name, value, type } = e.target;
@@ -96,21 +138,38 @@ export default function AccountSettingsCard({
 
   function handleCancel(): void {
     setFormData(savedSettings(account));
+    setSaveError(null);
     setIsEditing(false);
   }
 
   async function handleSave(): Promise<void> {
-    if (!formData.seedCapital || formData.seedCapital < 2000) {
-      setSaveError("시드 자금은 최소 $2,000 이상이어야 합니다.");
+    if (!formData.seedCapital || formData.seedCapital < MIN_SEED_CAPITAL) {
+      setSaveError(`${MIN_SEED_CAPITAL_MESSAGE}.`);
       return;
     }
     setSaveError(null);
-    try {
-      await onSave(formData);
+
+    const settingsChanged =
+      formData.strategy !== account.strategy || formData.cycleStartDate !== account.cycleStartDate;
+    const changes: AccountSettingsChanges = {
+      settings: settingsChanged
+        ? { strategy: formData.strategy, cycleStartDate: formData.cycleStartDate }
+        : null,
+      seedCapital: seedChangeToSend(account.seed, formData.seedCapital),
+    };
+    if (changes.settings === null && changes.seedCapital === null) {
       setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to save account settings:", error);
+      return;
     }
+
+    if (await onSave(changes)) {
+      setIsEditing(false);
+    }
+  }
+
+  /** 적용 전 변경을 지운다 - 지금 시드를 보내면 서버가 그 변경을 지운다 */
+  async function handleRevertSeed(): Promise<void> {
+    await onSave({ settings: null, seedCapital: account.seed.current });
   }
 
   return (
@@ -121,7 +180,7 @@ export default function AccountSettingsCard({
           <button
             type="button"
             className="btn btn-sm btn-outline-primary"
-            onClick={() => setIsEditing(true)}
+            onClick={() => startEditing({ focusSeed: false })}
           >
             설정 변경
           </button>
@@ -144,16 +203,23 @@ export default function AccountSettingsCard({
                 시드($)
               </label>
               <input
+                ref={seedInputRef}
                 id="settings-seed"
                 type="number"
                 className="form-control form-control-sm bg-dark text-light border-secondary"
                 name="seedCapital"
                 value={formData.seedCapital || ""}
                 onChange={handleChange}
-                min="2000"
+                min={MIN_SEED_CAPITAL}
                 step="1"
                 disabled={isSaving}
+                aria-describedby="settings-seed-hint"
               />
+              <div id="settings-seed-hint" className="form-text text-secondary text-keep-all">
+                {account.seed.pending &&
+                  `지금 시드는 ${formatSeedAmount(account.seed.current)}입니다. `}
+                바꾼 시드는 다음 거래일 주문표부터 쓰입니다.
+              </div>
             </div>
             <div className="col-md-6 col-lg-4">
               <label htmlFor="settings-strategy" className="form-label text-secondary small">
@@ -250,13 +316,32 @@ export default function AccountSettingsCard({
             </div>
             <div className="col-md-6 col-lg-4">
               <div className="text-secondary small mb-1">시드($)</div>
-              <div className="text-light">
-                {new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                  minimumFractionDigits: 0,
-                }).format(account.seedCapital)}
-              </div>
+              <div className="text-light">{formatSeedAmount(account.seed.current)}</div>
+              {pendingSeedText && (
+                <div className="mt-1">
+                  <div className="small text-warning text-keep-all">{pendingSeedText}</div>
+                  {canEdit && (
+                    <div className="d-flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => startEditing({ focusSeed: true })}
+                        disabled={isSaving}
+                      >
+                        다시 바꾸기
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={handleRevertSeed}
+                        disabled={isSaving}
+                      >
+                        되돌리기
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="col-md-6 col-lg-4">
               <div className="text-secondary small mb-1">전략</div>

@@ -145,9 +145,10 @@ export async function getClosingPrice(ticker: Ticker, date: string): Promise<num
  */
 export async function getPreviousTradingClose(
   ticker: Ticker,
-  date: string
+  date: string,
+  executor: DbExecutor = db
 ): Promise<{ date: string; adjClose: number } | null> {
-  const rows = await db
+  const rows = await executor
     .select({ date: dailyPrices.date, adjClose: dailyPrices.adjClose })
     .from(dailyPrices)
     .where(and(eq(dailyPrices.ticker, ticker), lt(dailyPrices.date, date)))

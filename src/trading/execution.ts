@@ -21,7 +21,7 @@ import {
   updateTierHolding,
   type DbExecutor,
 } from "@/database/trading";
-import { formatUtcDate, getPreviousTradingDate } from "@/lib/date";
+import { getNextWeekday, getPreviousTradingDate } from "@/lib/date";
 import type { CycleState, Execution, OrderIntent } from "@/strategy";
 import { calculateSellLimitPrice, settle } from "@/strategy";
 import type { DailyOrder, Ticker, TradingAccount } from "@/types/trading";
@@ -313,21 +313,10 @@ export async function processPreviousDayExecution(
 }
 
 /**
- * 다음 거래일 계산 (주말 제외)
+ * 다음 거래일 계산 (주말 제외 - 휴장일은 가격 행이 없어 처리 루프가 건너뛴다)
  */
 export function getNextTradingDate(date: string): string {
-  const d = new Date(date + "T12:00:00Z");
-  d.setDate(d.getDate() + 1);
-
-  // 주말이면 월요일로 이동
-  const dayOfWeek = d.getUTCDay();
-  if (dayOfWeek === 0) {
-    d.setDate(d.getDate() + 1); // 일요일 -> 월요일
-  } else if (dayOfWeek === 6) {
-    d.setDate(d.getDate() + 2); // 토요일 -> 월요일
-  }
-
-  return formatUtcDate(d);
+  return getNextWeekday(date);
 }
 
 /**
