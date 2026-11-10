@@ -307,6 +307,12 @@ body {
   box-shadow: 0 0 0 0.2rem rgba(42, 161, 152, 0.25);
 }
 
+/* Solar 테마의 선택 상자 화살표는 짙은 색이라 어두운 배경(.bg-dark)에서는 보이지 않는다.
+   부트스트랩이 다크 모드에서 쓰는 밝은 화살표로 바꾼다. */
+.form-select.bg-dark {
+  --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23dee2e6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
 /* Trading Stats Cards */
 .trading-stat-card {
   background-color: rgba(7, 54, 66, 0.5);
