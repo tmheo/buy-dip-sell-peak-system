@@ -14,6 +14,7 @@ import {
 import {
   createTradingAccount,
   getTradingAccountsByUserId,
+  getSeedStatus,
   getTierHoldings,
   getTotalShares,
 } from "@/database/trading";
@@ -24,6 +25,7 @@ import { CreateTradingAccountSchema } from "@/lib/validations/trading";
 /**
  * GET /api/trading/accounts
  * 사용자의 모든 계좌 목록 조회
+ * 계좌마다 시드 상태(seed)를 붙인다 - 목록의 시드 열은 오늘의 시드(seed.current)다 (ADR-0005).
  */
 export async function GET(): Promise<NextResponse> {
   const userId = await getAuthUserId();
@@ -31,12 +33,14 @@ export async function GET(): Promise<NextResponse> {
     return unauthorizedResponse();
   }
 
+  const today = getTodayTradingDate();
   const accounts = await getTradingAccountsByUserId(userId);
   const accountsWithHoldings = await Promise.all(
     accounts.map(async (account) => ({
       ...account,
       holdings: await getTierHoldings(account.id),
       totalShares: await getTotalShares(account.id),
+      seed: await getSeedStatus(account, today),
     }))
   );
   return NextResponse.json({ accounts: accountsWithHoldings });
