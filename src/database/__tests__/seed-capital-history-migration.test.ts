@@ -1,8 +1,8 @@
 /**
  * seed_capital_history 마이그레이션(마이그레이션 A)의 첫 줄 채우기와 검사 (ADR-0005, #116)
  *
- * CI는 이 마이그레이션을 빈 테이블에 적용하므로, 기존 계좌에 첫 줄을 채우는 로직과 실패
- * 검사는 거기서 검증되지 않는다. 이 테스트는 마이그레이션 SQL 본문을 픽스처 데이터에 그대로
+ * CI는 이 마이그레이션을 빈 테이블에 적용하므로, 기존 계좌에 첫 줄을 채우는 일과 실패
+ * 검사는 거기서 검증되지 않는다. 이 테스트는 마이그레이션 SQL 본문을 테스트용 계좌 데이터에 그대로
  * 돌려 본다 (profit-records-cycle-number-migration.test.ts와 같은 방식).
  *
  * 실제 테이블은 건드리지 않는다. 한 트랜잭션 안에서 trading_accounts의 구조를 임시 테이블로
@@ -20,7 +20,7 @@ const MIGRATION_PATH = path.resolve(
   "../../../supabase/migrations/20261110000000_add_seed_capital_history.sql"
 );
 
-/** 트랜잭션을 되돌리기 위해 던지는 표식 */
+/** 트랜잭션을 되돌리려고 일부러 던지는 오류 */
 class Rollback extends Error {}
 
 interface Fixture {
@@ -49,7 +49,7 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
   });
 
   /**
-   * 마이그레이션 전 상태의 임시 복제본에 픽스처를 넣고 마이그레이션을 times번 적용한다.
+   * 마이그레이션 전 상태의 임시 복제본에 테스트용 계좌를 넣고 마이그레이션을 times번 적용한다.
    * 성공하면 이력과 칸 상태를, 실패하면 마이그레이션이 던진 에러를 돌려준다.
    */
   async function migrate(
@@ -59,12 +59,13 @@ describe.skipIf(!hasDb)("seed_capital_history 마이그레이션", () => {
     let outcome: ({ ok: true } & Migrated) | { ok: false; error: string } | undefined;
     try {
       await sql.begin(async (transaction) => {
-        // postgres-js의 TransactionSql 타입은 Omit 때문에 호출 시그니처를 잃는다 - 런타임은 Sql과 같다
+        // postgres-js의 TransactionSql 타입은 Omit 때문에 함수로 부를 수 없게 적혀 있다 -
+        // 실제 객체는 Sql처럼 부를 수 있다
         const tx = transaction as unknown as postgres.Sql;
         await tx.unsafe(
           "CREATE TEMP TABLE trading_accounts (LIKE public.trading_accounts INCLUDING DEFAULTS INCLUDING INDEXES)"
         );
-        // 픽스처에 seed_capital이 없는 계좌를 넣을 수 있게 열어 두고, 그런 계좌가 없으면
+        // seed_capital이 없는 테스트용 계좌를 넣을 수 있게 열어 두고, 그런 계좌가 없으면
         // 마이그레이션 전처럼 NOT NULL로 되돌린다
         await tx.unsafe(
           "ALTER TABLE pg_temp.trading_accounts ALTER COLUMN seed_capital DROP NOT NULL"
