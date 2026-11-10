@@ -24,6 +24,7 @@
  * - 적용일(휴장이면 그 뒤 첫 거래일): 사이클 자본 $2,000 - 투자 중 $2,460 < 0 → 매수 없이
  *   티어 1 10주, 티어 2 15주를 MOC로 판다. 종가 $97에 체결: 손익 -20, -15. 사이클 2로 넘어간다
  * - 그다음 거래일: 새 시드로 티어 1을 지정가 $96.99로 floor(200 ÷ 96.99) = 2주
+ * - 다음 사이클 동안의 출금액: 옛 시드 $10,000 + 실현손익 -$35 - 새 시드 $2,000 = $7,965 (#118)
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
@@ -214,6 +215,16 @@ describe.skipIf(!hasDb)("예수금보다 큰 시드 감액으로 끝나는 사�
         { cycleNumber: 1, tier: 2, sellPrice: 97, profit: -15 },
       ]);
 
+      // 다음 사이클 동안 출금액을 보인다: 옛 시드 10,000 + 실현손익 -35 - 새 시드 2,000 (#118)
+      const settlement = {
+        endedCycleNumber: 1,
+        previousSeed: 10_000,
+        realizedPnl: -35,
+        newSeed: 2_000,
+        withdrawal: 7_965,
+      };
+      expect(await trading.loadSeedCutSettlement(afterSell)).toEqual(settlement);
+
       // 다음 거래일 주문표는 새 시드로 티어 1을 산다
       const nextCycle = await trading.getFreshDailyOrders(afterSell, scenario.nextCycleOn);
       expect(orderLines(nextCycle.orders)).toEqual([
@@ -226,6 +237,7 @@ describe.skipIf(!hasDb)("예수금보다 큰 시드 감액으로 끝나는 사�
       expect(
         nextHoldings.filter((holding) => holding.shares > 0).map((h) => [h.tier, h.shares])
       ).toEqual([[1, 2]]);
+      expect(await trading.loadSeedCutSettlement(await reload())).toEqual(settlement);
     }
   );
 });

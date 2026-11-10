@@ -72,6 +72,7 @@ export type { LatestClose, NewDailyOrder } from "./orders";
 // Profit Records
 export {
   createProfitRecord,
+  getCycleProfitRecords,
   getCycleRealizedPnl,
   getProfitRecords,
   aggregateProfits,

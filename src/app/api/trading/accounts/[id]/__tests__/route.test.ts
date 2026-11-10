@@ -353,6 +353,82 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
     }
   });
 
+  it("앞 사이클이 시드 감액으로 끝났으면 출금액 정산을 함께 돌려줘야 한다 (#118)", async () => {
+    // 시드 $10,000 → $3,000(09-16에 바꿔 09-17부터). 09-17 아침 투자 중 $3,960 > $3,000이라
+    // 그날 두 티어를 모두 팔았다: 티어 1 $100 × 20주를 $97.50(-$50), 티어 2 $98 × 20주를
+    // $93.49(-$90.20). 출금액 = 10,000 - 140.20 - 3,000 = $6,859.80.
+    // 직전 거래일은 가격 행으로 찾으므로 SOXL 상장 이전 날짜에 합성 시세를 넣는다.
+    const inserted = await db
+      .insert(schema.dailyPrices)
+      .values(
+        ["2009-09-14", "2009-09-15", "2009-09-16", "2009-09-17", "2009-09-18"].map((date) => ({
+          ticker: "SOXL" as const,
+          date,
+          open: 100,
+          high: 100,
+          low: 100,
+          close: 100,
+          adjClose: 100,
+          volume: 1000,
+        }))
+      )
+      .onConflictDoNothing()
+      .returning({ id: schema.dailyPrices.id });
+    try {
+      const trading = await import("@/database/trading");
+      const account = await trading.createTradingAccount(
+        OWNER_ID,
+        {
+          name: "출금액 응답 테스트 계좌",
+          ticker: "SOXL",
+          seedCapital: 10_000,
+          strategy: "Pro2",
+          cycleStartDate: "2009-09-14",
+        },
+        "2009-09-14"
+      );
+      await trading.changeSeedCapital(account.id, OWNER_ID, 3_000, "2009-09-16");
+      const sales = [
+        { tier: 1, buyDate: "2009-09-14", buyPrice: 100, shares: 20, sellPrice: 97.5 },
+        { tier: 2, buyDate: "2009-09-15", buyPrice: 98, shares: 20, sellPrice: 93.49 },
+      ];
+      for (const sale of sales) {
+        await trading.createProfitRecord({
+          accountId: account.id,
+          ticker: "SOXL",
+          strategy: "Pro2",
+          cycleNumber: 1,
+          sellDate: "2009-09-17",
+          ...settledSale({ ...sale, sellDate: "2009-09-17" }),
+        });
+      }
+      await trading.completeCycleAndIncrement(account.id);
+      mockLoggedIn(OWNER_ID);
+
+      const body = await (await get(account.id)).json();
+      const otherBody = await (await get(accountId)).json();
+
+      expect(body.seedCutSettlement).toEqual({
+        endedCycleNumber: 1,
+        previousSeed: 10_000,
+        realizedPnl: -140.2,
+        newSeed: 3_000,
+        withdrawal: 6_859.8,
+      });
+      // 첫 사이클 계좌에는 끝난 사이클이 없다
+      expect(otherBody.seedCutSettlement).toBeNull();
+    } finally {
+      if (inserted.length > 0) {
+        await db.delete(schema.dailyPrices).where(
+          inArray(
+            schema.dailyPrices.id,
+            inserted.map((row) => row.id)
+          )
+        );
+      }
+    }
+  });
+
   it("다른 사용자의 계좌는 404를 돌려줘야 한다", async () => {
     mockLoggedIn(OTHER_USER_ID);
 

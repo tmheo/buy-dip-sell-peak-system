@@ -31,20 +31,23 @@ import type {
 import { getStrategyParams, planOrdersDetailed } from "@/strategy";
 import type { DailyOrder, TierHolding, Ticker, TradingAccount } from "@/types/trading";
 
+/** 보유 상태로 바꿀 수 있는 티어 하나 - DB 티어 홀딩이나, 판 티어를 남긴 수익 기록 */
+export type HeldTier = Pick<TierHolding, "tier" | "shares" | "buyPrice" | "buyDate">;
+
 /**
- * DB 티어 홀딩을 src/strategy의 보유 상태로 변환 (내부 함수)
+ * 티어 홀딩을 src/strategy의 보유 상태로 변환 (src/trading 내부 함수)
  * holdingDays는 기준일 직전 거래일 마감 시점의 보유 거래일 수다
  * (매수 당일 = 0, settle마다 +1 - src/strategy의 손절 카운트 의미).
  * 가장 이른 매수일 이후 거래일 목록을 한 번만 조회하고 티어별 수는 메모리에서 센다.
  */
-async function toStrategyHoldings(
+export async function toStrategyHoldings(
   ticker: Ticker,
-  holdings: TierHolding[],
+  holdings: HeldTier[],
   date: string,
   executor: DbExecutor
 ): Promise<StrategyTierHolding[]> {
   const active = holdings.filter(
-    (holding): holding is TierHolding & { buyPrice: number; buyDate: string } =>
+    (holding): holding is HeldTier & { buyPrice: number; buyDate: string } =>
       holding.shares > 0 && holding.buyPrice !== null && holding.buyDate !== null
   );
   if (active.length === 0) {

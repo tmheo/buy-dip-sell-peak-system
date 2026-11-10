@@ -132,6 +132,25 @@ export async function getCycleRealizedPnl(
 }
 
 /**
+ * 한 사이클의 수익 기록 (매도일 순)
+ * 그 계좌에서 cycle_number가 주어진 사이클 번호인 기록이다. 끝난 사이클을 기록으로 다시
+ * 조립할 때 쓴다 (#118).
+ */
+export async function getCycleProfitRecords(
+  accountId: string,
+  cycleNumber: number,
+  executor: DbExecutor = db
+): Promise<ProfitRecord[]> {
+  const rows = await executor
+    .select()
+    .from(profitRecords)
+    .where(and(eq(profitRecords.accountId, accountId), eq(profitRecords.cycleNumber, cycleNumber)))
+    .orderBy(asc(profitRecords.sellDate), asc(profitRecords.tier));
+
+  return rows.map(mapDrizzleProfitRecord);
+}
+
+/**
  * 계좌의 모든 수익 기록 조회
  */
 export async function getProfitRecords(accountId: string): Promise<ProfitRecord[]> {

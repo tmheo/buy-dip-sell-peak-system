@@ -17,6 +17,10 @@ export { loadCycleState } from "./orders";
 export { changeSeed, loadCycleStateWithSeedCutLimits } from "./seed-change";
 export type { CycleStateWithSeedCutLimits, SeedChangeOutcome } from "./seed-change";
 
+// 시드 감액으로 끝난 사이클의 출금액 - 다음 사이클 동안 계좌 상세 화면이 보인다 (#118)
+export { loadSeedCutSettlement } from "./seed-cut-settlement";
+export type { SeedCutSettlement } from "./seed-cut-settlement";
+
 // 체결·마감 처리
 export {
   processOrderExecution,

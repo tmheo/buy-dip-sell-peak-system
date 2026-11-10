@@ -4,7 +4,9 @@
  * 티어별 보유 현황 테이블 컴포넌트
  *
  * 아직 안 산 티어의 할당 시드는 cashBreakdown이 정한 금액을 그대로 보이고, 예수금 때문에 비율대로
- * 못 사는 티어에는 "예수금 부족으로 축소"를 붙인다 (#98, ADR-0003, 결정은 #93). 데스크톱 표와
+ * 못 사는 티어에는 "예수금 부족으로 축소"를 붙인다 (#98, ADR-0003, 결정은 #93). 보유 중인 기본
+ * 티어의 할당 시드는 비워 둔다 - 산 금액은 매수시드 열에 있다 (#118). 시드 감액으로 모두 파는
+ * 날에는 보유 티어에 "오늘 모두 매도"와 매도목표 MOC를 보인다 (ADR-0006). 데스크톱 표와
  * 휴대폰 카드가 같은 정보를 보인다.
  */
 
@@ -28,9 +30,27 @@ function calculateHoldingDays(buyDate: string | null): string {
   return `${tradingDays}일`;
 }
 
-/** 축소 표시 배지. 표와 카드가 같은 문구를 쓴다. */
-function ReducedBadge(): React.ReactElement {
-  return <span className="badge bg-warning text-dark fw-normal">예수금 부족으로 축소</span>;
+/** 할당 시드 아래 배지: 축소 표시나 모두 파는 날의 매도 표시. 표와 카드가 같은 문구를 쓴다. */
+function RowBadge({ row }: { row: TierRow }): React.ReactElement | null {
+  if (row.soldAllToday) {
+    return <span className="badge bg-danger fw-normal">오늘 모두 매도</span>;
+  }
+  if (row.reducedFrom !== null) {
+    return <span className="badge bg-warning text-dark fw-normal">예수금 부족으로 축소</span>;
+  }
+  return null;
+}
+
+function hasRowBadge(row: TierRow): boolean {
+  return row.soldAllToday || row.reducedFrom !== null;
+}
+
+/** 매도목표. 모두 파는 날의 보유 티어는 지정가 없이 MOC로 판다 */
+function SellTarget({ row }: { row: TierRow }): React.ReactElement {
+  if (row.soldAllToday) {
+    return <span className="text-danger">MOC</span>;
+  }
+  return <>{formatCurrency(row.holding?.sellTargetPrice ?? null)}</>;
 }
 
 /** 할당 시드 금액. 축소된 티어는 비율대로의 금액을 지우고 실제 금액을 강조한다. */
@@ -94,10 +114,11 @@ export default function TierHoldingsTable({
                         {isReserveTier ? "-" : `${ratioPercent.toFixed(1)}%`}
                       </td>
                       <td className="text-end">
-                        <AllocatedSeed row={row} />
-                        {row.reducedFrom !== null && (
-                          <div className="mt-1">
-                            <ReducedBadge />
+                        {/* 오늘 모두 파는 보유 티어는 비운 할당 시드 대신 배지만 보인다 */}
+                        {!row.soldAllToday && <AllocatedSeed row={row} />}
+                        {hasRowBadge(row) && (
+                          <div className={row.soldAllToday ? undefined : "mt-1"}>
+                            <RowBadge row={row} />
                           </div>
                         )}
                       </td>
@@ -116,7 +137,7 @@ export default function TierHoldingsTable({
                         )}
                       </td>
                       <td className="text-end">
-                        {formatCurrency(holding?.sellTargetPrice ?? null)}
+                        <SellTarget row={row} />
                       </td>
                       <td className="text-center">
                         {calculateHoldingDays(holding?.buyDate ?? null)}
@@ -167,9 +188,9 @@ export default function TierHoldingsTable({
                     </span>
                     <span>보유: {calculateHoldingDays(holding?.buyDate ?? null)}</span>
                   </div>
-                  {row.reducedFrom !== null && (
+                  {hasRowBadge(row) && (
                     <div className="mt-1">
-                      <ReducedBadge />
+                      <RowBadge row={row} />
                     </div>
                   )}
                 </div>

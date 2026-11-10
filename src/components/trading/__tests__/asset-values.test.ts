@@ -91,6 +91,32 @@ describe("calculateAssetValues", () => {
     expect(values.stockRatio).toBe(0);
   });
 
+  it("시드 감액으로 모두 파는 날에는 아직 출금하지 않은 감액분을 총자산과 현금 비중에 넣는다 (ADR-0006)", () => {
+    // 시드 $10,000 → $2,000, 티어 1 $99 × 10주 + 티어 2 $98 × 15주 = 투자 중 $2,460, 25주 보유.
+    // 사이클 자본이 이미 새 시드라 계좌 현금 = 2,000 - 2,460 = -$460이지만, 감액분 $8,000은
+    // 팔기 전이라 아직 증권사에 있다
+    const sellAllDay: CashBreakdown = {
+      ...CASH,
+      availableCash: 0,
+      accountCash: -460,
+      cycleCapital: 2_000,
+      investedAmount: 2_460,
+      netRealizedLoss: 0,
+      isCashReduced: false,
+      endsCycleBySeedCut: true,
+      unwithdrawnCut: 8_000,
+    };
+
+    const values = calculateAssetValues(25, sellAllDay, { date: "2009-11-03", adjClose: 98 });
+
+    // 평가금 = 98 × 25 = 2,450, 총자산 = -460 + 8,000 + 2,450 = 9,990
+    expect(values.stockValue).toBe(2_450);
+    expect(values.totalAssets).toBe(9_990);
+    // 현금 = 7,540 ÷ 9,990 = 75.48%, 주식 = 2,450 ÷ 9,990 = 24.52%
+    expect(values.cashRatio).toBeCloseTo(75.475, 2);
+    expect(values.stockRatio).toBeCloseTo(24.525, 2);
+  });
+
   it("보유가 있는데 저장된 종가가 없으면 평가금과 총자산을 모른다", () => {
     const values = calculateAssetValues(TOTAL_SHARES, CASH, null);
 
