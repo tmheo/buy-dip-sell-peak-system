@@ -7,8 +7,17 @@
  * 두지 않아, 지난 날짜에 지금 시드를 쓰는 길이 구조로 막힌다.
  */
 
+import { and, asc, eq, gt } from "drizzle-orm";
+
 import { getNextWeekday } from "@/lib/date";
-import type { SeedHistoryEntry, SeedStatus } from "@/types/trading";
+import type { SeedHistoryEntry, SeedStatus, TradingAccount } from "@/types/trading";
+
+import { db, type DbExecutor } from "../db-drizzle";
+import { seedCapitalHistory, tradingAccounts } from "../schema/index";
+
+import { CycleInProgressError } from "./errors";
+import { getPreviousTradingClose } from "./orders";
+import { getTotalShares } from "./tier-holdings";
 
 /**
  * 어느 날의 시드 - 적용일이 그날 이하인 가장 최근 줄, 없으면 첫 줄.
@@ -75,4 +84,131 @@ export function seedStatus(
     pending: pending && { ...pending },
     appliedToday: previous === current ? null : { previous, current },
   };
+}
+
+/** 계좌의 시드 이력 (적용일 순) */
+async function getSeedHistory(
+  accountId: string,
+  executor: DbExecutor
+): Promise<SeedHistoryEntry[]> {
+  return executor
+    .select({
+      effectiveDate: seedCapitalHistory.effectiveDate,
+      seedCapital: seedCapitalHistory.seedCapital,
+    })
+    .from(seedCapitalHistory)
+    .where(eq(seedCapitalHistory.accountId, accountId))
+    .orderBy(asc(seedCapitalHistory.effectiveDate));
+}
+
+/** 이력과 가격 행 기준 직전 거래일로 화면용 시드 상태를 만든다 (내부 헬퍼) */
+async function toSeedStatus(
+  history: SeedHistoryEntry[],
+  ticker: TradingAccount["ticker"],
+  today: string,
+  executor: DbExecutor
+): Promise<SeedStatus> {
+  const previousClose = await getPreviousTradingClose(ticker, today, executor);
+  return seedStatus(history, today, previousClose?.date ?? null);
+}
+
+/**
+ * 계좌를 만들 때 첫 시드를 쓴다 - 계좌 생성과 같은 트랜잭션에서 부른다.
+ * 적용일은 만든 날이지만, 첫 시드는 첫 변경 전의 모든 날짜에 쓰인다(seedCapitalOn).
+ *
+ * @param today - 만든 날 (서버의 UTC 날짜, YYYY-MM-DD)
+ */
+export async function insertInitialSeed(
+  accountId: string,
+  seedCapital: number,
+  today: string,
+  executor: DbExecutor
+): Promise<void> {
+  await executor
+    .insert(seedCapitalHistory)
+    .values({ accountId, effectiveDate: today, seedCapital });
+}
+
+/**
+ * 어느 날의 시드 - 그날 주문표·체결의 사이클 자본이다.
+ *
+ * @param date - 기준일 (주문표 날짜 또는 체결 처리일, YYYY-MM-DD)
+ * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등)
+ */
+export async function getSeedCapitalOn(
+  accountId: string,
+  date: string,
+  executor: DbExecutor = db
+): Promise<number> {
+  return seedCapitalOn(await getSeedHistory(accountId, executor), date);
+}
+
+/**
+ * 화면에 보일 시드 상태 (오늘의 시드, 적용 전 변경, 오늘 처음 적용된 시드)
+ *
+ * @param account - 계좌 (직전 거래일을 가격 행으로 찾으려고 종목을 쓴다)
+ * @param today - 오늘 (서버의 UTC 날짜, YYYY-MM-DD)
+ */
+export async function getSeedStatus(
+  account: Pick<TradingAccount, "id" | "ticker">,
+  today: string,
+  executor: DbExecutor = db
+): Promise<SeedStatus> {
+  const history = await getSeedHistory(account.id, executor);
+  return toSeedStatus(history, account.ticker, today, executor);
+}
+
+/**
+ * 시드를 바꾼다 (한 트랜잭션). 새 시드는 오늘의 다음 평일부터 쓰인다(changeSeedHistory).
+ *
+ * 쓰는 줄은 언제나 적용일이 오늘 뒤인 줄뿐이다. 일일 마감은 어제까지, 화면 진입은 오늘까지
+ * 읽으므로 이미 쓰였을 수 있는 줄은 건드리지 않는다.
+ * 같은 계좌의 동시 변경은 계좌 행 잠금으로 차례를 세운다 - 나중 변경은 먼저 커밋된 변경을
+ * 보고 그 위에 덮어쓴다. (계좌, 적용일) 유일 제약은 이 잠금을 거치지 않는 쓰기까지 막는다.
+ *
+ * 사이클 중 변경은 아직 열지 않았으므로 보유 티어가 있으면 CycleInProgressError를 던진다.
+ *
+ * @param seedCapital - 새 시드 (검증은 호출 경로가 마쳤다)
+ * @param today - 바꾼 날 (서버의 UTC 날짜, YYYY-MM-DD)
+ * @param executor - 트랜잭션을 열 실행자. 트랜잭션이면 그 안의 저장점으로 묶인다.
+ * @returns 바꾼 뒤의 시드 상태. 계좌가 없거나 다른 사용자의 것이면 null
+ */
+export async function changeSeedCapital(
+  accountId: string,
+  userId: string,
+  seedCapital: number,
+  today: string,
+  executor: DbExecutor = db
+): Promise<SeedStatus | null> {
+  return executor.transaction(async (tx) => {
+    const [account] = await tx
+      .select({ ticker: tradingAccounts.ticker })
+      .from(tradingAccounts)
+      .where(and(eq(tradingAccounts.id, accountId), eq(tradingAccounts.userId, userId)))
+      .for("update");
+    if (!account) {
+      return null;
+    }
+
+    if ((await getTotalShares(accountId, tx)) > 0) {
+      throw new CycleInProgressError();
+    }
+
+    const history = changeSeedHistory(await getSeedHistory(accountId, tx), seedCapital, today);
+    const pending = history.filter((entry) => entry.effectiveDate > today);
+
+    await tx
+      .delete(seedCapitalHistory)
+      .where(
+        and(
+          eq(seedCapitalHistory.accountId, accountId),
+          gt(seedCapitalHistory.effectiveDate, today)
+        )
+      );
+    if (pending.length > 0) {
+      await tx.insert(seedCapitalHistory).values(pending.map((entry) => ({ accountId, ...entry })));
+    }
+
+    return toSeedStatus(history, account.ticker, today, tx);
+  });
 }

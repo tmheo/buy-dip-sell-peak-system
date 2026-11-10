@@ -23,7 +23,7 @@ export interface TradingAccount {
   userId: string;
   name: string;
   ticker: Ticker;
-  seedCapital: number;
+  // 시드 금액은 담지 않는다 - 날짜마다 다를 수 있어 시드 이력에서 그날의 시드를 읽는다 (ADR-0005)
   strategy: Strategy;
   // 운용 시작일(첫 사이클의 시작일). 사이클이 끝나도 바뀌지 않는다.
   cycleStartDate: string;
@@ -104,10 +104,10 @@ export interface CreateTradingAccountRequest {
 /**
  * 트레이딩 계좌 수정 요청
  * 종목은 계좌를 만들 때 정하고 바꿀 수 없으므로 담지 않는다 (#112).
+ * 시드는 적용일이 붙은 이력으로 따로 바꾼다 (PUT /api/trading/accounts/[id]/seed, ADR-0005).
  */
 export interface UpdateTradingAccountRequest {
   name?: string;
-  seedCapital?: number;
   strategy?: Strategy;
   // 운용 시작일(첫 사이클의 시작일). 첫 일일 마감 전에만 바꿀 수 있다.
   cycleStartDate?: string;
@@ -118,12 +118,19 @@ export interface UpdateTradingAccountRequest {
 // =====================================================
 
 /**
- * 계좌 상세 응답 (holdings 포함)
+ * 계좌 상세 (holdings 포함)
  */
 export interface TradingAccountWithHoldings extends TradingAccount {
   holdings: TierHolding[];
   totalShares: number;
   isCycleInProgress: boolean;
+}
+
+/**
+ * 계좌 상세 응답의 계좌 - 시드 상태를 붙인다 (ADR-0005)
+ */
+export interface TradingAccountDetail extends TradingAccountWithHoldings {
+  seed: SeedStatus;
 }
 
 // =====================================================

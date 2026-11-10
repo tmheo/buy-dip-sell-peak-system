@@ -2,7 +2,7 @@
  * 트레이딩 계좌 CRUD 함수 (PRD-TRADING-001)
  */
 
-import { eq, and, desc, gte, isNull, or } from "drizzle-orm";
+import { eq, and, desc, getTableColumns, gte, isNull, or } from "drizzle-orm";
 
 import { db, type DbExecutor } from "../db-drizzle";
 import { tradingAccounts, tierHoldings } from "../schema/index";
@@ -13,17 +13,26 @@ import type {
   UpdateTradingAccountRequest,
   TradingAccountWithHoldings,
 } from "@/types/trading";
+import { getTodayTradingDate } from "@/lib/date";
 import { MAX_TIER_NUMBER, MIN_TIER_NUMBER } from "@/strategy";
 
+import { CycleInProgressError, TradingStartDateLockedError } from "./errors";
 import { mapDrizzleTradingAccount } from "./mappers";
+import { insertInitialSeed } from "./seed-capital";
 import { getTierHoldings, getTotalShares } from "./tier-holdings";
 
+// 계좌 행에서 읽는 칸 - seed_capital은 더 읽지 않는다. 시드는 시드 이력이 소유한다 (ADR-0005).
+const { seedCapital: _unusedSeedCapital, ...accountColumns } = getTableColumns(tradingAccounts);
+
 /**
- * 트레이딩 계좌 생성 (티어 홀딩 7개 자동 생성)
+ * 트레이딩 계좌 생성 (티어 홀딩 7개와 첫 시드를 함께 쓴다)
+ *
+ * @param today - 만든 날 (서버의 UTC 날짜) - 첫 시드의 적용일이다
  */
 export async function createTradingAccount(
   userId: string,
-  request: CreateTradingAccountRequest
+  request: CreateTradingAccountRequest,
+  today: string = getTodayTradingDate()
 ): Promise<TradingAccount> {
   return await db.transaction(async (tx) => {
     // 1. 계좌 생성
@@ -33,18 +42,20 @@ export async function createTradingAccount(
         userId,
         name: request.name,
         ticker: request.ticker,
-        seedCapital: request.seedCapital,
         strategy: request.strategy,
         cycleStartDate: request.cycleStartDate,
         cycleNumber: 1,
         // 생성자가 곧 조회하므로 활성 상태로 시작 (스케줄러 처리 대상에 포함)
         lastViewedAt: new Date(),
       })
-      .returning();
+      .returning(accountColumns);
 
     const account = accountResult[0];
 
-    // 2. 티어 홀딩 7개(예비 티어 포함) 자동 생성
+    // 2. 첫 시드 - 적용일은 만든 날이고, 첫 변경 전의 모든 날짜에 쓰인다
+    await insertInitialSeed(account.id, request.seedCapital, today, tx);
+
+    // 3. 티어 홀딩 7개(예비 티어 포함) 자동 생성
     for (let tier = MIN_TIER_NUMBER; tier <= MAX_TIER_NUMBER; tier++) {
       await tx.insert(tierHoldings).values({
         accountId: account.id,
@@ -62,7 +73,7 @@ export async function createTradingAccount(
  */
 export async function getTradingAccountsByUserId(userId: string): Promise<TradingAccount[]> {
   const rows = await db
-    .select()
+    .select(accountColumns)
     .from(tradingAccounts)
     .where(eq(tradingAccounts.userId, userId))
     .orderBy(desc(tradingAccounts.createdAt));
@@ -75,7 +86,7 @@ export async function getTradingAccountsByUserId(userId: string): Promise<Tradin
  * 일일 마감 처리 cron에서 특정 계좌 지정 처리 시 사용
  */
 export async function getAllTradingAccounts(): Promise<TradingAccount[]> {
-  const rows = await db.select().from(tradingAccounts);
+  const rows = await db.select(accountColumns).from(tradingAccounts);
   return rows.map(mapDrizzleTradingAccount);
 }
 
@@ -88,7 +99,7 @@ export async function getAllTradingAccounts(): Promise<TradingAccount[]> {
  */
 export async function getActiveTradingAccounts(since: Date): Promise<TradingAccount[]> {
   const rows = await db
-    .select()
+    .select(accountColumns)
     .from(tradingAccounts)
     .where(gte(tradingAccounts.lastViewedAt, since));
   return rows.map(mapDrizzleTradingAccount);
@@ -115,7 +126,7 @@ export async function getTradingAccountById(
   executor: DbExecutor = db
 ): Promise<TradingAccount | null> {
   const rows = await executor
-    .select()
+    .select(accountColumns)
     .from(tradingAccounts)
     .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)))
     .limit(1);
@@ -131,7 +142,11 @@ export async function getTradingAccountById(
 export async function getTradingAccountByIdWithoutOwnerCheck(
   id: string
 ): Promise<TradingAccount | null> {
-  const rows = await db.select().from(tradingAccounts).where(eq(tradingAccounts.id, id)).limit(1);
+  const rows = await db
+    .select(accountColumns)
+    .from(tradingAccounts)
+    .where(eq(tradingAccounts.id, id))
+    .limit(1);
 
   return rows[0] ? mapDrizzleTradingAccount(rows[0]) : null;
 }
@@ -159,28 +174,6 @@ export async function getTradingAccountWithHoldings(
 }
 
 /**
- * 보유 티어가 있는 동안(사이클 진행 중) 계좌 설정을 수정하려 할 때 던진다.
- */
-export class CycleInProgressError extends Error {
-  constructor() {
-    super("사이클 진행 중에는 계좌 설정을 수정할 수 없습니다");
-    this.name = "CycleInProgressError";
-  }
-}
-
-/**
- * 첫 일일 마감 뒤에 운용 시작일을 다른 날짜로 바꾸려 할 때 던진다 (#112).
- * 일일 마감은 lastProcessedDate가 없을 때만 운용 시작일부터 처리하므로, 그 뒤에 바꾸면
- * 처리할 거래일은 그대로이고 화면 표시만 달라진다.
- */
-export class TradingStartDateLockedError extends Error {
-  constructor() {
-    super("첫 일일 마감 뒤에는 운용 시작일을 바꿀 수 없습니다");
-    this.name = "TradingStartDateLockedError";
-  }
-}
-
-/**
  * 계좌 수정 (사이클 미진행 시만)
  *
  * 운용 시작일(cycleStartDate)은 첫 일일 마감 전에만 바꿀 수 있다. 지금과 같은 날짜는
@@ -203,10 +196,7 @@ export async function updateTradingAccount(
 
   // 업데이트할 필드가 있는지 확인
   const hasUpdates =
-    data.name !== undefined ||
-    data.seedCapital !== undefined ||
-    data.strategy !== undefined ||
-    data.cycleStartDate !== undefined;
+    data.name !== undefined || data.strategy !== undefined || data.cycleStartDate !== undefined;
 
   if (!hasUpdates) {
     return account;
@@ -218,7 +208,6 @@ export async function updateTradingAccount(
   };
 
   if (data.name !== undefined) updateData.name = data.name;
-  if (data.seedCapital !== undefined) updateData.seedCapital = data.seedCapital;
   if (data.strategy !== undefined) updateData.strategy = data.strategy;
   if (data.cycleStartDate !== undefined) updateData.cycleStartDate = data.cycleStartDate;
 

@@ -95,7 +95,6 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
       expect(account.userId).toBe(TEST_USER_ID);
       expect(account.name).toBe("테스트 계좌");
       expect(account.ticker).toBe("SOXL");
-      expect(account.seedCapital).toBe(10000);
       expect(account.strategy).toBe("Pro2");
       expect(account.cycleStartDate).toBe("2025-01-02");
       expect(account.cycleNumber).toBe(1);
@@ -335,13 +334,11 @@ describe.skipIf(!hasDb)("트레이딩 계좌 CRUD 테스트", () => {
 
       const updated = await tradingModule.updateTradingAccount(created.id, TEST_USER_ID, {
         name: "수정된 계좌 이름",
-        seedCapital: 15000,
         strategy: "Pro3",
       });
 
       expect(updated).not.toBeNull();
       expect(updated!.name).toBe("수정된 계좌 이름");
-      expect(updated!.seedCapital).toBe(15000);
       expect(updated!.strategy).toBe("Pro3");
     });
 

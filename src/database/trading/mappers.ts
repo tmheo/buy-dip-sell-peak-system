@@ -21,13 +21,15 @@ import type {
   OrderMethod,
 } from "@/types/trading";
 
-export function mapDrizzleTradingAccount(row: DrizzleTradingAccount): TradingAccount {
+/** 계좌 행 - seed_capital은 읽지 않는다 (시드는 시드 이력이 소유한다, ADR-0005) */
+type TradingAccountRow = Omit<DrizzleTradingAccount, "seedCapital">;
+
+export function mapDrizzleTradingAccount(row: TradingAccountRow): TradingAccount {
   return {
     id: row.id,
     userId: row.userId,
     name: row.name,
     ticker: row.ticker as Ticker,
-    seedCapital: row.seedCapital,
     strategy: row.strategy as Strategy,
     cycleStartDate: row.cycleStartDate,
     cycleNumber: row.cycleNumber,
