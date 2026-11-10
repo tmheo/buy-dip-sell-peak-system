@@ -2,7 +2,7 @@
  * 사이클 경계 처리
  * #43: 사이클 자본은 외부에서 공급된다.
  * 백테스트는 직전 사이클 종료 시점의 현금 전액(복리), 실계좌는 사용자 설정 시드 금액.
- * 시드·전략 변경은 사이클 경계에서만 허용된다.
+ * 전략 변경은 사이클 경계에서만 허용된다. 실계좌의 시드는 사이클 중에도 바뀐다 (ADR-0004).
  */
 import type { CycleState, StrategyParams } from "./types";
 
@@ -31,6 +31,9 @@ export function startNextCycle(
   return {
     strategy,
     cycleCapital,
+    // 사이클 자본이 줄어든 날은 그 거래일 하나다. 실계좌는 날마다 상태를 새로 조립하므로
+    // 새 사이클에 넘기지 않고, 백테스트는 시드를 바꾸지 않으므로 늘 0이다 (ADR-0006)
+    capitalCut: 0,
     holdings: [],
     cycleNumber: state.cycleNumber + 1,
     // 실현손익은 호출자가 다음 사이클 자본에 반영한다 - 새 사이클은 0에서 시작

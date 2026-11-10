@@ -7,6 +7,7 @@
  * 두지 않아, 지난 날짜에 지금 시드를 쓰는 길이 구조로 막힌다.
  */
 
+import Decimal from "decimal.js";
 import { and, asc, eq, gt } from "drizzle-orm";
 
 import { getNextWeekday } from "@/lib/date";
@@ -37,6 +38,29 @@ export function seedCapitalOn(history: readonly SeedHistoryEntry[], date: string
   // 적용된 줄이 없으면 첫 줄을 쓴다. 첫 줄의 적용일은 계좌를 만든 날이지만, 이 대체 덕분에
   // 사이클 시작일이 그보다 앞서도 첫 시드가 사이클 시작일부터 쓰인다(ADR-0005).
   return (applied.at(-1) ?? sorted[0]).seedCapital;
+}
+
+/**
+ * 어느 거래일의 시드와, 그날 줄어든 사이클 자본 (ADR-0006)
+ * capitalCut = 직전 거래일의 시드 - 그날 시드, 줄지 않았으면 0.
+ * 직전 거래일은 가격 행 기준이다 - 적용일은 주말만 건너뛰어 정하므로 휴장일일 수 있고,
+ * 그러면 적용일 뒤의 실제 첫 거래일이 시드가 처음 줄어든 날이 된다.
+ *
+ * @param history - 계좌의 시드 이력
+ * @param date - 기준일 (주문표 날짜 또는 체결 처리일)
+ * @param previousTradingDate - 기준일의 직전 거래일 (가격 행 기준). 모르면 null - 줄어든 것으로 보지 않는다
+ */
+export function seedCapitalAndCutOn(
+  history: readonly SeedHistoryEntry[],
+  date: string,
+  previousTradingDate: string | null
+): { seedCapital: number; capitalCut: number } {
+  const seedCapital = seedCapitalOn(history, date);
+  if (previousTradingDate === null) {
+    return { seedCapital, capitalCut: 0 };
+  }
+  const cut = new Decimal(seedCapitalOn(history, previousTradingDate)).sub(seedCapital);
+  return { seedCapital, capitalCut: Decimal.max(0, cut).toNumber() };
 }
 
 /**
@@ -144,6 +168,26 @@ export async function getSeedCapitalOn(
   executor: DbExecutor = db
 ): Promise<number> {
   return seedCapitalOn(await getSeedHistory(accountId, executor), date);
+}
+
+/**
+ * 어느 날의 시드와 그날 줄어든 사이클 자본 (seedCapitalAndCutOn) - 그날 사이클 상태의 입력이다.
+ * 이력과 직전 거래일을 같은 실행자로 읽는다.
+ *
+ * @param account - 계좌 (직전 거래일을 가격 행으로 찾으려고 종목을 쓴다)
+ * @param date - 기준일 (주문표 날짜 또는 체결 처리일, YYYY-MM-DD)
+ * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등)
+ */
+export async function getSeedCapitalAndCutOn(
+  account: Pick<TradingAccount, "id" | "ticker">,
+  date: string,
+  executor: DbExecutor = db
+): Promise<{ seedCapital: number; capitalCut: number }> {
+  const [history, previousClose] = await Promise.all([
+    getSeedHistory(account.id, executor),
+    getPreviousTradingClose(account.ticker, date, executor),
+  ]);
+  return seedCapitalAndCutOn(history, date, previousClose?.date ?? null);
 }
 
 /**

@@ -46,8 +46,10 @@ export { CycleInProgressError, TradingStartDateLockedError } from "./errors";
 export {
   changeSeedCapital,
   changeSeedHistory,
+  getSeedCapitalAndCutOn,
   getSeedCapitalOn,
   getSeedStatus,
+  seedCapitalAndCutOn,
   seedCapitalOn,
   seedStatus,
 } from "./seed-capital";

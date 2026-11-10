@@ -10,7 +10,12 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { changeSeedHistory, seedCapitalOn, seedStatus } from "../trading/seed-capital";
+import {
+  changeSeedHistory,
+  seedCapitalAndCutOn,
+  seedCapitalOn,
+  seedStatus,
+} from "../trading/seed-capital";
 
 /** 2026-11-02에 $10,000로 만든 계좌의 이력 */
 const CREATED = [{ effectiveDate: "2026-11-02", seedCapital: 10_000 }];
@@ -40,6 +45,40 @@ describe("seedCapitalOn", () => {
 
   it("이력이 없으면 던진다 - 계좌는 만들 때 첫 줄을 쓴다", () => {
     expect(() => seedCapitalOn([], "2026-11-10")).toThrow();
+  });
+});
+
+describe("seedCapitalAndCutOn - 그날 줄어든 사이클 자본 (ADR-0006, #117)", () => {
+  // 2026-11-13(금)에 $10,000 → $3,000로 줄여 적용일이 2026-11-16(월)이다
+  const CUT = [...CREATED, { effectiveDate: "2026-11-16", seedCapital: 3_000 }];
+
+  it("적용일에는 직전 거래일의 시드에서 그날 시드를 뺀 만큼 줄어든다", () => {
+    expect(seedCapitalAndCutOn(CUT, "2026-11-16", "2026-11-13")).toEqual({
+      seedCapital: 3_000,
+      capitalCut: 7_000,
+    });
+  });
+
+  it("적용일이 휴장일이면 그 뒤 첫 거래일에 줄어든다 - 직전 거래일이 적용일 전이다", () => {
+    // 11-16이 휴장이면 11-17의 직전 거래일은 11-13이다
+    expect(seedCapitalAndCutOn(CUT, "2026-11-17", "2026-11-13").capitalCut).toBe(7_000);
+  });
+
+  it("적용일 다음 거래일부터는 줄지 않는다", () => {
+    expect(seedCapitalAndCutOn(CUT, "2026-11-17", "2026-11-16").capitalCut).toBe(0);
+  });
+
+  it("늘린 날은 줄지 않았으므로 0이다", () => {
+    const raised = [...CREATED, { effectiveDate: "2026-11-16", seedCapital: 12_000 }];
+
+    expect(seedCapitalAndCutOn(raised, "2026-11-16", "2026-11-13")).toEqual({
+      seedCapital: 12_000,
+      capitalCut: 0,
+    });
+  });
+
+  it("직전 거래일을 모르면 줄지 않은 것으로 본다", () => {
+    expect(seedCapitalAndCutOn(CUT, "2026-11-16", null).capitalCut).toBe(0);
   });
 });
 

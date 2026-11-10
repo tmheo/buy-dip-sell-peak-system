@@ -118,6 +118,9 @@ describe("cashBreakdown - 화면용 현금 내역", () => {
         // 예비 티어는 기본 티어 1-6이 다 차기 전에는 할당이 없다
         { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
+      // 사이클 자본이 줄지 않은 날이라 시드 감액으로 모두 파는 날이 아니다 (ADR-0006)
+      endsCycleBySeedCut: false,
+      unwithdrawnCut: 0,
     });
   });
 

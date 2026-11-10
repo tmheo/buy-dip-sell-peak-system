@@ -72,8 +72,12 @@ export interface TierHolding {
 export interface CycleState {
   // 전략 파라미터
   strategy: StrategyParams;
-  // 사이클 자본: 티어 비율을 곱하는 기준 금액, 사이클 동안 고정
+  // 사이클 자본: 티어 비율을 곱하는 기준 금액.
+  // 백테스트는 사이클 동안 고정, 실계좌는 그 거래일의 시드 금액이다 (ADR-0004)
   cycleCapital: number;
+  // 그 거래일에 줄어든 사이클 자본: 직전 거래일의 시드 - 그날 시드, 줄지 않았으면 0 (ADR-0006).
+  // 실계좌만 시드를 줄일 수 있다 - 백테스트 엔진과 startNextCycle은 늘 0을 넣는다.
+  capitalCut: number;
   // 활성 티어 보유 목록
   holdings: TierHolding[];
   // 사이클 번호
@@ -202,7 +206,29 @@ export interface CashBreakdown {
   isCashReduced: boolean;
   // 티어 1-7의 할당 시드, 티어 번호 순
   tiers: TierCash[];
+  // 시드 감액으로 보유 티어를 모두 MOC로 팔아 사이클을 끝내는 날인지 (calculations.ts의 endsCycleBySeedCut)
+  endsCycleBySeedCut: boolean;
+  // 모두 파는 날의 감액분(그날의 capitalCut), 다른 날은 0. 이날 사이클 자본은 이미 새 시드라
+  // 계좌 현금은 음수로 계산되지만 감액분은 팔기 전이라 아직 출금되지 않았다 - 화면은 총자산을
+  // 계좌 현금 + 감액분 + 평가금으로 보인다 (ADR-0006)
+  unwithdrawnCut: number;
 }
+
+/**
+ * 오늘 시드를 줄일 때의 감액 경계 (ADR-0006, #117). 규칙은 seed-cut.ts의 seedCutLimits 참고.
+ */
+export interface SeedCutLimits {
+  // 직전 거래일까지 마감된 예수금. 이보다 큰 감액은 적용일에 사이클을 끝낸다
+  closedCash: number;
+  // 오늘 주문표의 매수가 지정가 × 수량으로 체결된다고 쳤을 때의 예수금 (0 하한)
+  cashIfTodayBuyFills: number;
+}
+
+/**
+ * 감액 경계로 본 시드 변경의 분류 (ADR-0006, #117). 규칙은 seed-cut.ts의 classifySeedChange 참고.
+ * increase: 늘린다, keep: 사이클이 이어진다, depends: 오늘 매수가 체결되면 끝난다, ends: 끝난다
+ */
+export type SeedChangeKind = "increase" | "keep" | "depends" | "ends";
 
 /**
  * 예수금이 모자라 매수 주문을 내지 않는 티어 (#98)
@@ -237,4 +263,7 @@ export interface DetailedOrderPlan {
   intents: OrderIntent[];
   unaffordableBuy: UnaffordableBuy | null;
   reducedBuy: ReducedBuy | null;
+  // 예수금보다 큰 시드 감액의 적용일이라 보유 티어를 모두 MOC로 팔아 사이클을 끝내는지 (ADR-0006).
+  // true이면 주문 의도는 보유 티어별 MOC 매도뿐이고, 두 이유는 모두 null이다
+  endsCycleBySeedCut: boolean;
 }

@@ -58,6 +58,8 @@ function reducedCash(overrides: Partial<CashBreakdown> = {}): CashBreakdown {
     netRealizedLoss: 400,
     isCashReduced: true,
     tiers: tiers({ 6: { amount: 600, isReduced: true } }),
+    endsCycleBySeedCut: false,
+    unwithdrawnCut: 0,
     ...overrides,
   };
 }

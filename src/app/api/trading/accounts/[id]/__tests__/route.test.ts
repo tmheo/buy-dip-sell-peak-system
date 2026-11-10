@@ -122,6 +122,9 @@ describe.skipIf(!hasDb)("GET /api/trading/accounts/[id]", () => {
         { tier: 6, amount: 0, nominalAmount: 1_000, isReduced: true },
         { tier: 7, amount: 0, nominalAmount: null, isReduced: false },
       ],
+      // 시드를 줄이지 않았으므로 모두 파는 날이 아니다 (ADR-0006)
+      endsCycleBySeedCut: false,
+      unwithdrawnCut: 0,
     });
   });
 

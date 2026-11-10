@@ -138,10 +138,35 @@ export function accountCash(state: CycleState): number {
  * @returns 예수금 (소수점 2자리 내림, 음수면 0)
  */
 export function availableCash(state: CycleState): number {
-  const uninvested = uninvestedCapital(state);
-  const cash = Decimal.min(uninvested, uninvested.add(state.realizedPnl));
+  const cash = unclampedAvailableCash(state);
   if (cash.lte(0)) return 0;
   return cash.toDecimalPlaces(2, Decimal.ROUND_DOWN).toNumber();
+}
+
+/**
+ * 0으로 자르기 전의 예수금: min(사이클 자본 - Σ(활성 티어 매수금액), 계좌 현금) (내부 헬퍼)
+ */
+function unclampedAvailableCash(state: CycleState): Decimal {
+  const uninvested = uninvestedCapital(state);
+  return Decimal.min(uninvested, uninvested.add(state.realizedPnl));
+}
+
+/**
+ * 시드 감액으로 사이클을 끝내는 날인지 (ADR-0004, ADR-0006)
+ * 그 거래일에 사이클 자본이 줄었고(capitalCut > 0) 줄어든 사이클 자본으로 계산한 0으로 자르기 전의
+ * 예수금이 0보다 작으면, 그날 주문표는 매수 없이 보유 티어를 모두 MOC로 판다.
+ * 이는 "감액이 직전 거래일까지 마감된 예수금보다 크다"와 같은 판정이다 - 직전 거래일의
+ * 예수금이 0이었으면 어떤 감액도 사이클을 끝내고, 감액이 예수금과 같으면 예수금이 0으로 남아
+ * 사이클이 이어진다.
+ *
+ * 판정은 사이클 상태만으로 정해지므로, 신선도 판정이 주문표를 다시 만들어도 같은 답이 나온다.
+ * capitalCut이 0이면 옛 규칙으로 계좌 현금이 음수가 된 상태여도 모두 팔지 않는다.
+ * 팔 보유 티어가 없으면 끝낼 사이클도 없다.
+ *
+ * @param state - 사이클 상태 (그 거래일의 사이클 자본과 직전 거래일 마감 시점의 보유)
+ */
+export function endsCycleBySeedCut(state: CycleState): boolean {
+  return state.capitalCut > 0 && state.holdings.length > 0 && unclampedAvailableCash(state).lt(0);
 }
 
 /**
@@ -225,6 +250,7 @@ function reserveTierAmount(heldTiers: Set<number>, cash: number): number | null 
  * 화면용 현금 내역 (ADR-0003, #98)
  * 예수금과 그 계산식의 항목(사이클 자본, 투자 중, 이번 사이클 순실현손실), 계좌 현금,
  * 티어 1-7의 할당 시드를 함께 낸다. 화면은 이 값을 보이기만 하고 규칙을 다시 계산하지 않는다.
+ * 시드 감액으로 사이클을 끝내는 날인지와 그날의 감액분도 함께 낸다 (ADR-0006).
  *
  * 할당 시드:
  * - 보유 중인 기본 티어: 비율대로의 금액 (사이클 자본 × 비율)
@@ -264,6 +290,7 @@ export function cashBreakdown(state: CycleState): CashBreakdown {
   });
 
   const netRealizedLoss = Math.max(0, -state.realizedPnl);
+  const endsCycle = endsCycleBySeedCut(state);
   return {
     availableCash: cash,
     accountCash: accountCash(state),
@@ -272,5 +299,7 @@ export function cashBreakdown(state: CycleState): CashBreakdown {
     netRealizedLoss,
     isCashReduced: netRealizedLoss > 0,
     tiers,
+    endsCycleBySeedCut: endsCycle,
+    unwithdrawnCut: endsCycle ? state.capitalCut : 0,
   };
 }
