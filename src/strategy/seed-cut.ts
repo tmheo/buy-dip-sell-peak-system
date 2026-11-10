@@ -67,3 +67,15 @@ export function classifySeedChange(
   if (cut.gt(limits.cashIfTodayBuyFills)) return "depends";
   return "keep";
 }
+
+/** 사이클을 끝낼 수 있어 저장 전에 사용자의 확인을 받는 분류 (ends, depends) */
+export type CycleEndingSeedChange = Extract<SeedChangeKind, "depends" | "ends">;
+
+/**
+ * 사이클을 끝낼 수 있는 시드 변경인지 - 그렇다면 사용자가 확인한 뒤에만 저장한다.
+ *
+ * @param kind - classifySeedChange의 분류
+ */
+export function mayEndCycle(kind: SeedChangeKind): kind is CycleEndingSeedChange {
+  return kind === "depends" || kind === "ends";
+}

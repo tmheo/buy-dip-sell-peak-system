@@ -15,39 +15,44 @@ import {
   type DbExecutor,
 } from "@/database/trading";
 import { isWeekday } from "@/lib/date";
-import type { CycleState, SeedCutLimits } from "@/strategy";
-import { classifySeedChange, seedCutLimits } from "@/strategy";
+import type { CycleEndingSeedChange, CycleState, SeedCutLimits } from "@/strategy";
+import { classifySeedChange, isCycleInProgress, mayEndCycle, seedCutLimits } from "@/strategy";
 import type { SeedStatus, TradingAccount } from "@/types/trading";
 
 import { loadCycleState } from "./orders";
 
+/** 오늘의 사이클 상태와, 사이클 중이면 오늘 시드를 줄일 때의 감액 경계 (사이클 사이에는 null) */
+export interface CycleStateWithSeedCutLimits {
+  state: CycleState;
+  seedCutLimits: SeedCutLimits | null;
+}
+
 /**
- * 사이클 중 오늘 시드를 줄일 때의 감액 경계. 보유 티어가 없으면(사이클 사이) null이다.
- * 오늘 매수는 오늘 주문표를 만드는 직전 거래일 종가로 계산한다 - 주문표와 같은 입력이다.
+ * 오늘의 사이클 상태와 감액 경계를 같은 시점에서 읽는다.
  *
+ * 오늘 매수는 오늘 주문표를 만드는 직전 거래일 종가로 계산한다 - 주문표와 같은 입력이다.
  * 오늘이 주말이면 오늘 주문표는 체결되지 않으므로(일일 마감은 가격 행이 있는 거래일만 체결한다)
  * 오늘 매수도 없다. 오늘이 거래일인지는 오늘의 가격 행이 아직 없어 평일로 어림한다 - 적용일을
  * 정할 때처럼 앞으로의 휴장일은 알 수 없다. 그래서 평일 휴장일에는 체결되지 않을 오늘 매수를
  * 빼고 경계를 낮게 잡아, 사이클이 이어지는 감액도 확인을 한 번 더 받는다.
  *
- * @param account - 계좌 (종목)
+ * @param account - 계좌
  * @param today - 오늘 (서버의 UTC 날짜, YYYY-MM-DD)
- * @param state - loadCycleState(account, today)로 조립한 오늘의 사이클 상태
- * @param executor - 사이클 상태와 같은 시점에서 읽을 실행자
+ * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등)
  */
-export async function loadSeedCutLimits(
-  account: Pick<TradingAccount, "ticker">,
+export async function loadCycleStateWithSeedCutLimits(
+  account: TradingAccount,
   today: string,
-  state: CycleState,
   executor: DbExecutor
-): Promise<SeedCutLimits | null> {
-  if (state.holdings.length === 0) {
-    return null;
+): Promise<CycleStateWithSeedCutLimits> {
+  const state = await loadCycleState(account, today, executor);
+  if (!isCycleInProgress(state)) {
+    return { state, seedCutLimits: null };
   }
   const prevClose = isWeekday(today)
     ? await getPreviousTradingClose(account.ticker, today, executor)
     : null;
-  return seedCutLimits(state, prevClose?.adjClose ?? null);
+  return { state, seedCutLimits: seedCutLimits(state, prevClose?.adjClose ?? null) };
 }
 
 /**
@@ -59,17 +64,16 @@ export type SeedChangeOutcome =
   | { status: "changed"; seed: SeedStatus }
   | {
       status: "needsConfirmation";
-      classification: "depends" | "ends";
+      classification: CycleEndingSeedChange;
       seedCutLimits: SeedCutLimits;
     };
 
 /**
  * 시드를 바꾼다. 새 시드는 오늘의 다음 거래일부터 쓰인다 (ADR-0005).
  *
- * 사이클 중 감액은 오늘의 사이클 상태로 감액 경계를 새로 계산해 분류한다. 사이클을 끝내거나
- * (ends) 오늘 체결에 따라 끝낼 수 있는(depends) 감액이면 confirmCycleEnd가 true일 때만 쓴다 -
- * 화면이 경계를 보인 뒤 주문표가 체결됐을 수 있어, 서버가 지금의 상태로 다시 묻게 한다.
- * 사이클 사이에는 묻지 않는다.
+ * 사이클 중 감액은 오늘의 사이클 상태로 감액 경계를 새로 계산해 분류하고, 사이클을 끝낼 수 있는
+ * 감액(mayEndCycle)이면 confirmCycleEnd가 true일 때만 쓴다 - 화면이 경계를 보인 뒤 주문표가
+ * 체결됐을 수 있어, 서버가 지금의 상태로 다시 묻게 한다. 사이클 사이에는 묻지 않는다.
  *
  * 분류와 쓰기는 한 트랜잭션이 아니다. 그 사이에 일일 마감이 끝나 보유가 바뀌어도 판정은
  * 적용일 주문표가 그날의 상태로 다시 하므로 규칙이 어긋나지 않는다 - 이 분류는 사용자에게
@@ -90,20 +94,18 @@ export async function changeSeed(
   const judged = await runInReadSnapshot(async (snapshot) => {
     const account = await getTradingAccountById(accountId, userId, snapshot);
     if (!account) return null;
-    const state = await loadCycleState(account, today, snapshot);
-    const limits = await loadSeedCutLimits(account, today, state, snapshot);
-    return {
-      limits,
-      classification: limits && classifySeedChange(state.cycleCapital, seedCapital, limits),
-    };
+    return loadCycleStateWithSeedCutLimits(account, today, snapshot);
   });
   if (!judged) {
     return null;
   }
 
-  const { limits, classification } = judged;
-  if (limits && (classification === "depends" || classification === "ends") && !confirmCycleEnd) {
-    return { status: "needsConfirmation", classification, seedCutLimits: limits };
+  const { state, seedCutLimits: limits } = judged;
+  if (limits && !confirmCycleEnd) {
+    const classification = classifySeedChange(state.cycleCapital, seedCapital, limits);
+    if (mayEndCycle(classification)) {
+      return { status: "needsConfirmation", classification, seedCutLimits: limits };
+    }
   }
 
   const seed = await changeSeedCapital(accountId, userId, seedCapital, today);

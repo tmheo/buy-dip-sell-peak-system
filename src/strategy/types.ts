@@ -225,8 +225,8 @@ export interface SeedCutLimits {
 }
 
 /**
- * 감액 경계로 본 시드 변경의 분류 (ADR-0006, #117). 규칙은 seed-cut.ts의 classifySeedChange 참고.
- * increase: 늘린다, keep: 사이클이 이어진다, depends: 오늘 매수가 체결되면 끝난다, ends: 끝난다
+ * 감액 경계로 본 시드 변경의 분류 (ADR-0006, #117). 각 분류의 뜻과 규칙은 seed-cut.ts의
+ * classifySeedChange 참고.
  */
 export type SeedChangeKind = "increase" | "keep" | "depends" | "ends";
 

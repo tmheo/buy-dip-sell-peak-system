@@ -14,8 +14,8 @@ export type { FreshDailyOrders } from "./orders";
 export { loadCycleState } from "./orders";
 
 // 시드 변경과 감액 경계 - 계좌 상세 화면과 시드 변경 API가 같은 경계를 쓴다 (ADR-0006)
-export { changeSeed, loadSeedCutLimits } from "./seed-change";
-export type { SeedChangeOutcome } from "./seed-change";
+export { changeSeed, loadCycleStateWithSeedCutLimits } from "./seed-change";
+export type { CycleStateWithSeedCutLimits, SeedChangeOutcome } from "./seed-change";
 
 // 체결·마감 처리
 export {

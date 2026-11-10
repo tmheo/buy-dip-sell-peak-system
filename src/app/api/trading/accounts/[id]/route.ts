@@ -28,7 +28,7 @@ import {
 import { UpdateTradingAccountSchema } from "@/lib/validations/trading";
 import { getTodayTradingDate } from "@/lib/date";
 import { cashBreakdown } from "@/strategy";
-import { loadCycleState, loadSeedCutLimits } from "@/trading";
+import { loadCycleStateWithSeedCutLimits } from "@/trading";
 
 /**
  * GET /api/trading/accounts/[id]
@@ -61,12 +61,11 @@ export async function GET(_request: Request, { params }: RouteParams): Promise<N
   const detail = await runInReadSnapshot(async (snapshot) => {
     const account = await getTradingAccountWithHoldings(id, userId, snapshot);
     if (!account) return null;
-    const [state, latestClose, seed] = await Promise.all([
-      loadCycleState(account, today, snapshot),
+    const [{ state, seedCutLimits }, latestClose, seed] = await Promise.all([
+      loadCycleStateWithSeedCutLimits(account, today, snapshot),
       getLatestClose(account.ticker, snapshot),
       getSeedStatus(account, today, snapshot),
     ]);
-    const seedCutLimits = await loadSeedCutLimits(account, today, state, snapshot);
     return { account: { ...account, seed }, state, latestClose, seedCutLimits };
   });
 

@@ -60,7 +60,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed", () => {
   }
 
   async function seedOn(id: string, date: string): Promise<number> {
-    return trading.getSeedCapitalOn(id, date);
+    return (await trading.getSeedCapitalAndCutOn({ id, ticker: "SOXL" }, date)).seedCapital;
   }
 
   beforeAll(async () => {
@@ -245,7 +245,7 @@ describe.skipIf(!hasDb)("PUT /api/trading/accounts/[id]/seed - 사이클 중 감
 
   /** 다음 거래일(2009-12-07, 월)부터 쓰일 시드 */
   async function nextSeed(id: string): Promise<number> {
-    return trading.getSeedCapitalOn(id, "2009-12-07");
+    return (await trading.getSeedCapitalAndCutOn({ id, ticker: "SOXL" }, "2009-12-07")).seedCapital;
   }
 
   beforeAll(async () => {

@@ -47,12 +47,12 @@ export {
   changeSeedCapital,
   changeSeedHistory,
   getSeedCapitalAndCutOn,
-  getSeedCapitalOn,
   getSeedStatus,
   seedCapitalAndCutOn,
   seedCapitalOn,
   seedStatus,
 } from "./seed-capital";
+export type { SeedCapitalAndCut } from "./seed-capital";
 
 // DailyOrder CRUD
 export {

@@ -19,7 +19,7 @@ import { db, type DbExecutor } from "../db-drizzle";
 import * as schema from "../schema";
 import { users } from "../schema/auth";
 import { dailyPrices } from "../schema/index";
-import type { CreateTradingAccountRequest } from "@/types/trading";
+import type { CreateTradingAccountRequest, Ticker } from "@/types/trading";
 
 const TEST_USER_ID = randomUUID();
 const OTHER_USER_ID = randomUUID();
@@ -51,6 +51,11 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
   let otherClient: postgres.Sql;
   let otherDb: ReturnType<typeof drizzle<typeof schema>>;
 
+  /** 그날 사이클 상태가 쓰는 시드 */
+  async function seedOn(account: { id: string; ticker: Ticker }, date: string): Promise<number> {
+    return (await trading.getSeedCapitalAndCutOn(account, date)).seedCapital;
+  }
+
   beforeAll(async () => {
     await db
       .insert(users)
@@ -81,7 +86,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       appliedToday: null,
     });
     // 운용 시작일(2009-06-01)은 만든 날보다 앞이다
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-01")).toBe(10_000);
+    expect(await seedOn(account, "2009-06-01")).toBe(10_000);
   });
 
   it("바꾼 시드는 오늘이 아니라 다음 거래일부터 쓰인다", async () => {
@@ -94,8 +99,8 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       pending: { seedCapital: 3_000, effectiveDate: "2009-06-08" },
       appliedToday: null,
     });
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-05")).toBe(10_000);
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-08")).toBe(3_000);
+    expect(await seedOn(account, "2009-06-05")).toBe(10_000);
+    expect(await seedOn(account, "2009-06-08")).toBe(3_000);
   });
 
   it("적용 전 변경을 다시 바꾸면 덮어쓰고, 지금 시드로 되돌리면 지운다", async () => {
@@ -117,7 +122,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
       "2009-06-02"
     );
     expect(reverted).toEqual({ current: 10_000, pending: null, appliedToday: null });
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(10_000);
+    expect(await seedOn(account, "2009-06-03")).toBe(10_000);
   });
 
   it("보유 티어가 있어도 시드를 바꾼다 - 사이클 중 변경 (ADR-0004, #117)", async () => {
@@ -132,7 +137,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
     const changed = await trading.changeSeedCapital(account.id, TEST_USER_ID, 3_000, "2009-06-02");
 
     expect(changed?.pending).toEqual({ seedCapital: 3_000, effectiveDate: "2009-06-03" });
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(3_000);
+    expect(await seedOn(account, "2009-06-03")).toBe(3_000);
   });
 
   it("다른 사용자의 계좌는 바꾸지 않는다", async () => {
@@ -141,7 +146,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
     expect(
       await trading.changeSeedCapital(account.id, OTHER_USER_ID, 3_000, "2009-06-02")
     ).toBeNull();
-    expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(10_000);
+    expect(await seedOn(account, "2009-06-03")).toBe(10_000);
   });
 
   it("같은 계좌의 동시 변경은 차례로 처리되어 적용 전 줄을 하나만 남긴다", async () => {

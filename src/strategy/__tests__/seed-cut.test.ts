@@ -16,6 +16,8 @@ import {
   cashBreakdown,
   classifySeedChange,
   endsCycleBySeedCut,
+  isCycleInProgress,
+  mayEndCycle,
   planOrdersDetailed,
   seedCutLimits,
 } from "@/strategy";
@@ -201,6 +203,24 @@ describe("classifySeedChange - 시드 변경의 분류", () => {
     const zero = { closedCash: 0, cashIfTodayBuyFills: 0 };
 
     expect(classifySeedChange(10_000, 9_999.99, zero)).toBe("ends");
+  });
+});
+
+describe("mayEndCycle - 사이클을 끝낼 수 있어 확인을 받는 분류", () => {
+  it.each([
+    ["increase", false],
+    ["keep", false],
+    ["depends", true],
+    ["ends", true],
+  ] as const)("%s는 %s", (kind, expected) => {
+    expect(mayEndCycle(kind)).toBe(expected);
+  });
+});
+
+describe("isCycleInProgress - 사이클 중인지", () => {
+  it("보유 티어가 있으면 사이클 중이고, 없으면 사이클 사이다", () => {
+    expect(isCycleInProgress(createState({ holdings: TIERS_1_TO_5 }))).toBe(true);
+    expect(isCycleInProgress(createState({ holdings: [] }))).toBe(false);
   });
 });
 

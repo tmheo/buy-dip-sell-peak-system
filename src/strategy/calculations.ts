@@ -7,6 +7,7 @@
  */
 import Decimal from "decimal.js";
 import { floorToDecimal } from "@/utils/decimal";
+import { isCycleInProgress } from "./cycle";
 import type { CashBreakdown, CycleState, TierCash, TierHolding } from "./types";
 import { BASE_TIER_COUNT, MIN_TIER_NUMBER, RESERVE_TIER_NUMBER } from "./types";
 
@@ -161,12 +162,12 @@ function unclampedAvailableCash(state: CycleState): Decimal {
  *
  * 판정은 사이클 상태만으로 정해지므로, 신선도 판정이 주문표를 다시 만들어도 같은 답이 나온다.
  * capitalCut이 0이면 옛 규칙으로 계좌 현금이 음수가 된 상태여도 모두 팔지 않는다.
- * 팔 보유 티어가 없으면 끝낼 사이클도 없다.
+ * 사이클 사이(보유 티어가 없을 때)에는 끝낼 사이클도 없다.
  *
  * @param state - 사이클 상태 (그 거래일의 사이클 자본과 직전 거래일 마감 시점의 보유)
  */
 export function endsCycleBySeedCut(state: CycleState): boolean {
-  return state.capitalCut > 0 && state.holdings.length > 0 && unclampedAvailableCash(state).lt(0);
+  return state.capitalCut > 0 && isCycleInProgress(state) && unclampedAvailableCash(state).lt(0);
 }
 
 /**

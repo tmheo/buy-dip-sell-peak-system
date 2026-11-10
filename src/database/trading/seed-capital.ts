@@ -20,7 +20,7 @@ import { getPreviousTradingClose } from "./orders";
 
 /**
  * 어느 날의 시드 - 적용일이 그날 이하인 가장 최근 줄, 없으면 첫 줄.
- * 첫 시드는 첫 변경 전의 모든 날짜에 쓰인다. 그래서 사이클 시작일이 계좌를 만든 날보다
+ * 첫 시드는 첫 변경 전의 모든 날짜에 쓰인다. 그래서 운용 시작일이 계좌를 만든 날보다
  * 앞이든 뒤든 이력을 고칠 일이 없다.
  *
  * @param history - 계좌의 시드 이력 (순서는 상관없다)
@@ -34,8 +34,14 @@ export function seedCapitalOn(history: readonly SeedHistoryEntry[], date: string
   const sorted = [...history].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
   const applied = sorted.filter((entry) => entry.effectiveDate <= date);
   // 적용된 줄이 없으면 첫 줄을 쓴다. 첫 줄의 적용일은 계좌를 만든 날이지만, 이 대체 덕분에
-  // 사이클 시작일이 그보다 앞서도 첫 시드가 사이클 시작일부터 쓰인다(ADR-0005).
+  // 운용 시작일이 그보다 앞서도 첫 시드가 운용 시작일부터 쓰인다(ADR-0005).
   return (applied.at(-1) ?? sorted[0]).seedCapital;
+}
+
+/** 어느 거래일의 시드(그날의 사이클 자본)와, 그날 줄어든 사이클 자본 (ADR-0006) */
+export interface SeedCapitalAndCut {
+  seedCapital: number;
+  capitalCut: number;
 }
 
 /**
@@ -52,7 +58,7 @@ export function seedCapitalAndCutOn(
   history: readonly SeedHistoryEntry[],
   date: string,
   previousTradingDate: string | null
-): { seedCapital: number; capitalCut: number } {
+): SeedCapitalAndCut {
   const seedCapital = seedCapitalOn(history, date);
   if (previousTradingDate === null) {
     return { seedCapital, capitalCut: 0 };
@@ -155,20 +161,6 @@ export async function insertInitialSeed(
 }
 
 /**
- * 어느 날의 시드 - 그날 주문표·체결의 사이클 자본이다.
- *
- * @param date - 기준일 (주문표 날짜 또는 체결 처리일, YYYY-MM-DD)
- * @param executor - 같은 시점에서 함께 읽을 실행자 (runInReadSnapshot 등)
- */
-export async function getSeedCapitalOn(
-  accountId: string,
-  date: string,
-  executor: DbExecutor = db
-): Promise<number> {
-  return seedCapitalOn(await getSeedHistory(accountId, executor), date);
-}
-
-/**
  * 어느 날의 시드와 그날 줄어든 사이클 자본 (seedCapitalAndCutOn) - 그날 사이클 상태의 입력이다.
  * 이력과 직전 거래일을 같은 실행자로 읽는다.
  *
@@ -180,7 +172,7 @@ export async function getSeedCapitalAndCutOn(
   account: Pick<TradingAccount, "id" | "ticker">,
   date: string,
   executor: DbExecutor = db
-): Promise<{ seedCapital: number; capitalCut: number }> {
+): Promise<SeedCapitalAndCut> {
   const [history, previousClose] = await Promise.all([
     getSeedHistory(account.id, executor),
     getPreviousTradingClose(account.ticker, date, executor),

@@ -14,13 +14,14 @@ import {
 } from "@/lib/api-utils";
 import { getTodayTradingDate } from "@/lib/date";
 import { ChangeSeedCapitalSchema } from "@/lib/validations/trading";
+import type { CycleEndingSeedChange } from "@/strategy";
 import { changeSeed } from "@/trading";
 
 /** 확인이 필요한 감액의 409 문구 */
-const CONFIRMATION_MESSAGES = {
+const CONFIRMATION_MESSAGES: Record<CycleEndingSeedChange, string> = {
   ends: "이 감액은 적용일에 보유 티어를 모두 팔아 사이클을 끝냅니다. 확인한 뒤 다시 보내 주세요",
   depends: "오늘 매수가 체결되면 이 감액은 적용일에 사이클을 끝냅니다. 확인한 뒤 다시 보내 주세요",
-} as const;
+};
 
 /**
  * PUT /api/trading/accounts/[id]/seed
@@ -30,9 +31,9 @@ const CONFIRMATION_MESSAGES = {
  * 이미 증권사에 냈을 수 있어 옛 시드로 체결한다. 지금 시드를 보내면 적용 전 변경을 되돌린다.
  *
  * 사이클 중에도 받는다 (ADR-0004). 사이클 중 감액은 서버가 감액 경계를 새로 계산해 분류하고,
- * 사이클을 끝내거나(ends) 오늘 체결에 따라 끝낼 수 있는(depends) 감액인데 confirmCycleEnd가
- * true가 아니면 409 { error, classification, seedCutLimits }로 거절한다 - 오래 열려 있던 화면이
- * 사용자에게 지금의 경계로 다시 묻게 하려는 것이다.
+ * 사이클을 끝낼 수 있는 감액(src/strategy의 mayEndCycle)인데 confirmCycleEnd가 true가 아니면
+ * 409 { error, classification, seedCutLimits }로 거절한다 - 오래 열려 있던 화면이 사용자에게
+ * 지금의 경계로 다시 묻게 하려는 것이다.
  */
 export async function PUT(request: Request, { params }: RouteParams): Promise<NextResponse> {
   const userId = await getAuthUserId();

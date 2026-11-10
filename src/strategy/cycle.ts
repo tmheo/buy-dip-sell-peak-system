@@ -7,6 +7,16 @@
 import type { CycleState, StrategyParams } from "./types";
 
 /**
+ * 사이클 중인지 - 보유 티어가 하나라도 있으면 사이클 중이다.
+ * 보유 티어를 모두 팔면 사이클이 끝나고, 다음 사이클은 첫 매수로 시작된다.
+ *
+ * @param state - 사이클 상태
+ */
+export function isCycleInProgress(state: Pick<CycleState, "holdings">): boolean {
+  return state.holdings.length > 0;
+}
+
+/**
  * 새 사이클 시작
  * CYCLE_COMPLETED 이벤트를 받은 호출자가 다음 사이클 자본을 공급하며 호출한다.
  * 이번 사이클 실현손익은 0으로 되돌린다 (ADR-0003).
@@ -21,7 +31,7 @@ export function startNextCycle(
   cycleCapital: number,
   strategy: StrategyParams = state.strategy
 ): CycleState {
-  if (state.holdings.length > 0) {
+  if (isCycleInProgress(state)) {
     throw new Error(`Cannot start next cycle: ${state.holdings.length} active tier(s) remaining`);
   }
   if (cycleCapital <= 0) {
