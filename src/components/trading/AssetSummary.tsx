@@ -47,6 +47,10 @@ function FormulaRow({
   );
 }
 
+/**
+ * 자산 현황 카드. 총자산·수량·평가금·예수금·투자비중을 보인다.
+ * 값은 calculateAssetValues와 cashBreakdown에서 받아 그대로 그린다.
+ */
 export default function AssetSummary({
   ticker,
   totalShares,

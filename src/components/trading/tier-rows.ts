@@ -43,6 +43,14 @@ export interface TierRow {
   sellTarget: number | "MOC" | null;
 }
 
+/**
+ * 보유 현황의 티어별 표시 값을 만든다. 티어 순서와 금액은 cashBreakdown.tiers를 그대로 따른다.
+ *
+ * @param holdings - 계좌의 티어 보유 (account.holdings)
+ * @param strategy - 계좌의 전략. 티어 비율을 읽는다
+ * @param cash - 계좌 상세 응답의 현금 내역 (티어 금액, 축소 여부, 시드 감액으로 사이클을 끝내는 날인지)
+ * @returns 기본 티어와 예비 티어의 표시 값
+ */
 export function buildTierRows(
   holdings: TierHolding[],
   strategy: Strategy,

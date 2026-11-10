@@ -145,6 +145,12 @@ function SettlementBreakdown({
   );
 }
 
+/**
+ * 계좌 설정 카드. 읽기 모드에서는 설정과 새 시드가 쓰인 뒤의 안내를, 편집 모드에서는 입력 칸을 보인다.
+ *
+ * @param endsCycleBySeedCut - 오늘이 시드 감액으로 사이클을 끝내는 날인지 (cashBreakdown)
+ * @param seedCutSettlement - 앞 사이클의 시드 감액 정산. 앞 사이클이 시드 감액으로 끝나지 않았으면 null
+ */
 export default function AccountSettingsCard({
   account,
   endsCycleBySeedCut,

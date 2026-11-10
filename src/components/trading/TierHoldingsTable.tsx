@@ -82,6 +82,10 @@ function AllocatedSeedCell({ row }: { row: TierRow }): React.ReactElement {
   );
 }
 
+/**
+ * 보유 현황 카드. 데스크톱은 표, 휴대폰은 티어별 카드로 같은 티어 줄(buildTierRows)을 그린다.
+ * 축소 안내(reductionNotice)가 있으면 표 아래에 한 줄 보인다.
+ */
 export default function TierHoldingsTable({
   holdings,
   strategy,
