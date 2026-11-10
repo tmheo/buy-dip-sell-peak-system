@@ -1,7 +1,7 @@
 /**
  * 시드 이력 저장 테스트 (ADR-0005, #116)
  *
- * 계좌를 만들 때 첫 줄을 쓰고, 시드 변경은 다음 평일을 적용일로 한 줄을 쓴다.
+ * 계좌를 만들 때 첫 줄을 쓰고, 시드 변경은 다음 거래일을 적용일로 한 줄을 쓴다.
  * 오늘은 서버의 UTC 날짜지만, 테스트는 날짜를 정해 넘긴다.
  *
  * 화면용 읽기(getSeedStatus)의 "오늘 처음 적용됐나"는 가격 행 기준 직전 거래일로 판정하므로,
@@ -43,7 +43,7 @@ async function waitUntilWaitingForLock(executor: DbExecutor, pid: number): Promi
     }
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  throw new Error("앱 연결이 잠금을 기다리지 않았다");
+  throw new Error("이 서버의 연결이 잠금을 기다리지 않았다");
 }
 
 describe.skipIf(!hasDb)("시드 이력 저장", () => {
@@ -84,7 +84,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
     expect(await trading.getSeedCapitalOn(account.id, "2009-06-01")).toBe(10_000);
   });
 
-  it("바꾼 시드는 오늘이 아니라 다음 평일부터 쓰인다", async () => {
+  it("바꾼 시드는 오늘이 아니라 다음 거래일부터 쓰인다", async () => {
     const account = await trading.createTradingAccount(TEST_USER_ID, REQUEST, "2009-06-01");
 
     const seed = await trading.changeSeedCapital(account.id, TEST_USER_ID, 3_000, "2009-06-05");
@@ -120,7 +120,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
     expect(await trading.getSeedCapitalOn(account.id, "2009-06-03")).toBe(10_000);
   });
 
-  it("보유 티어가 있으면 시드를 바꾸지 않는다 - 사이클 중 변경은 아직 열지 않았다", async () => {
+  it("보유 티어가 있으면 시드를 바꾸지 않는다 - 사이클 중 변경(ADR-0004)은 #117에서 연다", async () => {
     const account = await trading.createTradingAccount(TEST_USER_ID, REQUEST, "2009-06-01");
     await trading.updateTierHolding(account.id, 1, {
       buyPrice: 100,
@@ -148,7 +148,7 @@ describe.skipIf(!hasDb)("시드 이력 저장", () => {
     const [{ pid }] = await db.execute<{ pid: number }>(sql`select pg_backend_pid() as pid`);
     let appChange: ReturnType<typeof trading.changeSeedCapital> | undefined;
 
-    // 다른 인스턴스의 변경이 커밋 전인 동안 이 인스턴스가 같은 계좌의 시드를 바꾼다
+    // 다른 서버의 변경이 커밋 전인 동안 이 서버가 같은 계좌의 시드를 바꾼다
     await otherDb.transaction(async (tx) => {
       await trading.changeSeedCapital(account.id, TEST_USER_ID, 5_000, "2009-06-02", tx);
       appChange = trading.changeSeedCapital(account.id, TEST_USER_ID, 3_000, "2009-06-02");

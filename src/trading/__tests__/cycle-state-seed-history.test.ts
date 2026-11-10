@@ -1,7 +1,7 @@
 /**
  * 주문표·체결이 그날의 시드로 사이클 자본을 정하는지 검증한다 (ADR-0005, #116)
  *
- * 바꾼 시드는 바꾼 날의 다음 평일 주문표부터 쓰인다. 사용자는 바꾼 날의 주문표를 이미
+ * 바꾼 시드는 바꾼 날의 다음 거래일 주문표부터 쓰인다. 사용자는 바꾼 날의 주문표를 이미
  * 증권사에 냈을 수 있으므로, 그 주문표는 신선도 판정에서도 다시 만들어지면 안 되고,
  * 밀린 지난 날짜를 따라잡을 때도 날짜마다 그날의 시드로 처리해야 한다.
  *
@@ -92,7 +92,7 @@ describe.skipIf(!hasDb)("그날의 시드로 만드는 주문표와 체결", () 
     }
   });
 
-  it("오늘 바꾼 시드는 이미 만든 오늘 주문표를 바꾸지 않고 다음 평일 주문표부터 쓰인다", async () => {
+  it("오늘 바꾼 시드는 이미 만든 오늘 주문표를 바꾸지 않고 다음 거래일 주문표부터 쓰인다", async () => {
     const account = await storage.createTradingAccount(TEST_USER_ID, REQUEST, CREATED_ON);
     // 사용자가 오늘 주문표를 보고 증권사에 주문을 낸 뒤 시드를 바꾼다
     const placed = await trading.getFreshDailyOrders(account, CHANGED_ON);

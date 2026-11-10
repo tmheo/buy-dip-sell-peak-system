@@ -2,7 +2,7 @@
  * 시드 이력 (ADR-0005, #116)
  *
  * 시드 금액은 적용일이 붙은 이력으로 남는다. 바꾼 시드는 바꾼 날(서버의 UTC 날짜)의
- * 다음 평일 주문표부터 쓰이고, 그 전까지의 주문표와 체결은 옛 시드로 한다.
+ * 다음 거래일 주문표부터 쓰이고, 그 전까지의 주문표와 체결은 옛 시드로 한다.
  * 어느 날의 사이클 자본은 언제나 이 이력에서 그날의 시드를 읽는다 - 계좌에 "지금 시드"를
  * 두지 않아, 지난 날짜에 지금 시드를 쓰는 길이 구조로 막힌다.
  */
@@ -34,12 +34,15 @@ export function seedCapitalOn(history: readonly SeedHistoryEntry[], date: string
 
   const sorted = [...history].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
   const applied = sorted.filter((entry) => entry.effectiveDate <= date);
+  // 적용된 줄이 없으면 첫 줄을 쓴다. 첫 줄의 적용일은 계좌를 만든 날이지만, 이 대체 덕분에
+  // 사이클 시작일이 그보다 앞서도 첫 시드가 사이클 시작일부터 쓰인다(ADR-0005).
   return (applied.at(-1) ?? sorted[0]).seedCapital;
 }
 
 /**
  * 시드를 바꾼 뒤의 이력.
- * 적용일은 오늘의 다음 평일이다 - 휴장일은 알 수 없으므로 주말만 건너뛴다.
+ * 적용일은 오늘의 다음 거래일이다. 앞으로의 휴장일은 알 수 없으므로 주말만 건너뛴다 -
+ * 적용일이 휴장일이면 그다음 거래일이 실제 첫 적용일이 된다(seedStatus).
  * 적용 전 줄(적용일이 오늘 뒤)은 많아야 하나이고, 새 변경이 그 줄을 지우고 쓴다.
  * 새 시드가 오늘의 시드와 같으면 적용 전 줄만 지운다(되돌리기).
  * 오늘 이하의 줄은 이미 주문표에 쓰였을 수 있으므로 고치지 않는다.
@@ -101,7 +104,7 @@ async function getSeedHistory(
     .orderBy(asc(seedCapitalHistory.effectiveDate));
 }
 
-/** 이력과 가격 행 기준 직전 거래일로 화면용 시드 상태를 만든다 (내부 헬퍼) */
+/** 이력과 가격 행 기준 직전 거래일로 화면용 시드 상태를 만든다 */
 async function toSeedStatus(
   history: SeedHistoryEntry[],
   ticker: TradingAccount["ticker"],
@@ -159,14 +162,15 @@ export async function getSeedStatus(
 }
 
 /**
- * 시드를 바꾼다 (한 트랜잭션). 새 시드는 오늘의 다음 평일부터 쓰인다(changeSeedHistory).
+ * 시드를 바꾼다 (한 트랜잭션). 새 시드는 오늘의 다음 거래일부터 쓰인다(changeSeedHistory).
  *
  * 쓰는 줄은 언제나 적용일이 오늘 뒤인 줄뿐이다. 일일 마감은 어제까지, 화면 진입은 오늘까지
  * 읽으므로 이미 쓰였을 수 있는 줄은 건드리지 않는다.
  * 같은 계좌의 동시 변경은 계좌 행 잠금으로 차례를 세운다 - 나중 변경은 먼저 커밋된 변경을
  * 보고 그 위에 덮어쓴다. (계좌, 적용일) 유일 제약은 이 잠금을 거치지 않는 쓰기까지 막는다.
  *
- * 사이클 중 변경은 아직 열지 않았으므로 보유 티어가 있으면 CycleInProgressError를 던진다.
+ * 사이클 중 변경(ADR-0004)은 #117에서 연다. 그때까지는 보유 티어가 있으면
+ * CycleInProgressError를 던진다.
  *
  * @param seedCapital - 새 시드 (검증은 호출 경로가 마쳤다)
  * @param today - 바꾼 날 (서버의 UTC 날짜, YYYY-MM-DD)

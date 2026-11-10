@@ -157,7 +157,7 @@ export const profitRecords = pgTable(
 /**
  * seed_capital_history 테이블
  * 계좌의 시드 금액 이력 - 줄마다 적용일부터 쓰이는 시드 (ADR-0005)
- * 계좌를 만들 때 첫 줄(적용일 = 만든 날)을 쓰고, 시드를 바꾸면 다음 평일을 적용일로 쓴다.
+ * 계좌를 만들 때 첫 줄(적용일 = 만든 날)을 쓰고, 시드를 바꾸면 다음 거래일을 적용일로 쓴다.
  * 한 계좌에 같은 적용일은 하나뿐이다 - 같은 계좌의 동시 변경이 두 줄을 남기지 않는다.
  */
 export const seedCapitalHistory = pgTable(
